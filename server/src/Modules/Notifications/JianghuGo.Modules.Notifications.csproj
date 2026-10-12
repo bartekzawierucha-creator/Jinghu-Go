@@ -8,6 +8,7 @@
     <!-- Consumes other modules' published event contracts only (via the outbox). -->
     <ProjectReference Include="../Identity/JianghuGo.Modules.Identity.csproj" />
     <ProjectReference Include="../Characters/JianghuGo.Modules.Characters.csproj" />
+    <ProjectReference Include="../Combat/JianghuGo.Modules.Combat.csproj" />
     <ProjectReference Include="../Cultivation/JianghuGo.Modules.Cultivation.csproj" />
   </ItemGroup>
 </Project>

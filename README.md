@@ -12,8 +12,9 @@ Serwer jest jedynym autorytetem — klient wysyła intencje, nigdy wyniki.
 | 2 | Konto i postać: rejestracja, logowanie, sesje, losowanie postaci, rerolle, blokady, finalizacja, klient Unity (rdzeń) | ✅ serwer + rdzeń klienta przetestowane; skrypty Unity tylko sprawdzone typowo |
 | — | Adapter PostgreSQL (SERIALIZABLE + ponawianie), migrator w C# | ✅ cały zestaw testów przechodzi na PostgreSQL i in-memory |
 | 3 | Kultywacja (medytacja, kroki, noc trucizn, przełomy, odchylenie Qi), transactional outbox, Worker, powiadomienia | ✅ (ścieżka Płomienia bez 12 punktów GPS — Etap 5) |
-| 4 | Walka turowa | ⏳ następny |
-| 5–8 | Świat/GPS, ekonomia, sekty, wydanie | ⏳ |
+| 4 | Walka turowa 1v1 (PvE, PvP), 8 slotów, techniki 1–10, nagrody przez outbox, replay i commit-reveal seeda | ✅ (Laboratorium Dao i zwoje → Etap 6; animacja widoku bocznego → klient) |
+| 5 | Świat i GPS | ⏳ następny |
+| 6–8 | Ekonomia, sekty, wydanie | ⏳ |
 
 Projekt **nie jest gotowy produkcyjnie** (brak testów obciążeniowych, odtwarzania backupu, bezpiecznego magazynu tokenów w kliencie) — patrz [raport weryfikacji](docs/status/verification-report.md).
 
@@ -47,7 +48,8 @@ Klient Unity: otwórz `client/JianghuGo.Unity` w Unity 6 LTS, utwórz pustą sce
 ```
 contracts/openapi/      kontrakt API (test kontraktowy pilnuje zgodności z serwerem)
 content/game-config/    reguły gry jako dane (walidowane przy starcie i w testach)
-server/src/             Domain · Application · Infrastructure · Modules/{Identity,Characters,Cultivation,Notifications} · Composition · Api · Worker
+server/src/             Domain · Application · Infrastructure · Modules/{Identity,Characters,Cultivation,Combat,Notifications} · Composition · Api · Worker
+tools/balance-simulator/ macierz zwycięstw AI vs AI na prawdziwym silniku walki
 server/tests/           TestKit · UnitTests · IntegrationTests (integracja, bezpieczeństwo, kontrakt, architektura, klient)
 client/                 Unity: Assets/Scripts/Core (czysty C#, testowany) + Assets/Scripts/Unity (UI, adaptery)
 database/               migracje SQL, migrator z sumami kontrolnymi, testy integralności

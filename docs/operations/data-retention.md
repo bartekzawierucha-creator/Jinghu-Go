@@ -9,6 +9,8 @@
 | rejestr Żetonów Losu | ekonomia | bez limitu (księgowość) | serwer |
 | `platform.outbox_messages` | dostarczanie zdarzeń | przetworzone: 7 dni; `dead`: do ręcznej analizy | serwer, operator |
 | `cultivation.breakthroughs` | audyt i odtwarzanie rzutów | bez limitu (mały wolumen) | serwer |
+| `combat.turns`, `combat.battles` | rozstrzyganie sporów, odtwarzanie walk | 180 dni po zakończeniu (do potwierdzenia) | uczestnicy walki, operator |
+| `combat.intents` | bieżąca tura | po rozstrzygnięciu tury redundantne z `combat.turns`; czyszczenie po 7 dniach | serwer |
 | `notifications.notifications` | powiadomienia w grze | 90 dni (do potwierdzenia) | właściciel konta |
 | lokalizacja (Etap 5) | walidacja eksploracji | **minimalna**: surowe próbki ≤ 24 h, potem tylko agregaty sesji | serwer |
 

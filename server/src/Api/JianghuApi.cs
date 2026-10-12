@@ -6,6 +6,7 @@ using JianghuGo.Composition;
 using JianghuGo.Infrastructure.Outbox;
 using JianghuGo.Infrastructure.Postgres;
 using JianghuGo.Modules.Characters.Api;
+using JianghuGo.Modules.Combat.Api;
 using JianghuGo.Modules.Cultivation.Api;
 using JianghuGo.Modules.Identity.Api;
 using JianghuGo.Modules.Notifications;
@@ -81,6 +82,7 @@ public static class JianghuApi
         app.MapIdentityEndpoints();
         app.MapCharacterEndpoints();
         app.MapCultivationEndpoints();
+        app.MapCombatEndpoints();
         app.MapNotificationEndpoints();
         return app;
     }

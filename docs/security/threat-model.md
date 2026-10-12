@@ -41,7 +41,12 @@ Status: ✅ zaimplementowane i przetestowane · 🟡 częściowo · ⏳ zaplanow
 ## Walka, GPS, komunikacja
 | ID | Zagrożenie | Kontrola | Status |
 |---|---|---|---|
-| T-CMB-* | Kolejność tur, powtórzone akcje, RNG klienta | Etap 4 (wzorce: version + idempotencja + `DeterministicRandom` z seedem serwera) | ⏳ |
+| T-CMB-1 | Klient ustawia obrażenia/wynik | Tylko intencja; nieznane pola → 400; rozstrzyganie wyłącznie na serwerze | ✅ (test #6) |
+| T-CMB-2 | Zła kolejność tur / akcja w cudzej walce | Numer tury musi się zgadzać; strona walki ustalana z tokena; cudze walki → 404 | ✅ (test #7) |
+| T-CMB-3 | Powtórzona / podwójna akcja | Idempotency-Key, PK `(battle, turn, side)`, tura rozstrzyga się raz | ✅ (test #8) |
+| T-CMB-4 | Manipulacja RNG / „ustawiona” walka przez serwer | Seed z CSPRNG, commit-reveal, pełny log tur — walkę odtworzy każdy | ✅ |
+| T-CMB-5 | Wymuszanie walkowerów / spam wyzwań | Wyzwania nie blokują postaci, maks. 3 oczekujące, wygasają po 10 min; walkower dopiero po 3 przegapionych turach | 🟡 |
+| T-CMB-6 | Farmienie Qi na NPC / win-trading PvP | Limit 20 nagradzanych zwycięstw PvE / 24 h; PvP bez nagród w Qi | ✅ |
 | T-GPS-* | Spoofing lokalizacji, teleportacja, farmienie | Etap 5: walidacja prędkości/dokładności/kolejności, scoring zamiast automatycznych kar, minimalizacja przechowywania | ⏳ |
 | T-COM-1 | Podsłuch | Klient release wymusza HTTPS (`UnityWebRequestTransport`); TLS terminowany na ingressie | 🟡 (ingress ⏳) |
 | T-COM-2 | Duże/zniekształcone żądania | Limit body 64 KiB, walidacja JSON → 400 | ✅ |

@@ -11,6 +11,9 @@ public interface ICharacterDirectory
 {
     /// <summary>The character if it exists AND belongs to <paramref name="accountId"/>; otherwise null.</summary>
     Task<CharacterSummary?> FindOwnedAsync(IUnitOfWork uow, AccountId accountId, Guid characterId, CancellationToken ct);
+
+    /// <summary>Any character (e.g. a PvP opponent). Character builds are public information in the game.</summary>
+    Task<CharacterSummary?> FindAsync(IUnitOfWork uow, Guid characterId, CancellationToken ct);
 }
 
 /// <summary>Integration events published by the Characters module.</summary>
@@ -25,9 +28,13 @@ internal sealed class CharacterDirectory(ICharacterRepository repo) : ICharacter
 {
     public async Task<CharacterSummary?> FindOwnedAsync(IUnitOfWork uow, AccountId accountId, Guid characterId, CancellationToken ct)
     {
+        var c = await FindAsync(uow, characterId, ct);
+        return c is null || c.AccountId != accountId ? null : c;
+    }
+
+    public async Task<CharacterSummary?> FindAsync(IUnitOfWork uow, Guid characterId, CancellationToken ct)
+    {
         var c = await repo.FindCharacterAsync(uow, new CharacterId(characterId), ct);
-        return c is null || c.AccountId != accountId
-            ? null
-            : new CharacterSummary(c.Id, c.AccountId, c.Name, c.Path, c.Stats.ToDictionary(s => s.Key, s => s.Value));
+        return c is null ? null : new CharacterSummary(c.Id, c.AccountId, c.Name, c.Path, c.Stats.ToDictionary(s => s.Key, s => s.Value));
     }
 }

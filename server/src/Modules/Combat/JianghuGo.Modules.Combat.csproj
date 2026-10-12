@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>JianghuGo.Modules.Combat</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../../Infrastructure/JianghuGo.Infrastructure.csproj" />
+    <!-- Allowed: Identity (claims), Characters.Contracts only. Rewards flow to Cultivation via outbox events. -->
+    <ProjectReference Include="../Identity/JianghuGo.Modules.Identity.csproj" />
+    <ProjectReference Include="../Characters/JianghuGo.Modules.Characters.csproj" />
+  </ItemGroup>
+</Project>

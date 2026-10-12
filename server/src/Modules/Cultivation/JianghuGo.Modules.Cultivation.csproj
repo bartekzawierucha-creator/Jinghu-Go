@@ -8,5 +8,6 @@
     <!-- Allowed: Identity (claims) and Characters.Contracts only. See docs/architecture/modules.md -->
     <ProjectReference Include="../Identity/JianghuGo.Modules.Identity.csproj" />
     <ProjectReference Include="../Characters/JianghuGo.Modules.Characters.csproj" />
+    <ProjectReference Include="../Combat/JianghuGo.Modules.Combat.csproj" />
   </ItemGroup>
 </Project>

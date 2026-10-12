@@ -10,6 +10,7 @@ namespace JianghuGo.Modules.Cultivation.Infrastructure;
 
 internal sealed class InMemoryCultivationRepository : ICultivationRepository
 {
+    private const string Rewards = "cultivation.reward_grants";
     private const string States = "cultivation.states";
     private const string Attempts = "cultivation.breakthroughs";
 
@@ -35,6 +36,15 @@ internal sealed class InMemoryCultivationRepository : ICultivationRepository
         var u = InMemoryUnitOfWork.From(uow);
         u.SetTable(Attempts, u.Table<Guid, BreakthroughAttempt>(Attempts).Add(attempt.Id, attempt));
         return Task.CompletedTask;
+    }
+
+    public Task<bool> TryRecordRewardAsync(IUnitOfWork uow, Guid sourceId, CharacterId characterId, long qi, DateTimeOffset at, CancellationToken ct)
+    {
+        var u = InMemoryUnitOfWork.From(uow);
+        var t = u.Table<(Guid, CharacterId), long>(Rewards);
+        if (t.ContainsKey((sourceId, characterId))) return Task.FromResult(false);
+        u.SetTable(Rewards, t.Add((sourceId, characterId), qi));
+        return Task.FromResult(true);
     }
 
     public Task<IReadOnlyList<BreakthroughAttempt>> ListBreakthroughsAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct)
@@ -83,6 +93,11 @@ internal sealed class PostgresCultivationRepository : ICultivationRepository
             "daily_date = $10, daily_meditation_qi = $11, daily_steps = $12, last_steps_report_at = $13, updated_at = $14 " +
             "WHERE character_id = $1 AND account_id = $2 AND path = $3 AND version = $15", ct, args) == 1;
     }
+
+    public async Task<bool> TryRecordRewardAsync(IUnitOfWork uow, Guid sourceId, CharacterId characterId, long qi, DateTimeOffset at, CancellationToken ct) =>
+        await PostgresUnitOfWork.From(uow).ExecuteAsync(
+            "INSERT INTO cultivation.reward_grants (source_id, character_id, qi, granted_at) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
+            ct, sourceId, characterId.Value, qi, at) == 1;
 
     public Task AddBreakthroughAsync(IUnitOfWork uow, BreakthroughAttempt a, CancellationToken ct) =>
         PostgresUnitOfWork.From(uow).ExecuteAsync(

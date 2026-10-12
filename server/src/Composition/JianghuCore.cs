@@ -5,6 +5,7 @@ using JianghuGo.Infrastructure.InMemory;
 using JianghuGo.Infrastructure.Outbox;
 using JianghuGo.Infrastructure.Postgres;
 using JianghuGo.Modules.Characters;
+using JianghuGo.Modules.Combat;
 using JianghuGo.Modules.Cultivation;
 using JianghuGo.Modules.Identity;
 using JianghuGo.Modules.Notifications;
@@ -32,6 +33,7 @@ public static class JianghuCore
         services.AddIdentityModule(configuration);
         services.AddCharactersModule(configuration);
         services.AddCultivationModule(configuration);
+        services.AddCombatModule(configuration);
         services.AddNotificationsModule(configuration);
         return services;
     }

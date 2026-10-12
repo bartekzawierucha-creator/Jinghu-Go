@@ -129,6 +129,25 @@ namespace JianghuGo.Client.Application
             SendAsync<BreakthroughResultDto>("POST", Cultivation(state.CharacterId) + "/breakthrough",
                 new { expectedVersion = state.Version }, true, NewIdempotencyKey(), ct);
 
+        // ---- combat -----------------------------------------------------------------------------
+
+        public Task<BattleDto> StartPveAsync(Guid characterId, string npcId, CancellationToken ct) =>
+            SendAsync<BattleDto>("POST", "/api/v1/combat/battles/pve", new { characterId, npcId }, true, NewIdempotencyKey(), ct);
+
+        public Task<BattleDto> ChallengeAsync(Guid characterId, Guid opponentCharacterId, CancellationToken ct) =>
+            SendAsync<BattleDto>("POST", "/api/v1/combat/battles/pvp", new { characterId, opponentCharacterId }, true, NewIdempotencyKey(), ct);
+
+        public Task<BattleDto> AcceptChallengeAsync(Guid battleId, CancellationToken ct) =>
+            SendAsync<BattleDto>("POST", "/api/v1/combat/battles/" + battleId + "/accept", null, true, null, ct);
+
+        public Task<BattleDto> GetBattleAsync(Guid battleId, CancellationToken ct) =>
+            SendAsync<BattleDto>("GET", "/api/v1/combat/battles/" + battleId, null, true, null, ct);
+
+        /// <summary>slot null = rest; direction only for the movement slot ("advance" / "retreat").</summary>
+        public Task<BattleDto> ActAsync(BattleDto battle, int? slot, string direction, CancellationToken ct) =>
+            SendAsync<BattleDto>("POST", "/api/v1/combat/battles/" + battle.Id + "/actions",
+                new { turn = battle.Turn, slot, direction }, true, NewIdempotencyKey(), ct);
+
         // ---- notifications ----------------------------------------------------------------------
 
         public Task<NotificationPageDto> GetNotificationsAsync(bool unreadOnly, int limit, Guid? before, CancellationToken ct) =>

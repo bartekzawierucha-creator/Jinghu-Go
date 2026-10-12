@@ -36,6 +36,37 @@ public static class NotificationTypes
     public const string Welcome = "welcome";
     public const string BreakthroughSucceeded = "breakthrough_succeeded";
     public const string BreakthroughFailed = "breakthrough_failed";
+    public const string PvpChallenge = "pvp_challenge";
+    public const string BattleWon = "battle_won";
+    public const string BattleLost = "battle_lost";
+    public const string BattleDraw = "battle_draw";
+}
+
+internal sealed class ChallengeReceivedHandler(INotificationRepository repo) : IOutboxHandler
+{
+    public string EventType => JianghuGo.Modules.Combat.Contracts.CombatEvents.ChallengeReceived;
+
+    public Task HandleAsync(IUnitOfWork uow, OutboxMessage message, CancellationToken ct)
+    {
+        var e = message.Payload<JianghuGo.Modules.Combat.Contracts.CombatEvents.ChallengeReceivedV1>();
+        return NotificationWriter.WriteOnceAsync(repo, uow, e.OpponentAccountId, NotificationTypes.PvpChallenge,
+            new { e.BattleId, e.ChallengerCharacterId, e.ChallengerName, e.OpponentCharacterId }, message, ct);
+    }
+}
+
+internal sealed class BattleFinishedHandler(INotificationRepository repo) : IOutboxHandler
+{
+    public string EventType => JianghuGo.Modules.Combat.Contracts.CombatEvents.BattleFinished;
+
+    public async Task HandleAsync(IUnitOfWork uow, OutboxMessage message, CancellationToken ct)
+    {
+        var e = message.Payload<JianghuGo.Modules.Combat.Contracts.CombatEvents.BattleFinishedV1>();
+        foreach (var p in e.Participants)
+        {
+            var type = p.Result switch { "won" => NotificationTypes.BattleWon, "lost" => NotificationTypes.BattleLost, _ => NotificationTypes.BattleDraw };
+            await NotificationWriter.WriteOnceAsync(repo, uow, p.AccountId, type, new { e.BattleId, e.Kind, e.NpcId, p.CharacterId, p.RewardQi }, message, ct);
+        }
+    }
 }
 
 internal static class NotificationWriter
@@ -151,6 +182,8 @@ public static class NotificationsModule
             services.AddSingleton<INotificationRepository, InMemoryNotificationRepository>();
 
         services.AddSingleton<IOutboxHandler, CharacterCreatedHandler>();
+        services.AddSingleton<IOutboxHandler, ChallengeReceivedHandler>();
+        services.AddSingleton<IOutboxHandler, BattleFinishedHandler>();
         services.AddSingleton<IOutboxHandler>(sp => new BreakthroughHandler(sp.GetRequiredService<INotificationRepository>(), CultivationEvents.BreakthroughSucceeded));
         services.AddSingleton<IOutboxHandler>(sp => new BreakthroughHandler(sp.GetRequiredService<INotificationRepository>(), CultivationEvents.BreakthroughFailed));
         return services;

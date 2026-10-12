@@ -138,3 +138,68 @@ namespace JianghuGo.Client.Application
         public Guid? NextBefore { get; set; }
     }
 }
+
+namespace JianghuGo.Client.Application
+{
+    public sealed class CombatSlotDto
+    {
+        public int Slot { get; set; }
+        public string Kind { get; set; }
+        public string TechniqueId { get; set; }
+        public string NamePl { get; set; }
+        public int Level { get; set; }
+        public int QiCost { get; set; }
+        public int Cooldown { get; set; }
+        public string Unavailable { get; set; }
+        public bool Usable => TechniqueId != null && Unavailable == null;
+    }
+
+    public sealed class FighterDto
+    {
+        public string Name { get; set; }
+        public int Hp { get; set; }
+        public int MaxHp { get; set; }
+        public int Qi { get; set; }
+        public int MaxQi { get; set; }
+    }
+
+    public sealed class TurnEventDto
+    {
+        public string Actor { get; set; }
+        public string Action { get; set; }
+        public string TechniqueId { get; set; }
+        public bool? Hit { get; set; }
+        public int Damage { get; set; }
+        public int Reflected { get; set; }
+        public int QiStolen { get; set; }
+        public string EffectApplied { get; set; }
+        public int Distance { get; set; }
+        public int HpA { get; set; }
+        public int HpB { get; set; }
+    }
+
+    public sealed class BattleDto
+    {
+        public Guid Id { get; set; }
+        public string Kind { get; set; }
+        public string Status { get; set; }
+        public string MySide { get; set; }
+        public int Turn { get; set; }
+        public int Distance { get; set; }
+        public DateTimeOffset Deadline { get; set; }
+        public FighterDto Me { get; set; }
+        public FighterDto Opponent { get; set; }
+        public List<CombatSlotDto> MySlots { get; set; } = new List<CombatSlotDto>();
+        public bool MyActionSubmitted { get; set; }
+        public bool OpponentActionSubmitted { get; set; }
+        public List<TurnEventDto> LastTurnEvents { get; set; } = new List<TurnEventDto>();
+        public string Result { get; set; }
+        public string NpcId { get; set; }
+        public string SeedHash { get; set; }
+        public string Seed { get; set; }
+        public long RewardQi { get; set; }
+
+        public bool IsActive => Status == "active";
+        public bool IsMine(TurnEventDto e) => e.Actor == MySide;
+    }
+}

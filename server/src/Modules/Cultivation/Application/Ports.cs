@@ -13,6 +13,9 @@ public interface ICultivationRepository
 
     Task AddBreakthroughAsync(IUnitOfWork uow, BreakthroughAttempt attempt, CancellationToken ct);
     Task<IReadOnlyList<BreakthroughAttempt>> ListBreakthroughsAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct);
+
+    /// <summary>Records a Qi grant from another module's event. False if this (source, character) was already granted.</summary>
+    Task<bool> TryRecordRewardAsync(IUnitOfWork uow, Guid sourceId, CharacterId characterId, long qi, DateTimeOffset at, CancellationToken ct);
 }
 
 /// <summary>Integration events published by Cultivation (consumed via the outbox).</summary>

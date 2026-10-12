@@ -7,12 +7,13 @@
 | `JianghuGo.Infrastructure` | Application, Domain |
 | `JianghuGo.Modules.Identity` | Infrastructure, Application, Domain |
 | `JianghuGo.Modules.Characters` | Identity (wyłącznie publiczne API: `JianghuClaims`), Infrastructure, Application, Domain |
-| `JianghuGo.Modules.Cultivation` | Characters (**tylko** `Characters.Contracts`), Identity (claims), Infrastructure, Application, Domain |
+| `JianghuGo.Modules.Combat` | Characters (**tylko** `Characters.Contracts`), Identity (claims), Infrastructure, Application, Domain |
+| `JianghuGo.Modules.Cultivation` | Characters.Contracts, Combat.Contracts (zdarzenie nagrody), Identity (claims), Infrastructure, Application, Domain |
 | `JianghuGo.Modules.Notifications` | zdarzenia publikowane przez Characters i Cultivation (konsumowane z outboxa), Identity (claims), Infrastructure, Application, Domain |
 | `JianghuGo.Composition` | wszystkie moduły — wspólna rejestracja usług dla hostów |
 | `JianghuGo.Api`, `JianghuGo.Worker` | Composition (hosty) |
 
-Reguły: brak cykli; moduł nie czyta tabel innego modułu; współpraca synchroniczna tylko przez kontrakty (`Characters.Contracts.ICharacterDirectory`), asynchroniczna przez zdarzenia z transactional outbox (ADR 0006). Test `Cross_module_usage_goes_through_published_contracts` pilnuje, by Cultivation/Notifications nie używały wewnętrznych typów Characters.
+Reguły: brak cykli; moduł nie czyta tabel innego modułu; współpraca synchroniczna tylko przez kontrakty (`Characters.Contracts.ICharacterDirectory`), asynchroniczna przez zdarzenia z transactional outbox (ADR 0006). Test `Cross_module_usage_goes_through_published_contracts` pilnuje, by moduły używały wyłącznie przestrzeni `*.Contracts` innych modułów.
 Wewnątrz modułu: `Domain/` (czyste reguły), `Application/` (przypadki użycia, porty), `Infrastructure/` (adaptery), `Api/` (endpointy).
 
 ## Status 14 modułów domenowych
@@ -22,7 +23,7 @@ Wewnątrz modułu: `Domain/` (czyste reguły), `Application/` (przypadki użycia
 | 1 | Identity | ✅ Etap 2 |
 | 2 | Characters | ✅ Etap 2 (tworzenie postaci; rozwój postaci w kolejnych etapach) |
 | 3 | Cultivation | ✅ Etap 3 (Płomień: punkty GPS w Etapie 5) |
-| 4 | Combat | Etap 4 |
+| 4 | Combat | ✅ Etap 4 (Laboratorium Dao i zwoje — Etap 6) |
 | 5 | Inventory | Etap 6 |
 | 6 | Crafting | Etap 6 |
 | 7 | Geolocation | Etap 5 |

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using JianghuGo.Client.Application;
@@ -162,6 +163,16 @@ namespace JianghuGo.Unity.Presentation
                 var r = await flow.BreakthroughAsync(_lifetime.Token);
                 SetStatus(r == null ? "Stan zmienił się na innym urządzeniu — odświeżono." : r.Success ? "Przełom udany!" : "Przełom nieudany — odchylenie Qi.");
             }));
+            foreach (var npc in new[] { ("training_dummy", "Manekin"), ("grey_wolf", "Szary Wilk"), ("mountain_bandit", "Bandyta") })
+            {
+                UiKit.ActionButton(s, "Walcz: " + npc.Item2, () => Run(async () =>
+                {
+                    var combat = new CombatFlow(_api);
+                    await combat.StartPveAsync(c.Id, npc.Item1, _lifetime.Token);
+                    ShowBattle(combat, c);
+                }));
+            }
+
             UiKit.ActionButton(s, "Powiadomienia", () => Run(async () =>
             {
                 var page = await _api.GetNotificationsAsync(true, 5, null, _lifetime.Token);
@@ -176,6 +187,49 @@ namespace JianghuGo.Unity.Presentation
             Run(() => flow.LoadAsync(_lifetime.Token));
         }
 
+        /// <summary>
+        /// Prototype battle screen: text timeline instead of the side-view pixel-art animation (Presentation layer only;
+        /// CombatFlow and the server protocol stay the same when the animated view replaces this).
+        /// </summary>
+        private void ShowBattle(CombatFlow combat, CharacterDto c)
+        {
+            var s = NewScreen("Pojedynek");
+            var header = UiKit.Label(s, string.Empty, 36);
+            var log = UiKit.Label(s, string.Empty, 28);
+            var buttons = new List<UnityEngine.UI.Button>();
+
+            void Render(BattleDto b)
+            {
+                header.text = b.Me.Name + "  HP " + b.Me.Hp + "/" + b.Me.MaxHp + "  Qi " + b.Me.Qi + "/" + b.Me.MaxQi +
+                              "\n" + b.Opponent.Name + "  HP " + b.Opponent.Hp + "/" + b.Opponent.MaxHp +
+                              "\nTura " + b.Turn + "   dystans " + b.Distance +
+                              (b.IsActive ? string.Empty : "\nWYNIK: " + b.Result + (b.RewardQi > 0 ? "  (+" + b.RewardQi + " Qi)" : string.Empty));
+                log.text = string.Join("\n", b.LastTurnEvents.Select(e =>
+                    (b.IsMine(e) ? "Ty" : "Wróg") + ": " + e.Action + (e.TechniqueId != null ? " " + e.TechniqueId : string.Empty) +
+                    (e.Hit == true ? " → " + e.Damage + " obrażeń" : e.Hit == false ? " → pudło" : string.Empty)));
+                for (var i = 0; i < buttons.Count; i++) buttons[i].interactable = b.IsActive && !b.MyActionSubmitted;
+            }
+
+            foreach (var slot in combat.Battle.MySlots.Where(x => x.TechniqueId != null))
+            {
+                var captured = slot;
+                if (captured.Kind == "movement")
+                {
+                    buttons.Add(UiKit.ActionButton(s, captured.NamePl + " (naprzód)", () => Run(() => combat.ActAsync(captured.Slot, "advance", _lifetime.Token))));
+                    buttons.Add(UiKit.ActionButton(s, captured.NamePl + " (odwrót)", () => Run(() => combat.ActAsync(captured.Slot, "retreat", _lifetime.Token))));
+                }
+                else
+                {
+                    buttons.Add(UiKit.ActionButton(s, captured.NamePl + " [" + captured.Kind + "]", () => Run(() => combat.ActAsync(captured.Slot, null, _lifetime.Token))));
+                }
+            }
+
+            buttons.Add(UiKit.ActionButton(s, "Odpoczynek (+Qi)", () => Run(() => combat.ActAsync(null, null, _lifetime.Token))));
+            UiKit.ActionButton(s, "Wróć", () => ShowCharacter(c));
+            combat.BattleChanged += Render;
+            Render(combat.Battle);
+        }
+
         private static string Describe(NotificationDto n)
         {
             switch (n.Type)
@@ -183,6 +237,10 @@ namespace JianghuGo.Unity.Presentation
                 case "welcome": return "Witaj w Jianghu!";
                 case "breakthrough_succeeded": return "Przełom udany.";
                 case "breakthrough_failed": return "Przełom nieudany.";
+                case "battle_won": return "Zwycięstwo w walce!";
+                case "battle_lost": return "Porażka w walce.";
+                case "battle_draw": return "Walka nierozstrzygnięta.";
+                case "pvp_challenge": return "Ktoś rzucił ci wyzwanie!";
                 default: return n.Type;
             }
         }
@@ -218,6 +276,9 @@ namespace JianghuGo.Unity.Presentation
                 case "insufficient_qi": return "Za mało Qi na przełom.";
                 case "qi_deviation_active": return "Odchylenie Qi — odpocznij przed kolejnym przełomem.";
                 case "meditation_in_progress": return "Najpierw zakończ medytację.";
+                case "out_of_range": return "Przeciwnik poza zasięgiem tej techniki.";
+                case "on_cooldown": return "Technika się odnawia.";
+                case "already_in_battle": return "Ta postać już walczy.";
                 default: return "Błąd: " + e.Code + (e.CorrelationId != null ? " (" + e.CorrelationId + ")" : string.Empty);
             }
         }

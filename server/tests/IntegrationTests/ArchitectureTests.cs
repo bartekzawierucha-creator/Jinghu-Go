@@ -14,8 +14,9 @@ public class ArchitectureTests
         ["JianghuGo.Infrastructure"] = ["JianghuGo.Application", "JianghuGo.Domain"],
         ["JianghuGo.Modules.Identity"] = ["JianghuGo.Infrastructure", "JianghuGo.Application", "JianghuGo.Domain"],
         ["JianghuGo.Modules.Characters"] = ["JianghuGo.Modules.Identity", "JianghuGo.Infrastructure", "JianghuGo.Application", "JianghuGo.Domain"],
-        ["JianghuGo.Modules.Cultivation"] = ["JianghuGo.Modules.Characters", "JianghuGo.Modules.Identity", "JianghuGo.Infrastructure", "JianghuGo.Application", "JianghuGo.Domain"],
-        ["JianghuGo.Modules.Notifications"] = ["JianghuGo.Modules.Cultivation", "JianghuGo.Modules.Characters", "JianghuGo.Modules.Identity", "JianghuGo.Infrastructure", "JianghuGo.Application", "JianghuGo.Domain"],
+        ["JianghuGo.Modules.Combat"] = ["JianghuGo.Modules.Characters", "JianghuGo.Modules.Identity", "JianghuGo.Infrastructure", "JianghuGo.Application", "JianghuGo.Domain"],
+        ["JianghuGo.Modules.Cultivation"] = ["JianghuGo.Modules.Combat", "JianghuGo.Modules.Characters", "JianghuGo.Modules.Identity", "JianghuGo.Infrastructure", "JianghuGo.Application", "JianghuGo.Domain"],
+        ["JianghuGo.Modules.Notifications"] = ["JianghuGo.Modules.Combat", "JianghuGo.Modules.Cultivation", "JianghuGo.Modules.Characters", "JianghuGo.Modules.Identity", "JianghuGo.Infrastructure", "JianghuGo.Application", "JianghuGo.Domain"],
     };
 
     [Fact]
@@ -36,17 +37,18 @@ public class ArchitectureTests
     [Fact]
     public void Cross_module_usage_goes_through_published_contracts()
     {
-        foreach (var consumer in new[] { "JianghuGo.Modules.Cultivation", "JianghuGo.Modules.Notifications" })
+        foreach (var consumer in new[] { "JianghuGo.Modules.Cultivation", "JianghuGo.Modules.Notifications", "JianghuGo.Modules.Combat" })
         {
             var asm = Assembly.Load(consumer);
             var used = asm.GetTypes()
                 .SelectMany(t => t.GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).Select(f => f.FieldType)
                     .Concat(t.GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).SelectMany(c => c.GetParameters()).Select(p => p.ParameterType)))
-                .Where(t => t.Namespace?.StartsWith("JianghuGo.Modules.Characters", StringComparison.Ordinal) == true)
+                .Where(t => t.Namespace?.StartsWith("JianghuGo.Modules.", StringComparison.Ordinal) == true && !t.Namespace.StartsWith(consumer, StringComparison.Ordinal)
+                            && !t.Namespace.StartsWith("JianghuGo.Modules.Identity", StringComparison.Ordinal))
                 .ToList();
             foreach (var t in used)
             {
-                Assert.Equal("JianghuGo.Modules.Characters.Contracts", t.Namespace, $"{consumer} depends on Characters internal type {t.FullName}");
+                Assert.True(t.Namespace!.EndsWith(".Contracts", StringComparison.Ordinal), $"{consumer} depends on another module's internal type {t.FullName}");
             }
         }
     }
