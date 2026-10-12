@@ -1,0 +1,27 @@
+# .NET
+bin/
+obj/
+*.user
+.vs/
+TestResults/
+
+# Unity (client/JianghuGo.Unity)
+client/JianghuGo.Unity/[Ll]ibrary/
+client/JianghuGo.Unity/[Tt]emp/
+client/JianghuGo.Unity/[Oo]bj/
+client/JianghuGo.Unity/[Bb]uild/
+client/JianghuGo.Unity/[Bb]uilds/
+client/JianghuGo.Unity/[Ll]ogs/
+client/JianghuGo.Unity/[Uu]ser[Ss]ettings/
+client/JianghuGo.Unity/*.csproj
+client/JianghuGo.Unity/*.sln
+
+# Secrets and local env
+.env
+*.pfx
+*.p12
+appsettings.*.local.json
+
+# OS / editors
+.DS_Store
+.idea/

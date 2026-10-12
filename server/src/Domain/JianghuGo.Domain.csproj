@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Shared kernel: zero dependencies. Every module may reference it; it references nothing. -->
+  <PropertyGroup>
+    <RootNamespace>JianghuGo.Domain</RootNamespace>
+  </PropertyGroup>
+</Project>

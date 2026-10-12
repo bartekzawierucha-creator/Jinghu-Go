@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>JianghuGo.Modules.Characters</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../../Infrastructure/JianghuGo.Infrastructure.csproj" />
+    <!-- Allowed dependency: Identity's public API surface (claims helpers). See docs/architecture/modules.md -->
+    <ProjectReference Include="../Identity/JianghuGo.Modules.Identity.csproj" />
+  </ItemGroup>
+</Project>

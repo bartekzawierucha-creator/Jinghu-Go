@@ -1,0 +1,9 @@
+{
+    "name": "JianghuGo.Unity",
+    "rootNamespace": "JianghuGo.Unity",
+    "references": ["JianghuGo.Client.Core", "UnityEngine.UI"],
+    "overrideReferences": true,
+    "precompiledReferences": ["Newtonsoft.Json.dll"],
+    "autoReferenced": true,
+    "noEngineReferences": false
+}

@@ -1,0 +1,9 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Cross-cutting application abstractions (unit of work, idempotency, audit). No infrastructure code. -->
+  <PropertyGroup>
+    <RootNamespace>JianghuGo.Application</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Domain/JianghuGo.Domain.csproj" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,265 @@
+openapi: 3.1.0
+info:
+  title: Jianghu Go API
+  version: 1.0.0-stage2
+  description: |
+    Authoritative game server API. Only endpoints implemented and covered by tests are listed here;
+    tests/IntegrationTests/ContractTests verifies that this file and the running server expose the
+    same set of routes. All timestamps are UTC ISO 8601. Errors are RFC 9457 application/problem+json
+    with a stable `code` extension and the request `correlationId`.
+servers:
+  - url: http://localhost:8080
+security:
+  - bearer: []
+tags:
+  - name: Operations
+  - name: Identity
+  - name: Characters
+paths:
+  /health/live:
+    get:
+      tags: [Operations]
+      security: []
+      summary: Liveness probe (process is up).
+      responses:
+        "200": { description: Healthy, content: { text/plain: { schema: { type: string } } } }
+  /health/ready:
+    get:
+      tags: [Operations]
+      security: []
+      summary: Readiness probe (storage reachable).
+      responses:
+        "200": { description: Healthy }
+        "503": { description: Unhealthy }
+  /api/v1/auth/register:
+    post:
+      tags: [Identity]
+      security: []
+      summary: Create an account. Rate limited per IP.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Credentials" }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/RegisterResponse" } } } }
+        "400": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "413": { description: Body larger than 64 KiB }
+        "429": { $ref: "#/components/responses/Problem" }
+  /api/v1/auth/login:
+    post:
+      tags: [Identity]
+      security: []
+      summary: Exchange credentials for an opaque token pair. Locks the account after repeated failures.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Credentials" }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/TokenPair" } } } }
+        "401": { $ref: "#/components/responses/Problem" }
+        "429": { $ref: "#/components/responses/Problem" }
+  /api/v1/auth/refresh:
+    post:
+      tags: [Identity]
+      security: []
+      summary: Rotate the token pair. Reusing a rotated refresh token revokes the whole session family.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/TokenPair" } } } }
+        "401": { $ref: "#/components/responses/Problem" }
+  /api/v1/auth/logout:
+    post:
+      tags: [Identity]
+      summary: Revoke the current session family (all tokens derived from this login).
+      responses:
+        "204": { description: Revoked }
+        "401": { description: Unauthenticated }
+  /api/v1/characters:
+    get:
+      tags: [Characters]
+      summary: List the caller's characters.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Character" } }
+  /api/v1/characters/{characterId}:
+    get:
+      tags: [Characters]
+      summary: Get one of the caller's characters. Other accounts' characters return 404.
+      parameters:
+        - { name: characterId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Character" } } } }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/drafts:
+    post:
+      tags: [Characters]
+      summary: Return the active draft or create one (free initial server roll; grants initial Destiny Tokens once).
+      responses:
+        "200": { description: Existing draft, content: { application/json: { schema: { $ref: "#/components/schemas/Draft" } } } }
+        "201": { description: New draft, content: { application/json: { schema: { $ref: "#/components/schemas/Draft" } } } }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/drafts/current:
+    get:
+      tags: [Characters]
+      summary: Get the active draft.
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Draft" } } } }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/drafts/{draftId}/reroll:
+    post:
+      tags: [Characters]
+      summary: Reroll unlocked traits and stats. Costs Destiny Tokens; idempotent per Idempotency-Key.
+      parameters:
+        - { name: draftId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [expectedVersion]
+              properties:
+                expectedVersion: { type: integer, description: Optimistic concurrency token from the draft. }
+                lockedCategories:
+                  type: array
+                  items: { type: string, enum: [background, bloodline, constitution] }
+      responses:
+        "200": { description: Rerolled (or replay of a previous identical request), content: { application/json: { schema: { $ref: "#/components/schemas/Draft" } } } }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/drafts/{draftId}/finalize:
+    post:
+      tags: [Characters]
+      summary: Turn the draft into a character with a name and cultivation path. Idempotent per Idempotency-Key.
+      parameters:
+        - { name: draftId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [expectedVersion, name, path]
+              properties:
+                expectedVersion: { type: integer }
+                name: { type: string, minLength: 2, maxLength: 24 }
+                path: { type: string, enum: [qi, body, flame, poison] }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/Character" } } } }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/game-config/character-creation:
+    get:
+      tags: [Characters]
+      summary: Public part of the character creation rules (trait catalogue, stat ranges, reroll costs).
+      responses:
+        "200": { description: OK }
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      description: Opaque access token (prefix jga_), 15 min lifetime.
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: { type: string, pattern: "^[A-Za-z0-9_-]{8,128}$" }
+  responses:
+    Problem:
+      description: Error
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+  schemas:
+    Problem:
+      type: object
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        code: { type: string, description: Stable machine-readable error code. }
+        correlationId: { type: string }
+    Credentials:
+      type: object
+      additionalProperties: false
+      required: [email, password]
+      properties:
+        email: { type: string, format: email, maxLength: 254 }
+        password: { type: string, minLength: 10, maxLength: 128 }
+    RegisterResponse:
+      type: object
+      properties:
+        accountId: { type: string, format: uuid }
+    TokenPair:
+      type: object
+      properties:
+        accessToken: { type: string }
+        accessTokenExpiresAt: { type: string, format: date-time }
+        refreshToken: { type: string }
+        refreshTokenExpiresAt: { type: string, format: date-time }
+    Trait:
+      type: object
+      properties:
+        id: { type: string }
+        category: { type: string, enum: [background, bloodline, constitution] }
+        rarity: { type: string, enum: [common, rare, epic, legendary, mythic] }
+        namePl: { type: string }
+        nameEn: { type: string }
+    Stat:
+      type: object
+      properties:
+        id: { type: string, enum: [strength, spirit, agility, constitution, insight, willpower, focus, elementalAffinity, fate] }
+        value: { type: integer }
+    Draft:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        version: { type: integer }
+        rulesVersion: { type: string }
+        traits: { type: array, items: { $ref: "#/components/schemas/Trait" } }
+        stats: { type: array, items: { $ref: "#/components/schemas/Stat" } }
+        rerollCount: { type: integer }
+        rerollsRemaining: { type: integer }
+        destinyTokens: { type: integer }
+        rerollBaseCost: { type: integer }
+        rerollCostPerLockedTrait: { type: integer }
+        maxLockedTraits: { type: integer }
+    Character:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        name: { type: string }
+        path: { type: string, enum: [qi, body, flame, poison] }
+        rulesVersion: { type: string }
+        traits: { type: array, items: { $ref: "#/components/schemas/Trait" } }
+        stats: { type: array, items: { $ref: "#/components/schemas/Stat" } }
+        createdAt: { type: string, format: date-time }

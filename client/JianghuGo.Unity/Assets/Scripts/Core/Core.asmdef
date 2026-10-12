@@ -1,0 +1,9 @@
+{
+    "name": "JianghuGo.Client.Core",
+    "rootNamespace": "JianghuGo.Client",
+    "references": [],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "noEngineReferences": true
+}

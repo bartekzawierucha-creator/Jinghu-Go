@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Compiles the engine-independent client code (Assets/Scripts/Core) outside Unity so it can be built and
+    tested against the real server in CI. Unity compiles the same files via Core.asmdef.
+    LangVersion 9 = the C# level Unity 6 supports; no records/init/file-scoped namespaces in Core.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <RootNamespace>JianghuGo.Client</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="JianghuGo.Unity/Assets/Scripts/Core/**/*.cs" />
+  </ItemGroup>
+</Project>

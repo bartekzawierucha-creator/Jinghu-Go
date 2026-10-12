@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Minimal test runner + assertions. Exists because NuGet (xUnit/NUnit/MSTest) is unreachable in the
+    environment where this repo was bootstrapped. Attribute/assert names mirror xUnit so the suite can be
+    migrated mechanically later (docs/decisions/0004-test-runner.md).
+  -->
+  <PropertyGroup>
+    <RootNamespace>JianghuGo.TestKit</RootNamespace>
+  </PropertyGroup>
+</Project>

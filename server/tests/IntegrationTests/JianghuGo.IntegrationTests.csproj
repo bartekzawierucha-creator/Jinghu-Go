@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- HTTP-level tests against the real pipeline on Kestrel (loopback, random port). Includes security and contract tests. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>JianghuGo.IntegrationTests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../TestKit/JianghuGo.TestKit.csproj" />
+    <ProjectReference Include="../../src/Api/JianghuGo.Api.csproj" />
+    <ProjectReference Include="../../../client/JianghuGo.Client.Core.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="../../../contracts/openapi/*.yaml" Link="contracts/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <RootNamespace>JianghuGo.Api</RootNamespace>
+    <UserSecretsId>jianghu-go-api</UserSecretsId>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Modules/Identity/JianghuGo.Modules.Identity.csproj" />
+    <ProjectReference Include="../Modules/Characters/JianghuGo.Modules.Characters.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="../../../content/game-config/**/*.json" Link="game-config/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

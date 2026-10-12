@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>JianghuGo.UnitTests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../TestKit/JianghuGo.TestKit.csproj" />
+    <ProjectReference Include="../../src/Modules/Characters/JianghuGo.Modules.Characters.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="../../../content/game-config/**/*.json" Link="game-config/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

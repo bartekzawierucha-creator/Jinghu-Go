@@ -1,0 +1,53 @@
+# Local development stack.  docker compose up --build
+# Secrets below are DEVELOPMENT-ONLY defaults; override via a git-ignored .env file.
+name: jianghu-go
+
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: jianghu
+      POSTGRES_USER: ${POSTGRES_USER:-jianghu}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-jianghu-dev}
+    ports: ["127.0.0.1:5432:5432"]
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d jianghu"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  migrate:
+    image: postgis/postgis:16-3.4
+    depends_on:
+      postgres: { condition: service_healthy }
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER:-jianghu}:${POSTGRES_PASSWORD:-jianghu-dev}@postgres:5432/jianghu
+    volumes: ["./database:/database:ro"]
+    entrypoint: ["bash", "/database/migrate.sh"]
+    restart: "no"
+
+  # Provisioned for distributed rate limiting / short-lived state (Stage 3+). Not used by the API yet.
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    ports: ["127.0.0.1:6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  api:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/api.Dockerfile
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      Storage__Provider: InMemory   # PostgreSQL adapter pending: docs/decisions/0002-storage-adapter.md
+    ports: ["127.0.0.1:8080:8080"]
+
+volumes:
+  pgdata:

@@ -1,0 +1,131 @@
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using JianghuGo.Api;
+using JianghuGo.Domain;
+using JianghuGo.TestKit;
+using Microsoft.AspNetCore.Builder;
+using Microsoft.AspNetCore.Hosting.Server;
+using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.AspNetCore.Http.Features;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+
+namespace JianghuGo.IntegrationTests;
+
+/// <summary>Starts the real API on a random loopback port with in-memory storage and a manual clock.</summary>
+public sealed class ApiHost : IAsyncDisposable
+{
+    private ApiHost(WebApplication app, HttpClient client, ManualTimeProvider clock)
+    {
+        App = app;
+        Client = client;
+        Clock = clock;
+    }
+
+    public WebApplication App { get; }
+    public HttpClient Client { get; }
+    public ManualTimeProvider Clock { get; }
+
+    public static async Task<ApiHost> StartAsync(Dictionary<string, string?>? settings = null)
+    {
+        var clock = new ManualTimeProvider(new DateTimeOffset(2026, 10, 12, 12, 0, 0, TimeSpan.Zero));
+        var app = JianghuApi.Create(["--urls", "http://127.0.0.1:0", "--environment", "Testing"], b =>
+        {
+            b.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["RateLimiting:AuthPermitsPerMinute"] = "10000",
+                ["RateLimiting:GlobalPermitsPerMinute"] = "100000",
+            });
+            if (settings is not null)
+            {
+                b.Configuration.AddInMemoryCollection(settings);
+            }
+
+            b.Services.AddSingleton<TimeProvider>(clock);
+            b.Logging.SetMinimumLevel(LogLevel.Warning);
+        });
+        await app.StartAsync();
+        var address = app.Services.GetRequiredService<IServer>().Features.GetRequiredFeature<IServerAddressesFeature>().Addresses.First();
+        return new ApiHost(app, new HttpClient { BaseAddress = new Uri(address) }, clock);
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        Client.Dispose();
+        await App.StopAsync();
+        await App.DisposeAsync();
+    }
+
+    public HttpClient NewClient() => new() { BaseAddress = Client.BaseAddress };
+
+    // ---- helpers -------------------------------------------------------------------------------
+
+    public const string Password = "correct-horse-battery";
+
+    public async Task<Player> RegisterAndLoginAsync(string? email = null)
+    {
+        email ??= $"p{Guid.NewGuid():N}@test.dev";
+        var reg = await Client.PostAsJsonAsync("/api/v1/auth/register", new { email, password = Password });
+        Assert.Equal(System.Net.HttpStatusCode.Created, reg.StatusCode, await reg.Content.ReadAsStringAsync());
+        var tokens = await LoginAsync(email, Password);
+        return new Player(this, email, tokens);
+    }
+
+    public async Task<JsonObject> LoginAsync(string email, string password)
+    {
+        var res = await Client.PostAsJsonAsync("/api/v1/auth/login", new { email, password });
+        Assert.Equal(System.Net.HttpStatusCode.OK, res.StatusCode, await res.Content.ReadAsStringAsync());
+        return await Json(res);
+    }
+
+    public static async Task<JsonObject> Json(HttpResponseMessage res) =>
+        JsonNode.Parse(await res.Content.ReadAsStringAsync())!.AsObject();
+}
+
+public sealed class Player(ApiHost host, string email, JsonObject tokens)
+{
+    public string Email { get; } = email;
+    public JsonObject Tokens { get; set; } = tokens;
+    public string AccessToken => Tokens["accessToken"]!.GetValue<string>();
+    public string RefreshToken => Tokens["refreshToken"]!.GetValue<string>();
+
+    public Task<HttpResponseMessage> SendAsync(HttpMethod method, string url, object? body = null, string? idempotencyKey = null, string? token = null)
+    {
+        var req = new HttpRequestMessage(method, url);
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", token ?? AccessToken);
+        if (idempotencyKey is not null) req.Headers.Add("Idempotency-Key", idempotencyKey);
+        if (body is not null) req.Content = JsonContent.Create(body);
+        return host.Client.SendAsync(req);
+    }
+
+    public Task<HttpResponseMessage> GetAsync(string url) => SendAsync(HttpMethod.Get, url);
+    public Task<HttpResponseMessage> PostAsync(string url, object? body = null, string? key = null) => SendAsync(HttpMethod.Post, url, body, key);
+
+    public async Task<JsonObject> CreateDraftAsync()
+    {
+        var res = await PostAsync("/api/v1/characters/drafts");
+        Assert.True(res.IsSuccessStatusCode, await res.Content.ReadAsStringAsync());
+        return await ApiHost.Json(res);
+    }
+
+    public async Task<JsonObject> CreateCharacterAsync(string name, string path = "qi")
+    {
+        var draft = await CreateDraftAsync();
+        var res = await PostAsync($"/api/v1/characters/drafts/{draft["id"]}/finalize",
+            new { expectedVersion = draft["version"]!.GetValue<int>(), name, path }, NewKey());
+        Assert.Equal(System.Net.HttpStatusCode.Created, res.StatusCode, await res.Content.ReadAsStringAsync());
+        return await ApiHost.Json(res);
+    }
+
+    public static string NewKey() => Guid.NewGuid().ToString("N");
+}
+
+internal static class JsonExt
+{
+    public static int Int(this JsonNode? node, string prop) => node![prop]!.GetValue<int>();
+    public static string Str(this JsonNode? node, string prop) => node![prop]!.GetValue<string>();
+    public static string Compact(this JsonNode node) => node.ToJsonString(new JsonSerializerOptions { WriteIndented = false });
+}

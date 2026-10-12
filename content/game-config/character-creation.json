@@ -1,0 +1,43 @@
+{
+  "rulesVersion": "char-creation-1",
+  "initialDestinyTokens": 10,
+  "maxCharactersPerAccount": 3,
+  "maxRerollsPerDraft": 50,
+  "reroll": { "baseCost": 1, "costPerLockedTrait": 2, "maxLockedTraits": 2 },
+  "name": { "minLength": 2, "maxLength": 24 },
+  "rarityWeights": { "common": 600, "rare": 250, "epic": 110, "legendary": 35, "mythic": 5 },
+  "paths": ["qi", "body", "flame", "poison"],
+  "stats": [
+    { "id": "strength",          "base": 10, "variance": 3, "min": 1, "max": 40 },
+    { "id": "spirit",            "base": 10, "variance": 3, "min": 1, "max": 40 },
+    { "id": "agility",           "base": 10, "variance": 3, "min": 1, "max": 40 },
+    { "id": "constitution",      "base": 10, "variance": 3, "min": 1, "max": 40 },
+    { "id": "insight",           "base": 10, "variance": 3, "min": 1, "max": 40 },
+    { "id": "willpower",         "base": 10, "variance": 3, "min": 1, "max": 40 },
+    { "id": "focus",             "base": 10, "variance": 3, "min": 1, "max": 40 },
+    { "id": "elementalAffinity", "base": 5,  "variance": 2, "min": 0, "max": 40 },
+    { "id": "fate",              "base": 5,  "variance": 2, "min": 0, "max": 40 }
+  ],
+  "traits": [
+    { "id": "bg_farmer_son",        "category": "background",   "rarity": "common",    "namePl": "Syn rolnika",              "nameEn": "Farmer's Son",            "modifiers": { "strength": 2, "constitution": 1 } },
+    { "id": "bg_street_urchin",     "category": "background",   "rarity": "common",    "namePl": "Uliczny włóczęga",         "nameEn": "Street Urchin",           "modifiers": { "agility": 2, "focus": 1 } },
+    { "id": "bg_scholar_family",    "category": "background",   "rarity": "rare",      "namePl": "Ród uczonych",             "nameEn": "Scholar Family",          "modifiers": { "insight": 3, "focus": 1 } },
+    { "id": "bg_escort_agency",     "category": "background",   "rarity": "epic",      "namePl": "Dziecko agencji eskorty",  "nameEn": "Escort Agency Heir",      "modifiers": { "strength": 2, "agility": 2, "willpower": 1 } },
+    { "id": "bg_fallen_sect_heir",  "category": "background",   "rarity": "legendary", "namePl": "Dziedzic upadłej sekty",   "nameEn": "Heir of a Fallen Sect",   "modifiers": { "spirit": 3, "willpower": 3, "fate": -1 } },
+    { "id": "bg_reincarnated_sage", "category": "background",   "rarity": "mythic",    "namePl": "Odrodzony mędrzec",        "nameEn": "Reincarnated Sage",       "modifiers": { "insight": 5, "spirit": 3, "fate": 2 } },
+
+    { "id": "bl_mortal",            "category": "bloodline",    "rarity": "common",    "namePl": "Krew śmiertelnika",        "nameEn": "Mortal Blood",            "modifiers": { "willpower": 1 } },
+    { "id": "bl_mountain_tribe",    "category": "bloodline",    "rarity": "common",    "namePl": "Krew górskiego plemienia", "nameEn": "Mountain Tribe Blood",    "modifiers": { "constitution": 2 } },
+    { "id": "bl_martial_clan",      "category": "bloodline",    "rarity": "rare",      "namePl": "Krew klanu wojowników",    "nameEn": "Martial Clan Blood",      "modifiers": { "strength": 2, "agility": 1 } },
+    { "id": "bl_spirit_fox",        "category": "bloodline",    "rarity": "epic",      "namePl": "Krew duchowego lisa",      "nameEn": "Spirit Fox Blood",        "modifiers": { "spirit": 3, "elementalAffinity": 2 } },
+    { "id": "bl_azure_dragon",      "category": "bloodline",    "rarity": "legendary", "namePl": "Krew lazurowego smoka",    "nameEn": "Azure Dragon Blood",      "modifiers": { "strength": 3, "spirit": 3, "elementalAffinity": 2 } },
+    { "id": "bl_primordial_phoenix","category": "bloodline",    "rarity": "mythic",    "namePl": "Krew pierwotnego feniksa", "nameEn": "Primordial Phoenix Blood","modifiers": { "spirit": 4, "constitution": 4, "fate": 2 } },
+
+    { "id": "co_ordinary",          "category": "constitution", "rarity": "common",    "namePl": "Zwyczajne ciało",          "nameEn": "Ordinary Body",           "modifiers": {} },
+    { "id": "co_sturdy_bones",      "category": "constitution", "rarity": "common",    "namePl": "Mocne kości",              "nameEn": "Sturdy Bones",            "modifiers": { "constitution": 2 } },
+    { "id": "co_clear_meridians",   "category": "constitution", "rarity": "rare",      "namePl": "Czyste meridiany",         "nameEn": "Clear Meridians",         "modifiers": { "spirit": 2, "focus": 1 } },
+    { "id": "co_yin_body",          "category": "constitution", "rarity": "epic",      "namePl": "Ciało Najwyższego Yin",    "nameEn": "Supreme Yin Body",        "modifiers": { "spirit": 3, "insight": 2 } },
+    { "id": "co_five_elements",     "category": "constitution", "rarity": "legendary", "namePl": "Ciało Pięciu Żywiołów",    "nameEn": "Five Elements Body",      "modifiers": { "elementalAffinity": 5, "spirit": 2 } },
+    { "id": "co_heaven_defying",    "category": "constitution", "rarity": "mythic",    "namePl": "Ciało przeciwne Niebu",    "nameEn": "Heaven-Defying Body",     "modifiers": { "strength": 3, "constitution": 3, "willpower": 3, "fate": 1 } }
+  ]
+}

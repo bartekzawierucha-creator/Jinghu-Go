@@ -1,0 +1,5 @@
+* text=auto eol=lf
+*.png binary
+*.psd binary
+*.unity merge=unityyamlmerge eol=lf
+*.prefab merge=unityyamlmerge eol=lf
