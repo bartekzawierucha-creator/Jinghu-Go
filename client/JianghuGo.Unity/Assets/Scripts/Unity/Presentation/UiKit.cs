@@ -53,6 +53,19 @@ namespace JianghuGo.Unity.Presentation
             return rt;
         }
 
+        /// <summary>A plain vertical list inside a screen (rebuilt by destroying its children).</summary>
+        public static RectTransform Column(Transform parent, string name)
+        {
+            var go = new GameObject(name, typeof(RectTransform), typeof(VerticalLayoutGroup));
+            go.transform.SetParent(parent, false);
+            var layout = go.GetComponent<VerticalLayoutGroup>();
+            layout.spacing = 12;
+            layout.childForceExpandHeight = false;
+            layout.childControlHeight = true;
+            layout.childControlWidth = true;
+            return (RectTransform)go.transform;
+        }
+
         public static Text Label(Transform parent, string text, int size = 40, Color? color = null)
         {
             var go = new GameObject("Label", typeof(RectTransform), typeof(Text), typeof(LayoutElement));

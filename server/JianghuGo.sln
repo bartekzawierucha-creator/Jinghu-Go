@@ -91,6 +91,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Market", "Market", "{03AAD4
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JianghuGo.Modules.Market", "src\Modules\Market\JianghuGo.Modules.Market.csproj", "{345D03BD-63FC-4444-936B-E3256C45134A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JianghuGo.UnityTypecheck", "..\tools\unity-typecheck\JianghuGo.UnityTypecheck.csproj", "{6F798D67-D28F-449D-AFDC-599BF66F239A}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -353,6 +355,18 @@ Global
 		{345D03BD-63FC-4444-936B-E3256C45134A}.Release|x64.Build.0 = Release|Any CPU
 		{345D03BD-63FC-4444-936B-E3256C45134A}.Release|x86.ActiveCfg = Release|Any CPU
 		{345D03BD-63FC-4444-936B-E3256C45134A}.Release|x86.Build.0 = Release|Any CPU
+		{6F798D67-D28F-449D-AFDC-599BF66F239A}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{6F798D67-D28F-449D-AFDC-599BF66F239A}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{6F798D67-D28F-449D-AFDC-599BF66F239A}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{6F798D67-D28F-449D-AFDC-599BF66F239A}.Debug|x64.Build.0 = Debug|Any CPU
+		{6F798D67-D28F-449D-AFDC-599BF66F239A}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{6F798D67-D28F-449D-AFDC-599BF66F239A}.Debug|x86.Build.0 = Debug|Any CPU
+		{6F798D67-D28F-449D-AFDC-599BF66F239A}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{6F798D67-D28F-449D-AFDC-599BF66F239A}.Release|Any CPU.Build.0 = Release|Any CPU
+		{6F798D67-D28F-449D-AFDC-599BF66F239A}.Release|x64.ActiveCfg = Release|Any CPU
+		{6F798D67-D28F-449D-AFDC-599BF66F239A}.Release|x64.Build.0 = Release|Any CPU
+		{6F798D67-D28F-449D-AFDC-599BF66F239A}.Release|x86.ActiveCfg = Release|Any CPU
+		{6F798D67-D28F-449D-AFDC-599BF66F239A}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

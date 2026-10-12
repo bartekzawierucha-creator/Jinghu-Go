@@ -273,5 +273,14 @@ namespace JianghuGo.Client.Application
         public string Kind { get; set; }
         public long RewardQi { get; set; }
         public Guid? BattleId { get; set; }
+
+        /// <summary>Materials gathered; they arrive in the bag shortly after (credited asynchronously by the server).</summary>
+        public List<GatheredItemDto> Items { get; set; } = new List<GatheredItemDto>();
+    }
+
+    public sealed class GatheredItemDto
+    {
+        public string ItemId { get; set; }
+        public int Quantity { get; set; }
     }
 }

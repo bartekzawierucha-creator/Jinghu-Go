@@ -18,3 +18,8 @@
 | `world.flame_attunements` | cooldown miejsc Płomienia | do usunięcia postaci (12 publicznych miejsc) | serwer |
 
 Zadania czyszczące: do dodania jako okresowe zadania Workera (Etap 8, razem z testami obciążeniowymi); indeksy pod nie już istnieją. Usunięcie konta z postaciami: blokowane przez FK (`ON DELETE RESTRICT`) — wymaga procedury anonimizacji (do zaprojektowania przed wydaniem).
+| rejestry `inventory.wallet_entries`, `inventory.stack_entries` | księgowość ekonomii, rekonsyliacja | bez limitu (partycjonowanie po czasie rozważane w Etapie 8) | serwer, operator |
+| `inventory.items`, `inventory.item_events` | własność i pochodzenie przedmiotów unikalnych | do usunięcia postaci | właściciel, operator |
+| `inventory.grants` | jednorazowość nagród z outboxa | 30 dni (dłużej niż retencja przetworzonych wiadomości) | serwer |
+| `crafting.log` | audyt i odtwarzanie rzutów | 180 dni (do potwierdzenia) | właściciel, operator |
+| `market.listings` | handel, spory | aktywne: do zamknięcia; zamknięte: 1 rok (do potwierdzenia) | strony transakcji, operator |

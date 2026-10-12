@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Type-checks the Unity-side client scripts (Assets/Scripts/Unity) outside Unity against UnityStubs.cs:
+    hand-written signatures of the small UnityEngine API surface the scripts use. It catches syntax, type and
+    C# 9 language-level errors in CI. It does NOT run the code and does NOT replace a build in the Unity Editor:
+    a stub signature can differ from the real engine API.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <DefineConstants>$(DefineConstants);UNITY_ANDROID</DefineConstants>
+    <NoWarn>$(NoWarn);CS0067;CS0649;CS0414</NoWarn>
+    <AnalysisLevel>none</AnalysisLevel>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="UnityStubs.cs" />
+    <Compile Include="../../client/JianghuGo.Unity/Assets/Scripts/Core/**/*.cs" />
+    <Compile Include="../../client/JianghuGo.Unity/Assets/Scripts/Unity/**/*.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+</Project>

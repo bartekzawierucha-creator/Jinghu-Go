@@ -12,9 +12,10 @@ Serwer jest jedynym autorytetem — klient wysyła intencje, nigdy wyniki.
 | 2 | Konto i postać: rejestracja, logowanie, sesje, losowanie postaci, rerolle, blokady, finalizacja, klient Unity (rdzeń) | ✅ serwer + rdzeń klienta przetestowane; skrypty Unity tylko sprawdzone typowo |
 | — | Adapter PostgreSQL (SERIALIZABLE + ponawianie), migrator w C# | ✅ cały zestaw testów przechodzi na PostgreSQL i in-memory |
 | 3 | Kultywacja (medytacja, kroki, noc trucizn, przełomy, odchylenie Qi), transactional outbox, Worker, powiadomienia | ✅ (ścieżka Płomienia bez 12 punktów GPS — Etap 5) |
-| 4 | Walka turowa 1v1 (PvE, PvP), 8 slotów, techniki 1–10, nagrody przez outbox, replay i commit-reveal seeda | ✅ (Laboratorium Dao i zwoje → Etap 6; animacja widoku bocznego → klient) |
+| 4 | Walka turowa 1v1 (PvE, PvP), 8 slotów, techniki 1–10, nagrody przez outbox, replay i commit-reveal seeda | ✅ (Laboratorium Dao i zwoje → następny krok; animacja widoku bocznego → klient) |
 | 5 | Świat i GPS: sesje eksploracji, walidacja próbek, proceduralne punkty, bestie → walka, 12 miejsc Płomienia, wydarzenia, minimalizacja danych lokalizacyjnych | ✅ (mapa w kliencie: abstrakcja + prototyp listy) |
-| 6 | Przedmioty i ekonomia | ⏳ następny |
+| 6 | Przedmioty i ekonomia: sakwa, ekwipunek (5 slotów), pigułki, łupy i materiały ze świata, rzemiosło (kucie, alchemia, ulepszanie +1…+15), targ z depozytem, opłatą i podatkiem, rekonsyliacja rejestrów | ✅ ([zasady](docs/game-design/economy.md), [ADR 0009](docs/decisions/0009-economy-ledgers.md)); ekrany Unity — prototyp |
+| 6+ | Laboratorium Dao, zwoje technik | ⏳ następny |
 | 7–8 | Sekty, wydanie | ⏳ |
 
 Projekt **nie jest gotowy produkcyjnie** (brak testów obciążeniowych, odtwarzania backupu, bezpiecznego magazynu tokenów w kliencie) — patrz [raport weryfikacji](docs/status/verification-report.md).
@@ -49,8 +50,9 @@ Klient Unity: otwórz `client/JianghuGo.Unity` w Unity 6 LTS, utwórz pustą sce
 ```
 contracts/openapi/      kontrakt API (test kontraktowy pilnuje zgodności z serwerem)
 content/game-config/    reguły gry jako dane (walidowane przy starcie i w testach)
-server/src/             Domain · Application · Infrastructure · Modules/{Identity,Characters,Cultivation,Combat,Geolocation,World,Notifications} · Composition · Api · Worker
+server/src/             Domain · Application · Infrastructure · Modules/{Identity,Characters,Cultivation,Combat,Geolocation,World,Inventory,Crafting,Market,Notifications} · Composition · Api · Worker
 tools/balance-simulator/ macierz zwycięstw AI vs AI na prawdziwym silniku walki
+tools/unity-typecheck/  kontrola typów skryptów Unity względem atrap API (bez uruchamiania)
 server/tests/           TestKit · UnitTests · IntegrationTests (integracja, bezpieczeństwo, kontrakt, architektura, klient)
 client/                 Unity: Assets/Scripts/Core (czysty C#, testowany) + Assets/Scripts/Unity (UI, adaptery)
 database/               migracje SQL, migrator z sumami kontrolnymi, testy integralności

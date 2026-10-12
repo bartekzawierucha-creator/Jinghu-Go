@@ -184,6 +184,70 @@ namespace JianghuGo.Client.Application
         public Task MarkNotificationReadAsync(Guid id, CancellationToken ct) =>
             SendAsync<object>("POST", "/api/v1/notifications/" + id + "/read", null, true, null, ct);
 
+        // ---- inventory --------------------------------------------------------------------------
+
+        private static string Inventory(Guid characterId) => "/api/v1/characters/" + characterId + "/inventory";
+
+        public Task<InventoryDto> GetInventoryAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<InventoryDto>("GET", Inventory(characterId), null, true, null, ct);
+
+        public Task<InventoryDto> EquipAsync(Guid characterId, ItemInstanceDto item, CancellationToken ct) =>
+            SendAsync<InventoryDto>("POST", Inventory(characterId) + "/equip", new { instanceId = item.Id, expectedVersion = item.Version }, true, null, ct);
+
+        public Task<InventoryDto> UnequipAsync(Guid characterId, ItemInstanceDto item, CancellationToken ct) =>
+            SendAsync<InventoryDto>("POST", Inventory(characterId) + "/unequip", new { instanceId = item.Id, expectedVersion = item.Version }, true, null, ct);
+
+        public Task<UseResultDto> UseItemAsync(Guid characterId, string itemId, int quantity, CancellationToken ct) =>
+            SendAsync<UseResultDto>("POST", Inventory(characterId) + "/use", new { itemId, quantity }, true, NewIdempotencyKey(), ct);
+
+        public Task<InventoryDto> DiscardStackAsync(Guid characterId, string itemId, int quantity, CancellationToken ct) =>
+            SendAsync<InventoryDto>("POST", Inventory(characterId) + "/discard", new { itemId, quantity, instanceId = (Guid?)null }, true, NewIdempotencyKey(), ct);
+
+        public Task<InventoryDto> DiscardItemAsync(Guid characterId, Guid instanceId, CancellationToken ct) =>
+            SendAsync<InventoryDto>("POST", Inventory(characterId) + "/discard", new { itemId = (string)null, quantity = 1, instanceId }, true, NewIdempotencyKey(), ct);
+
+        public Task<WalletPageDto> GetWalletAsync(Guid characterId, Guid? before, int limit, CancellationToken ct) =>
+            SendAsync<WalletPageDto>("GET", Inventory(characterId) + "/wallet?limit=" + limit + (before.HasValue ? "&before=" + before.Value : string.Empty), null, true, null, ct);
+
+        // ---- crafting ---------------------------------------------------------------------------
+
+        public Task<RecipeBookDto> GetRecipesAsync(CancellationToken ct) =>
+            SendAsync<RecipeBookDto>("GET", "/api/v1/crafting/recipes", null, true, null, ct);
+
+        public Task<CraftResultDto> CraftAsync(Guid characterId, string recipeId, int times, CancellationToken ct) =>
+            SendAsync<CraftResultDto>("POST", "/api/v1/characters/" + characterId + "/crafting/craft", new { recipeId, times }, true, NewIdempotencyKey(), ct);
+
+        public Task<UpgradeResultDto> UpgradeAsync(Guid characterId, ItemInstanceDto item, CancellationToken ct) =>
+            SendAsync<UpgradeResultDto>("POST", "/api/v1/characters/" + characterId + "/crafting/upgrade",
+                new { instanceId = item.Id, expectedVersion = item.Version }, true, NewIdempotencyKey(), ct);
+
+        // ---- market -----------------------------------------------------------------------------
+
+        public Task<MarketRulesDto> GetMarketRulesAsync(CancellationToken ct) =>
+            SendAsync<MarketRulesDto>("GET", "/api/v1/market/rules", null, true, null, ct);
+
+        public Task<ListingPageDto> BrowseMarketAsync(string itemId, Guid? before, int limit, CancellationToken ct) =>
+            SendAsync<ListingPageDto>("GET", "/api/v1/market/listings?limit=" + limit
+                + (itemId != null ? "&itemId=" + Uri.EscapeDataString(itemId) : string.Empty)
+                + (before.HasValue ? "&before=" + before.Value : string.Empty), null, true, null, ct);
+
+        public Task<ListingDto> ListStackAsync(Guid characterId, string itemId, long quantity, long price, CancellationToken ct) =>
+            SendAsync<ListingDto>("POST", "/api/v1/market/listings",
+                new { characterId, itemId, quantity, instanceId = (Guid?)null, expectedVersion = (int?)null, price }, true, NewIdempotencyKey(), ct);
+
+        public Task<ListingDto> ListItemAsync(Guid characterId, ItemInstanceDto item, long price, CancellationToken ct) =>
+            SendAsync<ListingDto>("POST", "/api/v1/market/listings",
+                new { characterId, itemId = (string)null, quantity = 1, instanceId = item.Id, expectedVersion = item.Version, price }, true, NewIdempotencyKey(), ct);
+
+        public Task<PurchaseResultDto> BuyAsync(Guid characterId, Guid listingId, CancellationToken ct) =>
+            SendAsync<PurchaseResultDto>("POST", "/api/v1/market/listings/" + listingId + "/buy", new { characterId }, true, NewIdempotencyKey(), ct);
+
+        public Task<ListingDto> CancelListingAsync(Guid characterId, Guid listingId, CancellationToken ct) =>
+            SendAsync<ListingDto>("POST", "/api/v1/market/listings/" + listingId + "/cancel", new { characterId }, true, null, ct);
+
+        public Task<MyListingPageDto> GetMyListingsAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<MyListingPageDto>("GET", "/api/v1/characters/" + characterId + "/market/listings", null, true, null, ct);
+
         // ---- plumbing ---------------------------------------------------------------------------
 
         public static string NewIdempotencyKey() => Guid.NewGuid().ToString("N");

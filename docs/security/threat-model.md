@@ -25,7 +25,12 @@ Status: ✅ zaimplementowane i przetestowane · 🟡 częściowo · ⏳ zaplanow
 | T-ECO-1 | Podwójne naliczenie przy ponowieniu | `Idempotency-Key` + zapis w tej samej transakcji | ✅ (test #2) |
 | T-ECO-2 | Wyścig równoległych operacji | `expectedVersion`; in-memory serializowalny; SQL: blokada wiersza salda w triggerze rejestru | ✅ |
 | T-ECO-3 | Ujemne saldo / manipulacja saldem | CHECK ≥ 0; saldo zmieniane wyłącznie przez trigger rejestru; wpisy niezmienne; widok rekonsyliacji | ✅ (`database/tests`) |
-| T-ECO-4 | Duplikacja przedmiotów, rynek | Etap 6 | ⏳ |
+| T-ECO-4 | Duplikacja przedmiotów przy równoległym zakupie | Wersja oferty + SERIALIZABLE; indeks: jedna aktywna oferta na przedmiot; wersja przedmiotu podnoszona o 1 (trigger) | ✅ (test #3 `Concurrent_buyers_of_a_unique_item_cannot_both_win`, 4 kupujących × 3 rundy) |
+| T-ECO-5 | Ujemne/zerowe ilości i ceny | Walidacja w API i w `InventoryLedger` (każdy moduł), CHECK `delta <> 0`, `quantity_after >= 0`, `price >= 1` | ✅ (test #4, `database/tests/005_economy.sql`) |
+| T-ECO-6 | Częściowe pobranie przy błędzie (np. brak miejsca po zabraniu składników) | Cała operacja w jednej transakcji; błąd biznesowy = brak commitu | ✅ (test #5: rzemiosło, targ, wystawienie) |
+| T-ECO-7 | Pranie waluty między własnymi postaciami przez targ | Zakaz zakupu oferty z tego samego konta (serwis + CHECK). Między różnymi kontami: opłata + podatek i audyt; wykrywanie sieci kont — moduł AntiAbuse (Etap 8) | 🟡 |
+| T-ECO-8 | Przewidywanie łupu przed walką | Ziarno łupu = f(id wiadomości outboxa), nieznane klientowi; nagradzane tylko zwycięstwa w dziennym limicie | ✅ |
+| T-ECO-9 | DoS przez kosztowną rekonsyliację | `/health/economy` buforuje wynik (skan najwyżej co 5 min); docelowo tylko sieć wewnętrzna | ✅ / ⏳ ingress |
 
 ## Kultywacja i zdarzenia
 | ID | Zagrożenie | Kontrola | Status |

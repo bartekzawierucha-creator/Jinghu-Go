@@ -182,6 +182,12 @@ namespace JianghuGo.Unity.Presentation
                 }));
             }
 
+            UiKit.ActionButton(s, "Sakwa i ekwipunek", () => Run(async () =>
+            {
+                var economy = new EconomyFlow(_api, c.Id);
+                await economy.LoadAsync(_lifetime.Token);
+                ShowBag(economy, c);
+            }));
             UiKit.ActionButton(s, "Powiadomienia", () => Run(async () =>
             {
                 var page = await _api.GetNotificationsAsync(true, 5, null, _lifetime.Token);
@@ -334,6 +340,132 @@ namespace JianghuGo.Unity.Presentation
             Render(combat.Battle);
         }
 
+        // ---- economy (prototype list screens; balances, chances and fees always come from the server) -----------
+
+        private void ShowBag(EconomyFlow economy, CharacterDto c)
+        {
+            var s = NewScreen("Sakwa — " + c.Name);
+            var summary = UiKit.Label(s, "…", 32);
+            var list = UiKit.Column(s, "Items");
+
+            void Render(InventoryDto inv)
+            {
+                summary.text = "Kamienie Duchowe: " + inv.Balance + "   Miejsca: " + inv.SlotsUsed + "/" + inv.Capacity +
+                               (inv.Bonuses.Count > 0 ? "\nBonusy: " + string.Join("  ", inv.Bonuses.Select(b => b.Key + " +" + b.Value)) : string.Empty);
+                foreach (Transform child in list) Destroy(child.gameObject);
+                foreach (var st in inv.Stacks)
+                {
+                    var stack = st;
+                    if (stack.Type == "consumable")
+                        UiKit.ActionButton(list, "Użyj: " + stack.NamePl + " ×" + stack.Quantity, () => Run(async () =>
+                        {
+                            var r = await economy.UseAsync(stack.ItemId, 1, _lifetime.Token);
+                            Render(economy.Inventory);
+                            SetStatus("+" + r.QiGranted + " Qi (wkrótce na koncie kultywacji)");
+                        }));
+                    else
+                        UiKit.Label(list, stack.NamePl + " ×" + stack.Quantity, 30);
+                }
+
+                foreach (var it in inv.Items)
+                {
+                    var item = it;
+                    var caption = (item.IsEquipped ? "[założone] " : item.State == "listed" ? "[na targu] " : string.Empty) +
+                                  item.NamePl + (item.UpgradeLevel > 0 ? " +" + item.UpgradeLevel : string.Empty) +
+                                  "  " + string.Join(" ", item.Stats.Select(x => x.Key + "+" + x.Value));
+                    if (item.State == "listed") { UiKit.Label(list, caption, 30); continue; }
+                    UiKit.ActionButton(list, caption, () => Run(async () =>
+                    {
+                        var ok = await economy.ToggleEquipAsync(item, _lifetime.Token);
+                        Render(economy.Inventory);
+                        if (!ok) SetStatus("Przedmiot zmienił się na innym urządzeniu — odświeżono.");
+                    }));
+                    var next = economy.NextUpgrade(item);
+                    if (next != null)
+                        UiKit.ActionButton(list, "  Ulepsz do +" + next.Level + " (" + next.Stones + " KD, " + next.SuccessPermille / 10 + "%)", () => Run(async () =>
+                        {
+                            var r = await economy.UpgradeAsync(item, _lifetime.Token);
+                            Render(economy.Inventory);
+                            SetStatus(r == null ? "Odświeżono." : r.Success ? "Udane! Teraz +" + r.Level : "Nieudane — poziom +" + r.Level + " zachowany.");
+                        }));
+                }
+            }
+
+            UiKit.ActionButton(s, "Rzemiosło i alchemia", () => ShowCrafting(economy, c));
+            UiKit.ActionButton(s, "Targ", () => Run(async () => await ShowMarketAsync(economy, c)));
+            UiKit.ActionButton(s, "Wróć", () => ShowCharacter(c));
+            Render(economy.Inventory);
+        }
+
+        private void ShowCrafting(EconomyFlow economy, CharacterDto c)
+        {
+            var s = NewScreen("Kuźnia i alchemia");
+            var balance = UiKit.Label(s, string.Empty, 32);
+            void Render(InventoryDto inv) => balance.text = "Kamienie Duchowe: " + inv.Balance;
+            Render(economy.Inventory);
+            foreach (var r in economy.Recipes.Items)
+            {
+                var recipe = r;
+                var inputs = string.Join(", ", recipe.Inputs.Select(i => i.Item + "×" + i.Quantity));
+                UiKit.ActionButton(s, recipe.Output.Item + " ← " + inputs + " + " + recipe.Stones + " KD" +
+                                      (recipe.Kind == "alchemy" ? " (" + recipe.SuccessPermille / 10 + "%+)" : string.Empty), () => Run(async () =>
+                {
+                    if (!economy.CanAfford(recipe, 1)) { SetStatus("Brakuje składników lub kamieni."); return; }
+                    var result = await economy.CraftAsync(recipe.Id, 1, _lifetime.Token);
+                    Render(economy.Inventory);
+                    SetStatus(result.Successes > 0 ? "Wytworzono: " + result.OutputItem : "Alchemia nie powiodła się — składniki przepadły.");
+                }));
+            }
+
+            UiKit.ActionButton(s, "Wróć do sakwy", () => ShowBag(economy, c));
+        }
+
+        private async System.Threading.Tasks.Task ShowMarketAsync(EconomyFlow economy, CharacterDto c)
+        {
+            var page = await economy.BrowseAsync(null, null, _lifetime.Token);
+            var mine = await economy.MyListingsAsync(_lifetime.Token);
+            var s = NewScreen("Targ");
+            var rules = economy.MarketRules;
+            UiKit.Label(s, "Opłata za wystawienie " + rules.ListingFeePermille / 10.0 + "% (min. " + rules.MinListingFee + "), podatek od sprzedaży " +
+                           rules.SaleTaxPermille / 10.0 + "%, oferta ważna " + rules.ListingHours + " h", 28);
+            foreach (var l in page.Items)
+            {
+                var listing = l;
+                if (listing.SellerCharacterId == c.Id) continue;
+                UiKit.ActionButton(s, "Kup: " + listing.ItemNamePl + (listing.UpgradeLevel > 0 ? " +" + listing.UpgradeLevel : string.Empty) +
+                                      " ×" + listing.Quantity + " — " + listing.Price + " KD (" + listing.SellerName + ")", () => Run(async () =>
+                {
+                    var bought = await economy.BuyAsync(listing, _lifetime.Token);
+                    SetStatus(bought == null ? "Ktoś był szybszy — oferta już nieaktualna." : "Kupiono za " + bought.Paid + " KD.");
+                    await ShowMarketAsync(economy, c);
+                }));
+            }
+
+            foreach (var m in mine.Where(x => x.Listing.Status == "active"))
+            {
+                var listing = m.Listing;
+                UiKit.ActionButton(s, (listing.Expired ? "Odbierz (wygasła): " : "Wycofaj: ") + listing.ItemNamePl + " ×" + listing.Quantity, () => Run(async () =>
+                {
+                    await economy.CancelAsync(listing, _lifetime.Token);
+                    await ShowMarketAsync(economy, c);
+                }));
+            }
+
+            // Prototype selling: the first sellable bag item at a typed price.
+            var price = UiKit.TextField(s, "Cena w Kamieniach Duchowych");
+            UiKit.ActionButton(s, "Wystaw pierwszy przedmiot z sakwy", () => Run(async () =>
+            {
+                if (!long.TryParse(price.text, out var p) || p < rules.MinPrice || p > rules.MaxPrice) { SetStatus("Podaj poprawną cenę."); return; }
+                var item = economy.Inventory.Items.FirstOrDefault(i => i.InBag);
+                var stack = economy.Inventory.Stacks.FirstOrDefault();
+                if (item != null) await economy.SellAsync(item, p, _lifetime.Token);
+                else if (stack != null) await economy.SellAsync(stack.ItemId, stack.Quantity, p, _lifetime.Token);
+                else { SetStatus("Sakwa jest pusta."); return; }
+                await ShowMarketAsync(economy, c);
+            }));
+            UiKit.ActionButton(s, "Wróć do sakwy", () => ShowBag(economy, c));
+        }
+
         private static string Describe(NotificationDto n)
         {
             switch (n.Type)
@@ -345,6 +477,7 @@ namespace JianghuGo.Unity.Presentation
                 case "battle_lost": return "Porażka w walce.";
                 case "battle_draw": return "Walka nierozstrzygnięta.";
                 case "pvp_challenge": return "Ktoś rzucił ci wyzwanie!";
+                case "market_sold": return "Sprzedano przedmiot na targu.";
                 default: return n.Type;
             }
         }
@@ -389,6 +522,15 @@ namespace JianghuGo.Unity.Presentation
                 case "too_far": return "Podejdź bliżej.";
                 case "already_harvested": return "Już to zebrałeś.";
                 case "attunement_cooldown": return "Płomień jeszcze się nie odnowił.";
+                case "insufficient_funds": return "Za mało Kamieni Duchowych.";
+                case "insufficient_items": return "Brakuje przedmiotów.";
+                case "bag_full": return "Sakwa jest pełna.";
+                case "stack_full": return "Stos osiągnął limit.";
+                case "item_listed": return "Przedmiot jest wystawiony na targu.";
+                case "item_not_in_bag": return "Najpierw zdejmij przedmiot.";
+                case "max_upgrade_level": return "Maksymalny poziom ulepszenia.";
+                case "own_listing": return "Nie możesz kupić własnej oferty.";
+                case "listing_limit": return "Za dużo aktywnych ofert.";
                 default: return "Błąd: " + e.Code + (e.CorrelationId != null ? " (" + e.CorrelationId + ")" : string.Empty);
             }
         }
