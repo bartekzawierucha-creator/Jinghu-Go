@@ -45,7 +45,7 @@ public class SecurityTests : IAsyncLifetime
     {
         string[] publicRoutes =
         [
-            "GET /health/live", "GET /health/ready",
+            "GET /health/live", "GET /health/ready", "GET /health/economy", // economy: cached scan, at most one per 5 min
             "POST /api/v1/auth/register", "POST /api/v1/auth/login", "POST /api/v1/auth/refresh",
         ];
         var endpoints = _host.App.Services.GetRequiredService<EndpointDataSource>().Endpoints.OfType<RouteEndpoint>().ToList();

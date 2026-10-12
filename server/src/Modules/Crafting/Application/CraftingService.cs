@@ -130,6 +130,7 @@ public sealed class CraftingService(
                 var item = await inventory.FindInstanceAsync(uow, cmd.InstanceId, ct);
                 if (item is null || item.CharacterId != c.Id.Value) return Error.NotFound("item_not_found", "Item not found.");
                 if (item.Version != cmd.ExpectedVersion) return Error.Conflict("version_conflict", "The item changed concurrently; reload and retry.");
+                if (item.State == "listed") return Error.Conflict("item_listed", "The item is listed on the market.");
                 if (item.UpgradeLevel >= config.Upgrade.MaxLevel) return Error.LimitReached("max_upgrade_level", $"The item is already +{config.Upgrade.MaxLevel}.");
 
                 var now = clock.GetUtcNow();

@@ -20,6 +20,9 @@ tags:
   - name: Combat
   - name: Exploration
   - name: World
+  - name: Inventory
+  - name: Crafting
+  - name: Market
 paths:
   /health/live:
     get:
@@ -36,6 +39,16 @@ paths:
       responses:
         "200": { description: Healthy }
         "503": { description: Unhealthy }
+  /health/economy:
+    get:
+      tags: [Operations]
+      security: []
+      summary: |
+        Economy reconciliation (every wallet and stack equals the sum of its ledger). Scans the ledgers: poll slowly
+        (e.g. every 5 min) and expose only on the internal network (see docs/operations/observability.md).
+      responses:
+        "200": { description: Healthy }
+        "503": { description: A projection disagrees with its ledger }
   /api/v1/auth/register:
     post:
       tags: [Identity]
@@ -735,6 +748,97 @@ paths:
         - { $ref: "#/components/parameters/CharacterId" }
         - { name: before, in: query, required: false, schema: { type: string, format: uuid } }
         - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200 } }
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/market/rules:
+    get:
+      tags: [Market]
+      summary: Market rules (listing fee, sale tax, price range, listing lifetime, per-character listing limit).
+      responses:
+        "200": { description: OK }
+  /api/v1/market/listings:
+    get:
+      tags: [Market]
+      summary: Buyable listings, newest first (?itemId=&before=<listing id>&limit=1-100). Expired listings are hidden.
+      parameters:
+        - { name: itemId, in: query, required: false, schema: { type: string } }
+        - { name: before, in: query, required: false, schema: { type: string, format: uuid } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+    post:
+      tags: [Market]
+      summary: |
+        List a whole lot: a stack (itemId + quantity) or one unique item (instanceId + expectedVersion). The goods go into
+        escrow and the non-refundable listing fee is charged in the same transaction.
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [characterId, price]
+              properties:
+                characterId: { type: string, format: uuid }
+                itemId: { type: [string, "null"] }
+                quantity: { type: integer, minimum: 1 }
+                instanceId: { type: [string, "null"], format: uuid }
+                expectedVersion: { type: [integer, "null"] }
+                price: { type: integer, minimum: 1 }
+      responses:
+        "201": { description: Listed }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/market/listings/{listingId}:
+    get:
+      tags: [Market]
+      summary: One listing (any status).
+      parameters: [{ name: listingId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/market/listings/{listingId}/buy:
+    post:
+      tags: [Market]
+      summary: |
+        Buy a listing: price from the buyer, price minus tax to the seller, goods out of escrow, all in one transaction.
+        Of concurrent buyers exactly one succeeds; the others get 409 listing_unavailable.
+      parameters: [{ name: listingId, in: path, required: true, schema: { type: string, format: uuid } }, { $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, additionalProperties: false, required: [characterId], properties: { characterId: { type: string, format: uuid } } } } }
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/market/listings/{listingId}/cancel:
+    post:
+      tags: [Market]
+      summary: Seller withdraws an active or expired listing; goods return from escrow (fee not refunded).
+      parameters: [{ name: listingId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, additionalProperties: false, required: [characterId], properties: { characterId: { type: string, format: uuid } } } } }
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/market/listings:
+    get:
+      tags: [Market]
+      summary: The character's own listings in every status, with fee, tax and proceeds.
+      parameters:
+        - { $ref: "#/components/parameters/CharacterId" }
+        - { name: before, in: query, required: false, schema: { type: string, format: uuid } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100 } }
       responses:
         "200": { description: OK }
         "404": { $ref: "#/components/responses/Problem" }

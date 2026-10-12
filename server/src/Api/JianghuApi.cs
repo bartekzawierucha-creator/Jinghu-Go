@@ -11,6 +11,7 @@ using JianghuGo.Modules.Crafting.Api;
 using JianghuGo.Modules.Cultivation.Api;
 using JianghuGo.Modules.Geolocation.Api;
 using JianghuGo.Modules.Inventory.Api;
+using JianghuGo.Modules.Market.Api;
 using JianghuGo.Modules.World.Api;
 using JianghuGo.Modules.Identity.Api;
 using JianghuGo.Modules.Notifications;
@@ -68,7 +69,8 @@ public static class JianghuApi
 
         services.AddHealthChecks()
             .AddCheck<StorageHealthCheck>("storage", tags: ["ready"])
-            .AddCheck<OutboxHealthCheck>("outbox", tags: ["ready"]);
+            .AddCheck<OutboxHealthCheck>("outbox", tags: ["ready"])
+            .AddCheck<JianghuGo.Modules.Inventory.Application.EconomyHealthCheck>("economy", tags: ["economy"]);
 
         var app = builder.Build();
 
@@ -83,6 +85,8 @@ public static class JianghuApi
             .WithMetadata(new HttpMethodMetadata(["GET"]));
         app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = c => c.Tags.Contains("ready") })
             .WithMetadata(new HttpMethodMetadata(["GET"]));
+        app.MapHealthChecks("/health/economy", new HealthCheckOptions { Predicate = c => c.Tags.Contains("economy") })
+            .WithMetadata(new HttpMethodMetadata(["GET"]));
         app.MapIdentityEndpoints();
         app.MapCharacterEndpoints();
         app.MapCultivationEndpoints();
@@ -91,6 +95,7 @@ public static class JianghuApi
         app.MapWorldEndpoints();
         app.MapInventoryEndpoints();
         app.MapCraftingEndpoints();
+        app.MapMarketEndpoints();
         app.MapNotificationEndpoints();
         return app;
     }

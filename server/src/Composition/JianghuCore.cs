@@ -10,6 +10,7 @@ using JianghuGo.Modules.Crafting;
 using JianghuGo.Modules.Cultivation;
 using JianghuGo.Modules.Geolocation;
 using JianghuGo.Modules.Inventory;
+using JianghuGo.Modules.Market;
 using JianghuGo.Modules.World;
 using JianghuGo.Modules.Identity;
 using JianghuGo.Modules.Notifications;
@@ -38,6 +39,7 @@ public static class JianghuCore
         services.AddCharactersModule(configuration);
         services.AddInventoryModule(configuration);
         services.AddCraftingModule(configuration);
+        services.AddMarketModule(configuration);
         services.AddCultivationModule(configuration);
         services.AddCombatModule(configuration);
         services.AddGeolocationModule(configuration);

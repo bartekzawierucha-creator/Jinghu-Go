@@ -18,6 +18,9 @@ public class OperationsTests : IAsyncLifetime
         var ready = await _host.Client.GetAsync(new Uri("/health/ready", UriKind.Relative));
         Assert.Equal(HttpStatusCode.OK, ready.StatusCode);
         Assert.Equal("Healthy", await ready.Content.ReadAsStringAsync());
+        var economy = await _host.Client.GetAsync(new Uri("/health/economy", UriKind.Relative));
+        Assert.Equal(HttpStatusCode.OK, economy.StatusCode);
+        Assert.Equal("Healthy", await economy.Content.ReadAsStringAsync());
     }
 
     [Fact]

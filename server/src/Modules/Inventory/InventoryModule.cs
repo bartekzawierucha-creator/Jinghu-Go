@@ -41,6 +41,7 @@ public static class InventoryModule
         services.AddSingleton<IInventory>(sp => sp.GetRequiredService<InventoryLedger>());
         services.AddSingleton<IEquipmentStats>(sp => sp.GetRequiredService<InventoryLedger>());
         services.AddSingleton<IItemCatalog, ItemCatalog>();
+        services.AddSingleton<EconomyReconciliation>();
         services.AddScoped<InventoryService>();
         services.AddSingleton<JianghuGo.Application.IOutboxHandler, CombatLootHandler>();
         services.AddSingleton<JianghuGo.Application.IOutboxHandler, WorldItemsHandler>();

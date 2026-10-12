@@ -261,4 +261,40 @@ public class InventoryTests : IAsyncLifetime
         Assert.Equal("amount_invalid", zero.Error?.Code);
         Assert.Equal((0, 0), await MismatchesAsync());
     }
+
+    /// <summary>The reconciliation alert fires when a projection is edited behind the ledger's back.</summary>
+    [Fact]
+    public async Task Economy_health_detects_a_balance_changed_outside_the_ledger()
+    {
+        var (_, c) = await CharacterAsync();
+        await InUowAsync((uow, inv) => inv.CreditAsync(uow, new CharacterId(Guid.Parse(c.Str("id"))), 5, "test", "seed", CancellationToken.None));
+        var health = () => _host.Client.GetAsync(new Uri("/health/economy", UriKind.Relative));
+        Assert.Equal(HttpStatusCode.OK, (await health()).StatusCode);
+
+        if (_host.Database is not null)
+        {
+            // Only the table owner can bypass the guard trigger — exactly the kind of manual edit the alert exists for.
+            await using var ds = Npgsql.NpgsqlDataSource.Create(TestDatabase.ConnectionStringFor(_host.Database));
+            await using var cmd = ds.CreateCommand(
+                "ALTER TABLE inventory.wallets DISABLE TRIGGER wallets_guard; UPDATE inventory.wallets SET balance = balance + 1000; " +
+                "ALTER TABLE inventory.wallets ENABLE TRIGGER wallets_guard;");
+            await cmd.ExecuteNonQueryAsync();
+        }
+        else
+        {
+            await _host.Service<IUnitOfWorkFactory>().RunAsync(async uow =>
+            {
+                var u = JianghuGo.Infrastructure.InMemory.InMemoryUnitOfWork.From(uow);
+                var wallets = u.Table<CharacterId, long>("inventory.wallets");
+                u.SetTable("inventory.wallets", wallets.SetItem(wallets.Keys.First(), 1_000_000));
+                await uow.CommitAsync(CancellationToken.None);
+                return 0;
+            }, CancellationToken.None);
+        }
+
+        Assert.Equal(HttpStatusCode.OK, (await health()).StatusCode, "cached: the scan runs at most every 5 minutes");
+        _host.Clock.Advance(EconomyReconciliation.Interval);
+        Assert.Equal(HttpStatusCode.ServiceUnavailable, (await health()).StatusCode);
+        Assert.Equal((1, 0), await MismatchesAsync());
+    }
 }
