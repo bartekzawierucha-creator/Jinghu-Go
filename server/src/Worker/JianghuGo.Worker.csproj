@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+  <!-- Background processing host: drains the transactional outbox. Requires PostgreSQL (shared with the API). -->
+  <PropertyGroup>
+    <RootNamespace>JianghuGo.Worker</RootNamespace>
+    <OutputType>Exe</OutputType>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../Composition/JianghuGo.Composition.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="../../../content/game-config/**/*.json" Link="game-config/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

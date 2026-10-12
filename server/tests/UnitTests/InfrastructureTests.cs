@@ -60,3 +60,21 @@ public class InfrastructureTests
         await Assert.ThrowsAsync<DuplicateKeyException>(() => store.AddAsync(uow, rec, default));
     }
 }
+
+public class Uuid7Tests
+{
+    [Fact]
+    public void Ids_are_version_7_and_strictly_increasing_even_within_a_millisecond()
+    {
+        var ids = Enumerable.Range(0, 20_000).Select(_ => JianghuGo.Domain.Uuid7.New()).ToList();
+        for (var i = 1; i < ids.Count; i++)
+        {
+            Assert.True(ids[i - 1].CompareTo(ids[i]) < 0, $"not increasing at {i}");
+            // bytewise (PostgreSQL) order must agree with .NET order
+            Assert.True(string.CompareOrdinal(ids[i - 1].ToString("N"), ids[i].ToString("N")) < 0, $"hex order differs at {i}");
+        }
+
+        Assert.Equal(7, ids[0].Version);
+        Assert.Equal(20_000, ids.Distinct().Count());
+    }
+}

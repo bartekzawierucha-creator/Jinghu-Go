@@ -43,6 +43,7 @@ public sealed class CharacterService(
     IDestinyTokenLedger ledger,
     IIdempotencyStore idempotency,
     IAuditLog audit,
+    IOutbox outbox,
     ICorrelationContext correlation,
     IRandomSeedSource seeds,
     CharacterCreationConfig config,
@@ -59,49 +60,53 @@ public sealed class CharacterService(
     public async Task<Result<DraftOutcome>> GetOrCreateDraftAsync(AccountId accountId, CancellationToken ct)
     {
         var now = clock.GetUtcNow();
-        await using var uow = await uowFactory.BeginAsync(ct);
-        var existing = await repo.FindActiveDraftAsync(uow, accountId, ct);
-        if (existing is not null)
+        return await uowFactory.RunAsync<Result<DraftOutcome>>(async uow =>
         {
-            return new DraftOutcome(await ViewAsync(uow, existing, ct), false);
-        }
-
-        if ((await repo.ListCharactersAsync(uow, accountId, ct)).Count >= config.MaxCharactersPerAccount)
-        {
-            return Error.LimitReached("character_limit_reached", $"An account may own at most {config.MaxCharactersPerAccount} characters.");
-        }
-
-        if (await ledger.GetBalanceAsync(uow, accountId, ct) is null)
-        {
-            var grant = await ledger.PostAsync(uow, accountId, config.InitialDestinyTokens, DestinyTokenReasons.InitialGrant, accountId.ToString(), now, ct);
-            if (!grant.IsSuccess)
+            var existing = await repo.FindActiveDraftAsync(uow, accountId, ct);
+            if (existing is not null)
             {
-                return grant.Error!;
+                return new DraftOutcome(await ViewAsync(uow, existing, ct), false);
             }
-        }
 
-        var seed = seeds.NextSeed();
-        var roll = CharacterRoller.Roll(config, seed, null, new HashSet<string>());
-        var draft = new CharacterDraft(DraftId.New(), accountId, 1, DraftStatus.Active, config.RulesVersion, seed, roll.Traits, roll.Stats, 0, now, now);
-        await repo.AddDraftAsync(uow, draft, ct);
-        await AuditAsync(uow, accountId, "character.draft_created", "character_draft", draft.Id.ToString(),
-            new { seed = draft.LastSeed.ToString(System.Globalization.CultureInfo.InvariantCulture), draft.RulesVersion, traits = draft.Traits }, now, ct);
-        var view = await ViewAsync(uow, draft, ct);
-        await uow.CommitAsync(ct);
-        return new DraftOutcome(view, true);
+            if ((await repo.ListCharactersAsync(uow, accountId, ct)).Count >= config.MaxCharactersPerAccount)
+            {
+                return Error.LimitReached("character_limit_reached", $"An account may own at most {config.MaxCharactersPerAccount} characters.");
+            }
+
+            if (await ledger.GetBalanceAsync(uow, accountId, ct) is null)
+            {
+                var grant = await ledger.PostAsync(uow, accountId, config.InitialDestinyTokens, DestinyTokenReasons.InitialGrant, accountId.ToString(), now, ct);
+                if (!grant.IsSuccess)
+                {
+                    return grant.Error!;
+                }
+            }
+
+            var seed = seeds.NextSeed();
+            var roll = CharacterRoller.Roll(config, seed, null, new HashSet<string>());
+            var draft = new CharacterDraft(DraftId.New(), accountId, 1, DraftStatus.Active, config.RulesVersion, seed, roll.Traits, roll.Stats, 0, now, now);
+            await repo.AddDraftAsync(uow, draft, ct);
+            await AuditAsync(uow, accountId, "character.draft_created", "character_draft", draft.Id.ToString(),
+                new { seed = draft.LastSeed.ToString(System.Globalization.CultureInfo.InvariantCulture), draft.RulesVersion, traits = draft.Traits }, now, ct);
+            var view = await ViewAsync(uow, draft, ct);
+            await uow.CommitAsync(ct);
+            return new DraftOutcome(view, true);
+        }, ct);
     }
 
     public async Task<Result<DraftView>> RerollAsync(AccountId accountId, Guid draftId, string? idempotencyKey, RerollCommand command, CancellationToken ct)
     {
-        await using var uow = await uowFactory.BeginAsync(ct);
-        var result = await Idempotency.ExecuteAsync(idempotency, uow, clock, accountId, RerollOperation, idempotencyKey, new { draftId, command },
-            () => RerollCoreAsync(uow, accountId, new DraftId(draftId), command, ct), ct);
-        if (result.IsSuccess)
+        return await uowFactory.RunAsync<Result<DraftView>>(async uow =>
         {
-            await uow.CommitAsync(ct);
-        }
+            var result = await Idempotency.ExecuteAsync(idempotency, uow, clock, accountId, RerollOperation, idempotencyKey, new { draftId, command },
+                () => RerollCoreAsync(uow, accountId, new DraftId(draftId), command, ct), ct);
+            if (result.IsSuccess)
+            {
+                await uow.CommitAsync(ct);
+            }
 
-        return result;
+            return result;
+        }, ct);
     }
 
     private async Task<Result<DraftView>> RerollCoreAsync(IUnitOfWork uow, AccountId accountId, DraftId draftId, RerollCommand command, CancellationToken ct)
@@ -174,15 +179,17 @@ public sealed class CharacterService(
 
     public async Task<Result<CharacterView>> FinalizeAsync(AccountId accountId, Guid draftId, string? idempotencyKey, FinalizeCommand command, CancellationToken ct)
     {
-        await using var uow = await uowFactory.BeginAsync(ct);
-        var result = await Idempotency.ExecuteAsync(idempotency, uow, clock, accountId, FinalizeOperation, idempotencyKey, new { draftId, command },
-            () => FinalizeCoreAsync(uow, accountId, new DraftId(draftId), command, ct), ct);
-        if (result.IsSuccess)
+        return await uowFactory.RunAsync<Result<CharacterView>>(async uow =>
         {
-            await uow.CommitAsync(ct);
-        }
+            var result = await Idempotency.ExecuteAsync(idempotency, uow, clock, accountId, FinalizeOperation, idempotencyKey, new { draftId, command },
+                () => FinalizeCoreAsync(uow, accountId, new DraftId(draftId), command, ct), ct);
+            if (result.IsSuccess)
+            {
+                await uow.CommitAsync(ct);
+            }
 
-        return result;
+            return result;
+        }, ct);
     }
 
     private async Task<Result<CharacterView>> FinalizeCoreAsync(IUnitOfWork uow, AccountId accountId, DraftId draftId, FinalizeCommand command, CancellationToken ct)
@@ -243,27 +250,35 @@ public sealed class CharacterService(
 
         await AuditAsync(uow, accountId, "character.created", "character", character.Id.ToString(),
             new { draftId = draft.Id.Value, character.Name, character.Path }, now, ct);
+        await outbox.EnqueueAsync(uow, OutboxMessage.Create(Contracts.CharacterEvents.CharacterCreated,
+            new Contracts.CharacterEvents.CharacterCreatedV1(accountId.Value, character.Id.Value, character.Name, character.Path), now, correlation.CorrelationId), ct);
         return View(character);
     }
 
     public async Task<Result<DraftView>> GetActiveDraftAsync(AccountId accountId, CancellationToken ct)
     {
-        await using var uow = await uowFactory.BeginAsync(ct);
-        var draft = await repo.FindActiveDraftAsync(uow, accountId, ct);
-        return draft is null ? DraftNotFound : await ViewAsync(uow, draft, ct);
+        return await uowFactory.RunAsync<Result<DraftView>>(async uow =>
+        {
+            var draft = await repo.FindActiveDraftAsync(uow, accountId, ct);
+            return draft is null ? DraftNotFound : await ViewAsync(uow, draft, ct);
+        }, ct);
     }
 
     public async Task<IReadOnlyList<CharacterView>> ListAsync(AccountId accountId, CancellationToken ct)
     {
-        await using var uow = await uowFactory.BeginAsync(ct);
-        return [.. (await repo.ListCharactersAsync(uow, accountId, ct)).Select(View)];
+        return await uowFactory.RunAsync<IReadOnlyList<CharacterView>>(async uow =>
+        {
+            return [.. (await repo.ListCharactersAsync(uow, accountId, ct)).Select(View)];
+        }, ct);
     }
 
     public async Task<Result<CharacterView>> GetAsync(AccountId accountId, Guid characterId, CancellationToken ct)
     {
-        await using var uow = await uowFactory.BeginAsync(ct);
-        var character = await repo.FindCharacterAsync(uow, new CharacterId(characterId), ct);
-        return character is null || character.AccountId != accountId ? CharacterNotFound : View(character);
+        return await uowFactory.RunAsync<Result<CharacterView>>(async uow =>
+        {
+            var character = await repo.FindCharacterAsync(uow, new CharacterId(characterId), ct);
+            return character is null || character.AccountId != accountId ? CharacterNotFound : View(character);
+        }, ct);
     }
 
     private async Task<DraftView> ViewAsync(IUnitOfWork uow, CharacterDraft d, CancellationToken ct) =>
@@ -282,6 +297,6 @@ public sealed class CharacterService(
         [.. stats.Select(s => new StatView(s.Key, s.Value))];
 
     private Task AuditAsync(IUnitOfWork uow, AccountId accountId, string action, string entityType, string entityId, object data, DateTimeOffset now, CancellationToken ct) =>
-        audit.AppendAsync(uow, new AuditEntry(Guid.CreateVersion7(), accountId, action, entityType, entityId,
+        audit.AppendAsync(uow, new AuditEntry(Uuid7.New(), accountId, action, entityType, entityId,
             JsonSerializer.Serialize(data, Idempotency.Json), correlation.CorrelationId, now), ct);
 }

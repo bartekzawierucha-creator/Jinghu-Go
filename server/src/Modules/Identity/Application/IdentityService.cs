@@ -55,24 +55,26 @@ public sealed class IdentityService(
         var account = new Account(AccountId.New(), normalized, "", now, 0, null);
         account = account with { PasswordHash = hasher.HashPassword(account, password!) };
 
-        await using var uow = await uowFactory.BeginAsync(ct);
-        if (await accounts.FindByEmailAsync(uow, normalized, ct) is not null)
+        return await uowFactory.RunAsync<Result<AccountId>>(async uow =>
         {
-            return Error.Conflict("email_taken", "An account with this e-mail already exists.");
-        }
+            if (await accounts.FindByEmailAsync(uow, normalized, ct) is not null)
+            {
+                return Error.Conflict("email_taken", "An account with this e-mail already exists.");
+            }
 
-        try
-        {
-            await accounts.AddAsync(uow, account, ct);
-        }
-        catch (DuplicateKeyException)
-        {
-            return Error.Conflict("email_taken", "An account with this e-mail already exists.");
-        }
+            try
+            {
+                await accounts.AddAsync(uow, account, ct);
+            }
+            catch (DuplicateKeyException)
+            {
+                return Error.Conflict("email_taken", "An account with this e-mail already exists.");
+            }
 
-        await AuditAsync(uow, account.Id, "account.registered", "account", account.Id.ToString(), new { }, now, ct);
-        await uow.CommitAsync(ct);
-        return account.Id;
+            await AuditAsync(uow, account.Id, "account.registered", "account", account.Id.ToString(), new { }, now, ct);
+            await uow.CommitAsync(ct);
+            return account.Id;
+        }, ct);
     }
 
     public async Task<Result<TokenPair>> LoginAsync(string? email, string? password, CancellationToken ct)
@@ -83,49 +85,51 @@ public sealed class IdentityService(
         }
 
         var now = clock.GetUtcNow();
-        await using var uow = await uowFactory.BeginAsync(ct);
-        var account = await accounts.FindByEmailAsync(uow, NormalizeEmail(email), ct);
-        if (account is null)
+        return await uowFactory.RunAsync<Result<TokenPair>>(async uow =>
         {
-            hasher.VerifyHashedPassword(new Account(default, "", "", default, 0, null), _dummyHash.Value, password);
-            return InvalidCredentials;
-        }
-
-        var verification = hasher.VerifyHashedPassword(account, account.PasswordHash, password);
-        if (account.IsLocked(now))
-        {
-            // Same generic error while locked: no oracle for password correctness during lockout.
-            return InvalidCredentials;
-        }
-
-        if (verification == PasswordVerificationResult.Failed)
-        {
-            var failures = account.FailedLoginCount + 1;
-            if (failures >= Opt.MaxFailedLogins)
+            var account = await accounts.FindByEmailAsync(uow, NormalizeEmail(email), ct);
+            if (account is null)
             {
-                account = account with { FailedLoginCount = 0, LockedUntil = now + Opt.LockoutDuration };
-                await AuditAsync(uow, account.Id, "account.locked", "account", account.Id.ToString(), new { until = account.LockedUntil }, now, ct);
+                hasher.VerifyHashedPassword(new Account(default, "", "", default, 0, null), _dummyHash.Value, password);
+                return InvalidCredentials;
             }
-            else
+
+            var verification = hasher.VerifyHashedPassword(account, account.PasswordHash, password);
+            if (account.IsLocked(now))
             {
-                account = account with { FailedLoginCount = failures };
+                // Same generic error while locked: no oracle for password correctness during lockout.
+                return InvalidCredentials;
+            }
+
+            if (verification == PasswordVerificationResult.Failed)
+            {
+                var failures = account.FailedLoginCount + 1;
+                if (failures >= Opt.MaxFailedLogins)
+                {
+                    account = account with { FailedLoginCount = 0, LockedUntil = now + Opt.LockoutDuration };
+                    await AuditAsync(uow, account.Id, "account.locked", "account", account.Id.ToString(), new { until = account.LockedUntil }, now, ct);
+                }
+                else
+                {
+                    account = account with { FailedLoginCount = failures };
+                }
+
+                await accounts.UpdateAsync(uow, account, ct);
+                await uow.CommitAsync(ct); // failed-attempt counter must persist even though login fails
+                return InvalidCredentials;
+            }
+
+            account = account with { FailedLoginCount = 0, LockedUntil = null };
+            if (verification == PasswordVerificationResult.SuccessRehashNeeded)
+            {
+                account = account with { PasswordHash = hasher.HashPassword(account, password) };
             }
 
             await accounts.UpdateAsync(uow, account, ct);
-            await uow.CommitAsync(ct); // failed-attempt counter must persist even though login fails
-            return InvalidCredentials;
-        }
-
-        account = account with { FailedLoginCount = 0, LockedUntil = null };
-        if (verification == PasswordVerificationResult.SuccessRehashNeeded)
-        {
-            account = account with { PasswordHash = hasher.HashPassword(account, password) };
-        }
-
-        await accounts.UpdateAsync(uow, account, ct);
-        var pair = await IssueAsync(uow, account.Id, Guid.CreateVersion7(), now, ct);
-        await uow.CommitAsync(ct);
-        return pair;
+            var pair = await IssueAsync(uow, account.Id, Uuid7.New(), now, ct);
+            await uow.CommitAsync(ct);
+            return pair;
+        }, ct);
     }
 
     public async Task<Result<TokenPair>> RefreshAsync(string? refreshToken, CancellationToken ct)
@@ -136,40 +140,44 @@ public sealed class IdentityService(
         }
 
         var now = clock.GetUtcNow();
-        await using var uow = await uowFactory.BeginAsync(ct);
-        var session = await sessions.FindByRefreshHashAsync(uow, Tokens.Hash(refreshToken), ct);
-        if (session is null || session.RevokedAt is not null || session.RefreshExpiresAt <= now)
+        return await uowFactory.RunAsync<Result<TokenPair>>(async uow =>
         {
-            return InvalidRefreshToken;
-        }
+            var session = await sessions.FindByRefreshHashAsync(uow, Tokens.Hash(refreshToken), ct);
+            if (session is null || session.RevokedAt is not null || session.RefreshExpiresAt <= now)
+            {
+                return InvalidRefreshToken;
+            }
 
-        if (session.RotatedAt is not null)
-        {
-            await RevokeFamilyAsync(uow, session.FamilyId, SessionRevokeReason.RefreshTokenReuse, now, ct);
-            await AuditAsync(uow, session.AccountId, "session.refresh_reuse_detected", "session_family", session.FamilyId.ToString(), new { sessionId = session.Id.Value }, now, ct);
+            if (session.RotatedAt is not null)
+            {
+                await RevokeFamilyAsync(uow, session.FamilyId, SessionRevokeReason.RefreshTokenReuse, now, ct);
+                await AuditAsync(uow, session.AccountId, "session.refresh_reuse_detected", "session_family", session.FamilyId.ToString(), new { sessionId = session.Id.Value }, now, ct);
+                await uow.CommitAsync(ct);
+                return InvalidRefreshToken;
+            }
+
+            await sessions.UpdateAsync(uow, session with { RotatedAt = now }, ct);
+            var pair = await IssueAsync(uow, session.AccountId, session.FamilyId, now, ct);
             await uow.CommitAsync(ct);
-            return InvalidRefreshToken;
-        }
-
-        await sessions.UpdateAsync(uow, session with { RotatedAt = now }, ct);
-        var pair = await IssueAsync(uow, session.AccountId, session.FamilyId, now, ct);
-        await uow.CommitAsync(ct);
-        return pair;
+            return pair;
+        }, ct);
     }
 
     public async Task LogoutAsync(SessionId sessionId, CancellationToken ct)
     {
         var now = clock.GetUtcNow();
-        await using var uow = await uowFactory.BeginAsync(ct);
-        var session = await sessions.FindByIdAsync(uow, sessionId, ct);
-        if (session is null)
+        await uowFactory.RunAsync(async uow =>
         {
-            return;
-        }
+            var session = await sessions.FindByIdAsync(uow, sessionId, ct);
+            if (session is null)
+            {
+                return;
+            }
 
-        await RevokeFamilyAsync(uow, session.FamilyId, SessionRevokeReason.Logout, now, ct);
-        await AuditAsync(uow, session.AccountId, "session.logout", "session_family", session.FamilyId.ToString(), new { }, now, ct);
-        await uow.CommitAsync(ct);
+            await RevokeFamilyAsync(uow, session.FamilyId, SessionRevokeReason.Logout, now, ct);
+            await AuditAsync(uow, session.AccountId, "session.logout", "session_family", session.FamilyId.ToString(), new { }, now, ct);
+            await uow.CommitAsync(ct);
+        }, ct);
     }
 
     public async Task<AuthenticatedSession?> AuthenticateAsync(string accessToken, CancellationToken ct)
@@ -179,11 +187,13 @@ public sealed class IdentityService(
             return null;
         }
 
-        await using var uow = await uowFactory.BeginAsync(ct);
-        var session = await sessions.FindByAccessHashAsync(uow, Tokens.Hash(accessToken), ct);
-        return session is not null && session.IsAccessValid(clock.GetUtcNow())
-            ? new AuthenticatedSession(session.AccountId, session.Id)
-            : null;
+        return await uowFactory.RunAsync<AuthenticatedSession?>(async uow =>
+        {
+            var session = await sessions.FindByAccessHashAsync(uow, Tokens.Hash(accessToken), ct);
+            return session is not null && session.IsAccessValid(clock.GetUtcNow())
+                ? new AuthenticatedSession(session.AccountId, session.Id)
+                : null;
+        }, ct);
     }
 
     private async Task<TokenPair> IssueAsync(IUnitOfWork uow, AccountId accountId, Guid familyId, DateTimeOffset now, CancellationToken ct)
@@ -211,7 +221,7 @@ public sealed class IdentityService(
     }
 
     private Task AuditAsync(IUnitOfWork uow, AccountId accountId, string action, string entityType, string entityId, object data, DateTimeOffset now, CancellationToken ct) =>
-        audit.AppendAsync(uow, new AuditEntry(Guid.CreateVersion7(), accountId, action, entityType, entityId, JsonSerializer.Serialize(data, Idempotency.Json), correlation.CorrelationId, now), ct);
+        audit.AppendAsync(uow, new AuditEntry(Uuid7.New(), accountId, action, entityType, entityId, JsonSerializer.Serialize(data, Idempotency.Json), correlation.CorrelationId, now), ct);
 
     private static Error? ValidateEmail(string? email)
     {

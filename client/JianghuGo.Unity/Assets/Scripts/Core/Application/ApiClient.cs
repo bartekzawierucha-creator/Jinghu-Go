@@ -108,6 +108,36 @@ namespace JianghuGo.Client.Application
             SendAsync<CharacterDto>("POST", "/api/v1/characters/drafts/" + draft.Id + "/finalize",
                 new { expectedVersion = draft.Version, name, path }, true, NewIdempotencyKey(), ct);
 
+        // ---- cultivation ------------------------------------------------------------------------
+
+        private static string Cultivation(Guid characterId) => "/api/v1/characters/" + characterId + "/cultivation";
+
+        public Task<CultivationDto> GetCultivationAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<CultivationDto>("GET", Cultivation(characterId), null, true, null, ct);
+
+        public Task<CultivationDto> StartMeditationAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<CultivationDto>("POST", Cultivation(characterId) + "/meditation/start", null, true, null, ct);
+
+        public Task<MeditationResultDto> FinishMeditationAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<MeditationResultDto>("POST", Cultivation(characterId) + "/meditation/finish", null, true, NewIdempotencyKey(), ct);
+
+        /// <summary>Body path. <paramref name="steps"/> = pedometer delta since the last successful report.</summary>
+        public Task<StepsResultDto> ReportStepsAsync(Guid characterId, int steps, CancellationToken ct) =>
+            SendAsync<StepsResultDto>("POST", Cultivation(characterId) + "/steps", new { steps }, true, NewIdempotencyKey(), ct);
+
+        public Task<BreakthroughResultDto> BreakthroughAsync(CultivationDto state, CancellationToken ct) =>
+            SendAsync<BreakthroughResultDto>("POST", Cultivation(state.CharacterId) + "/breakthrough",
+                new { expectedVersion = state.Version }, true, NewIdempotencyKey(), ct);
+
+        // ---- notifications ----------------------------------------------------------------------
+
+        public Task<NotificationPageDto> GetNotificationsAsync(bool unreadOnly, int limit, Guid? before, CancellationToken ct) =>
+            SendAsync<NotificationPageDto>("GET", "/api/v1/notifications?unreadOnly=" + (unreadOnly ? "true" : "false") + "&limit=" + limit
+                + (before.HasValue ? "&before=" + before.Value : string.Empty), null, true, null, ct);
+
+        public Task MarkNotificationReadAsync(Guid id, CancellationToken ct) =>
+            SendAsync<object>("POST", "/api/v1/notifications/" + id + "/read", null, true, null, ct);
+
         // ---- plumbing ---------------------------------------------------------------------------
 
         public static string NewIdempotencyKey() => Guid.NewGuid().ToString("N");

@@ -11,6 +11,8 @@
     <ProjectReference Include="../../../client/JianghuGo.Client.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="../../../database/migrations/*.sql" Link="migrations/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="../../../database/migrate.sh" Link="db/migrate.sh" CopyToOutputDirectory="PreserveNewest" />
     <Content Include="../../../contracts/openapi/*.yaml" Link="contracts/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

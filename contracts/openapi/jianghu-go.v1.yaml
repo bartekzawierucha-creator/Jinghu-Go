@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Jianghu Go API
-  version: 1.0.0-stage2
+  version: 1.0.0-stage3
   description: |
     Authoritative game server API. Only endpoints implemented and covered by tests are listed here;
     tests/IntegrationTests/ContractTests verifies that this file and the running server expose the
@@ -15,6 +15,8 @@ tags:
   - name: Operations
   - name: Identity
   - name: Characters
+  - name: Cultivation
+  - name: Notifications
 paths:
   /health/live:
     get:
@@ -180,6 +182,136 @@ paths:
       summary: Public part of the character creation rules (trait catalogue, stat ranges, reroll costs).
       responses:
         "200": { description: OK }
+  /api/v1/characters/{characterId}/cultivation:
+    get:
+      tags: [Cultivation]
+      summary: Cultivation state of one of the caller's characters (initial state if it never cultivated).
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Cultivation" } } } }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/cultivation/meditation/start:
+    post:
+      tags: [Cultivation]
+      summary: Start meditating at server time. Repeating while a session runs changes nothing.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Cultivation" } } } }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/cultivation/meditation/finish:
+    post:
+      tags: [Cultivation]
+      summary: Finish the session; Qi is computed from server time (whole minutes, capped, daily cap). Idempotent per key.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  qiGained: { type: integer }
+                  minutesCounted: { type: integer }
+                  dailyCapReached: { type: boolean }
+                  state: { $ref: "#/components/schemas/Cultivation" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/cultivation/steps:
+    post:
+      tags: [Cultivation]
+      summary: Body path only. Report pedometer steps since the last report; implausible counts are clipped, not punished.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [steps]
+              properties:
+                steps: { type: integer, minimum: 1, maximum: 100000 }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  acceptedSteps: { type: integer }
+                  clipped: { type: boolean }
+                  qiGained: { type: integer }
+                  state: { $ref: "#/components/schemas/Cultivation" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/cultivation/breakthrough:
+    post:
+      tags: [Cultivation]
+      summary: Attempt a breakthrough. Server-side roll; failure costs part of the Qi and causes a Qi deviation. Idempotent per key.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [expectedVersion]
+              properties:
+                expectedVersion: { type: integer }
+      responses:
+        "200":
+          description: Attempt resolved (success or failure)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  chance: { type: number }
+                  qiSpent: { type: integer }
+                  state: { $ref: "#/components/schemas/Cultivation" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/cultivation/breakthroughs:
+    get:
+      tags: [Cultivation]
+      summary: History of breakthrough attempts.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/notifications:
+    get:
+      tags: [Notifications]
+      summary: The caller's notifications, newest first, keyset-paginated.
+      parameters:
+        - { name: unreadOnly, in: query, schema: { type: boolean, default: false } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 50, default: 20 } }
+        - { name: before, in: query, description: "nextBefore from the previous page", schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items: { type: array, items: { $ref: "#/components/schemas/Notification" } }
+                  nextBefore: { type: [string, "null"], format: uuid }
+        "400": { $ref: "#/components/responses/Problem" }
+  /api/v1/notifications/{id}/read:
+    post:
+      tags: [Notifications]
+      summary: Mark a notification as read (idempotent).
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "204": { description: Marked }
+        "404": { $ref: "#/components/responses/Problem" }
 components:
   securitySchemes:
     bearer:
@@ -187,6 +319,11 @@ components:
       scheme: bearer
       description: Opaque access token (prefix jga_), 15 min lifetime.
   parameters:
+    CharacterId:
+      name: characterId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
     IdempotencyKey:
       name: Idempotency-Key
       in: header
@@ -263,3 +400,33 @@ components:
         traits: { type: array, items: { $ref: "#/components/schemas/Trait" } }
         stats: { type: array, items: { $ref: "#/components/schemas/Stat" } }
         createdAt: { type: string, format: date-time }
+    Cultivation:
+      type: object
+      properties:
+        characterId: { type: string, format: uuid }
+        path: { type: string, enum: [qi, body, flame, poison] }
+        rulesVersion: { type: string }
+        realmId: { type: string }
+        realmNamePl: { type: string }
+        stage: { type: integer }
+        stagesInRealm: { type: integer }
+        isPeak: { type: boolean }
+        qi: { type: integer }
+        qiRequired: { type: integer }
+        breakthroughChance: { type: number }
+        majorBreakthrough: { type: boolean }
+        version: { type: integer }
+        deviationUntil: { type: [string, "null"], format: date-time }
+        meditationStartedAt: { type: [string, "null"], format: date-time }
+        dailyMeditationQi: { type: integer }
+        dailyMeditationQiCap: { type: integer }
+        dailySteps: { type: integer }
+        dailyStepCap: { type: integer }
+    Notification:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        type: { type: string, enum: [welcome, breakthrough_succeeded, breakthrough_failed] }
+        payload: { type: object, description: "Type-specific data; the client renders localised text." }
+        createdAt: { type: string, format: date-time }
+        readAt: { type: [string, "null"], format: date-time }

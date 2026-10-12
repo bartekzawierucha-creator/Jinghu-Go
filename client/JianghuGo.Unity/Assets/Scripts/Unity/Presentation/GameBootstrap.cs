@@ -128,14 +128,63 @@ namespace JianghuGo.Unity.Presentation
         private void ShowCharacter(CharacterDto c)
         {
             var s = NewScreen(c.Name);
-            UiKit.Label(s, "Ścieżka: " + c.Path, 40);
-            UiKit.Label(s, string.Join("\n", c.Traits.Select(t => t.NamePl + " — " + t.Rarity)), 36);
-            UiKit.Label(s, string.Join("\n", c.Stats.Select(st => st.Id + ": " + st.Value)), 36);
+            UiKit.Label(s, "Ścieżka: " + c.Path + "   " + string.Join("  ", c.Traits.Select(t => t.NamePl)), 32);
+            UiKit.Label(s, string.Join("   ", c.Stats.Select(st => st.Id + " " + st.Value)), 30);
+            var cultivation = UiKit.Label(s, "…", 38);
+            var inbox = UiKit.Label(s, string.Empty, 30);
+            var flow = new CultivationFlow(_api, c.Id);
+
+            void Render(CultivationDto st)
+            {
+                var deviation = st.DeviationUntil.HasValue && st.DeviationUntil > DateTimeOffset.UtcNow
+                    ? "\nOdchylenie Qi do " + st.DeviationUntil.Value.ToLocalTime().ToString("HH:mm") : string.Empty;
+                cultivation.text = st.RealmNamePl + " — etap " + st.Stage + "/" + st.StagesInRealm +
+                                   "\nQi: " + st.Qi + " / " + st.QiRequired + "   szansa przełomu: " + Math.Round(st.BreakthroughChance * 100) + "%" +
+                                   (st.IsMeditating ? "\nMedytujesz od " + st.MeditationStartedAt.Value.ToLocalTime().ToString("HH:mm") : string.Empty) +
+                                   "\nDzisiaj z medytacji: " + st.DailyMeditationQi + " / " + st.DailyMeditationQiCap + deviation;
+            }
+
+            flow.StateChanged += Render;
+            UiKit.ActionButton(s, "Medytuj / zakończ medytację", () => Run(async () =>
+            {
+                if (flow.State.IsMeditating)
+                {
+                    var r = await flow.FinishMeditationAsync(_lifetime.Token);
+                    SetStatus("+" + r.QiGained + " Qi (" + r.MinutesCounted + " min)" + (r.DailyCapReached ? " — dzienny limit" : string.Empty));
+                }
+                else
+                {
+                    await flow.StartMeditationAsync(_lifetime.Token);
+                }
+            }));
+            UiKit.ActionButton(s, "Próba przełomu", () => Run(async () =>
+            {
+                var r = await flow.BreakthroughAsync(_lifetime.Token);
+                SetStatus(r == null ? "Stan zmienił się na innym urządzeniu — odświeżono." : r.Success ? "Przełom udany!" : "Przełom nieudany — odchylenie Qi.");
+            }));
+            UiKit.ActionButton(s, "Powiadomienia", () => Run(async () =>
+            {
+                var page = await _api.GetNotificationsAsync(true, 5, null, _lifetime.Token);
+                inbox.text = page.Items.Count == 0 ? "Brak nowych powiadomień." : string.Join("\n", page.Items.Select(Describe));
+                foreach (var n in page.Items) await _api.MarkNotificationReadAsync(n.Id, _lifetime.Token);
+            }));
             UiKit.ActionButton(s, "Wyloguj", () => Run(async () =>
             {
                 await _api.LogoutAsync(_lifetime.Token);
                 ShowLogin();
             }));
+            Run(() => flow.LoadAsync(_lifetime.Token));
+        }
+
+        private static string Describe(NotificationDto n)
+        {
+            switch (n.Type)
+            {
+                case "welcome": return "Witaj w Jianghu!";
+                case "breakthrough_succeeded": return "Przełom udany.";
+                case "breakthrough_failed": return "Przełom nieudany.";
+                default: return n.Type;
+            }
         }
 
         /// <summary>Runs a UI action, turning failures into a readable status line instead of an unhandled exception.</summary>
@@ -166,6 +215,9 @@ namespace JianghuGo.Unity.Presentation
                 case "insufficient_destiny_tokens": return "Za mało Żetonów Losu.";
                 case "name_taken": return "To imię jest już zajęte.";
                 case "name_invalid": return "Imię: 2–24 litery, spacje, myślniki.";
+                case "insufficient_qi": return "Za mało Qi na przełom.";
+                case "qi_deviation_active": return "Odchylenie Qi — odpocznij przed kolejnym przełomem.";
+                case "meditation_in_progress": return "Najpierw zakończ medytację.";
                 default: return "Błąd: " + e.Code + (e.CorrelationId != null ? " (" + e.CorrelationId + ")" : string.Empty);
             }
         }

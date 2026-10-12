@@ -14,6 +14,8 @@ public class ArchitectureTests
         ["JianghuGo.Infrastructure"] = ["JianghuGo.Application", "JianghuGo.Domain"],
         ["JianghuGo.Modules.Identity"] = ["JianghuGo.Infrastructure", "JianghuGo.Application", "JianghuGo.Domain"],
         ["JianghuGo.Modules.Characters"] = ["JianghuGo.Modules.Identity", "JianghuGo.Infrastructure", "JianghuGo.Application", "JianghuGo.Domain"],
+        ["JianghuGo.Modules.Cultivation"] = ["JianghuGo.Modules.Characters", "JianghuGo.Modules.Identity", "JianghuGo.Infrastructure", "JianghuGo.Application", "JianghuGo.Domain"],
+        ["JianghuGo.Modules.Notifications"] = ["JianghuGo.Modules.Cultivation", "JianghuGo.Modules.Characters", "JianghuGo.Modules.Identity", "JianghuGo.Infrastructure", "JianghuGo.Application", "JianghuGo.Domain"],
     };
 
     [Fact]
@@ -26,6 +28,25 @@ public class ArchitectureTests
             foreach (var r in internalRefs)
             {
                 Assert.True(allowed.Contains(r), $"{name} must not reference {r}");
+            }
+        }
+    }
+
+    /// <summary>Other modules may use only Characters.Contracts (and Cultivation's published events), never internals.</summary>
+    [Fact]
+    public void Cross_module_usage_goes_through_published_contracts()
+    {
+        foreach (var consumer in new[] { "JianghuGo.Modules.Cultivation", "JianghuGo.Modules.Notifications" })
+        {
+            var asm = Assembly.Load(consumer);
+            var used = asm.GetTypes()
+                .SelectMany(t => t.GetFields(BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public).Select(f => f.FieldType)
+                    .Concat(t.GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic).SelectMany(c => c.GetParameters()).Select(p => p.ParameterType)))
+                .Where(t => t.Namespace?.StartsWith("JianghuGo.Modules.Characters", StringComparison.Ordinal) == true)
+                .ToList();
+            foreach (var t in used)
+            {
+                Assert.Equal("JianghuGo.Modules.Characters.Contracts", t.Namespace, $"{consumer} depends on Characters internal type {t.FullName}");
             }
         }
     }

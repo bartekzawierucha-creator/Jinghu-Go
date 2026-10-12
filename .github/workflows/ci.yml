@@ -11,7 +11,19 @@ permissions:
 jobs:
   server:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: jianghu
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: postgres
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U jianghu" --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      JIANGHU_TEST_POSTGRES: Host=localhost;Username=jianghu;Password=ci-only-password;Database=postgres
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -21,8 +33,14 @@ jobs:
         run: dotnet build server/JianghuGo.sln -c Release --nologo
       - name: Unit tests
         run: dotnet run --project server/tests/UnitTests -c Release --no-build
-      - name: Integration, security, contract, architecture and client-core tests
+      - name: Integration suite on the in-memory store
         run: dotnet run --project server/tests/IntegrationTests -c Release --no-build
+        env:
+          JIANGHU_TEST_STORAGE: InMemory
+      - name: Integration suite on PostgreSQL (incl. migrations and worker process)
+        run: dotnet run --project server/tests/IntegrationTests -c Release --no-build
+        env:
+          JIANGHU_TEST_STORAGE: Postgres
       - name: Vulnerable dependency check
         run: dotnet list server/JianghuGo.sln package --vulnerable --include-transitive 2>&1 | tee vuln.txt && ! grep -q "has the following vulnerable packages" vuln.txt
 

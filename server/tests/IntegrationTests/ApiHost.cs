@@ -18,26 +18,43 @@ namespace JianghuGo.IntegrationTests;
 /// <summary>Starts the real API on a random loopback port with in-memory storage and a manual clock.</summary>
 public sealed class ApiHost : IAsyncDisposable
 {
-    private ApiHost(WebApplication app, HttpClient client, ManualTimeProvider clock)
+    private ApiHost(WebApplication app, HttpClient client, ManualTimeProvider clock, string? database)
     {
         App = app;
         Client = client;
         Clock = clock;
+        Database = database;
     }
+
+    /// <summary>Name of the per-test PostgreSQL database, or null when running on the in-memory store.</summary>
+    public string? Database { get; }
 
     public WebApplication App { get; }
     public HttpClient Client { get; }
     public ManualTimeProvider Clock { get; }
 
-    public static async Task<ApiHost> StartAsync(Dictionary<string, string?>? settings = null)
+    /// <summary>When true the per-test database survives DisposeAsync (used to simulate a process restart).</summary>
+    public bool KeepDatabase { get; set; }
+
+    public static async Task<ApiHost> StartAsync(
+        Dictionary<string, string?>? settings = null,
+        bool? postgres = null,
+        IRandomSeedSource? seeds = null,
+        string? existingDatabase = null,
+        ManualTimeProvider? clock = null)
     {
-        var clock = new ManualTimeProvider(new DateTimeOffset(2026, 10, 12, 12, 0, 0, TimeSpan.Zero));
+        var usePostgres = existingDatabase is not null || (postgres ?? TestDatabase.SuiteUsesPostgres);
+        var database = existingDatabase ?? (usePostgres ? await TestDatabase.CreateAsync() : null);
+        clock ??= new ManualTimeProvider(new DateTimeOffset(2026, 10, 12, 12, 0, 0, TimeSpan.Zero));
         var app = JianghuApi.Create(["--urls", "http://127.0.0.1:0", "--environment", "Testing"], b =>
         {
             b.Configuration.AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["RateLimiting:AuthPermitsPerMinute"] = "10000",
                 ["RateLimiting:GlobalPermitsPerMinute"] = "100000",
+                ["Storage:Provider"] = usePostgres ? "Postgres" : "InMemory",
+                ["Worker:RunInProcess"] = "false", // tests drain the outbox explicitly (OutboxDispatcher.DrainAsync)
+                ["ConnectionStrings:Jianghu"] = usePostgres ? TestDatabase.ConnectionStringFor(database!) : null,
             });
             if (settings is not null)
             {
@@ -45,11 +62,15 @@ public sealed class ApiHost : IAsyncDisposable
             }
 
             b.Services.AddSingleton<TimeProvider>(clock);
+            if (seeds is not null)
+            {
+                b.Services.AddSingleton(seeds);
+            }
             b.Logging.SetMinimumLevel(LogLevel.Warning);
         });
         await app.StartAsync();
         var address = app.Services.GetRequiredService<IServer>().Features.GetRequiredFeature<IServerAddressesFeature>().Addresses.First();
-        return new ApiHost(app, new HttpClient { BaseAddress = new Uri(address) }, clock);
+        return new ApiHost(app, new HttpClient { BaseAddress = new Uri(address) }, clock, database);
     }
 
     public async ValueTask DisposeAsync()
@@ -57,9 +78,18 @@ public sealed class ApiHost : IAsyncDisposable
         Client.Dispose();
         await App.StopAsync();
         await App.DisposeAsync();
+        if (Database is not null && !KeepDatabase)
+        {
+            await TestDatabase.DropAsync(Database);
+        }
     }
 
     public HttpClient NewClient() => new() { BaseAddress = Client.BaseAddress };
+
+    public T Service<T>() where T : notnull => App.Services.GetRequiredService<T>();
+
+    /// <summary>Runs the outbox dispatcher until nothing is due (what the Worker does continuously).</summary>
+    public Task<int> DrainOutboxAsync() => Service<JianghuGo.Infrastructure.Outbox.OutboxDispatcher>().DrainAsync(CancellationToken.None);
 
     // ---- helpers -------------------------------------------------------------------------------
 
@@ -121,6 +151,14 @@ public sealed class Player(ApiHost host, string email, JsonObject tokens)
     }
 
     public static string NewKey() => Guid.NewGuid().ToString("N");
+
+    /// <summary>What a real client does after its 15-minute access token expires (tests advance the clock).</summary>
+    public async Task RefreshAsync()
+    {
+        var res = await host.Client.PostAsJsonAsync("/api/v1/auth/refresh", new { refreshToken = RefreshToken });
+        Assert.Equal(System.Net.HttpStatusCode.OK, res.StatusCode, await res.Content.ReadAsStringAsync());
+        Tokens = await ApiHost.Json(res);
+    }
 }
 
 internal static class JsonExt

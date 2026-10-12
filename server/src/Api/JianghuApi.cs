@@ -2,17 +2,18 @@ using System.Diagnostics;
 using System.Threading.RateLimiting;
 using JianghuGo.Application;
 using JianghuGo.Domain;
-using JianghuGo.Infrastructure;
-using JianghuGo.Infrastructure.InMemory;
-using JianghuGo.Modules.Characters;
+using JianghuGo.Composition;
+using JianghuGo.Infrastructure.Outbox;
+using JianghuGo.Infrastructure.Postgres;
 using JianghuGo.Modules.Characters.Api;
-using JianghuGo.Modules.Identity;
+using JianghuGo.Modules.Cultivation.Api;
 using JianghuGo.Modules.Identity.Api;
+using JianghuGo.Modules.Notifications;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
+using Npgsql;
 
 namespace JianghuGo.Api;
 
@@ -49,17 +50,20 @@ public static class JianghuApi
         services.AddHttpContextAccessor();
         // Strict request bodies: unknown fields (e.g. a client-sent "stats" or "damage") are rejected, not ignored.
         services.ConfigureHttpJsonOptions(o => o.SerializerOptions.UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow);
-        services.TryAddSingleton(TimeProvider.System);
-        services.TryAddSingleton<IRandomSeedSource, CsprngSeedSource>();
         services.AddScoped<ICorrelationContext, HttpCorrelationContext>();
-        AddStorage(builder);
+        services.AddJianghuCore(builder.Configuration, builder.Environment);
         AddRateLimiting(builder);
 
-        services.AddIdentityModule(builder.Configuration);
-        services.AddCharactersModule(builder.Configuration);
+        // In development and single-instance setups the outbox is drained inside the API process;
+        // production runs JianghuGo.Worker instead (Worker:RunInProcess=false).
+        if (builder.Configuration.GetValue("Worker:RunInProcess", false))
+        {
+            services.AddHostedService(sp => sp.GetRequiredService<OutboxDispatcher>());
+        }
 
         services.AddHealthChecks()
-            .AddCheck<StorageHealthCheck>("storage", tags: ["ready"]);
+            .AddCheck<StorageHealthCheck>("storage", tags: ["ready"])
+            .AddCheck<OutboxHealthCheck>("outbox", tags: ["ready"]);
 
         var app = builder.Build();
 
@@ -76,29 +80,22 @@ public static class JianghuApi
             .WithMetadata(new HttpMethodMetadata(["GET"]));
         app.MapIdentityEndpoints();
         app.MapCharacterEndpoints();
+        app.MapCultivationEndpoints();
+        app.MapNotificationEndpoints();
         return app;
     }
 
-    private static void AddStorage(WebApplicationBuilder builder)
+    /// <summary>`JianghuGo.Api migrate`: applies database/migrations and exits (deployment step, never at web startup).</summary>
+    public static async Task<int> MigrateAsync(string[] args)
     {
-        var provider = builder.Configuration["Storage:Provider"] ?? "InMemory";
-        switch (provider)
-        {
-            case "InMemory":
-                if (builder.Environment.IsProduction())
-                {
-                    throw new InvalidOperationException("Storage:Provider=InMemory is not durable and is refused in Production.");
-                }
-
-                builder.Services.AddSingleton<InMemoryDatabase>();
-                builder.Services.AddSingleton<IUnitOfWorkFactory>(sp => sp.GetRequiredService<InMemoryDatabase>());
-                builder.Services.AddSingleton<IIdempotencyStore, InMemoryIdempotencyStore>();
-                builder.Services.AddSingleton<IAuditLog, InMemoryAuditLog>();
-                break;
-            default:
-                throw new InvalidOperationException(
-                    $"Storage:Provider '{provider}' is not implemented yet. Supported: InMemory. PostgreSQL adapter: see docs/decisions/0002-storage-adapter.md.");
-        }
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = args, ContentRootPath = AppContext.BaseDirectory });
+        var connectionString = builder.Configuration.GetConnectionString("Jianghu")
+            ?? throw new InvalidOperationException("ConnectionStrings:Jianghu is required.");
+        var dir = builder.Configuration["Storage:MigrationsPath"] ?? Path.Combine(AppContext.BaseDirectory, "migrations");
+        await using var dataSource = NpgsqlDataSource.Create(connectionString);
+        var applied = await MigrationRunner.RunAsync(dataSource, dir);
+        Console.WriteLine(applied.Count == 0 ? "Migrations up to date." : "Applied: " + string.Join(", ", applied));
+        return 0;
     }
 
     private static void AddRateLimiting(WebApplicationBuilder builder)

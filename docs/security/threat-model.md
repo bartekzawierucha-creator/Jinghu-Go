@@ -27,6 +27,17 @@ Status: ✅ zaimplementowane i przetestowane · 🟡 częściowo · ⏳ zaplanow
 | T-ECO-3 | Ujemne saldo / manipulacja saldem | CHECK ≥ 0; saldo zmieniane wyłącznie przez trigger rejestru; wpisy niezmienne; widok rekonsyliacji | ✅ (`database/tests`) |
 | T-ECO-4 | Duplikacja przedmiotów, rynek | Etap 6 | ⏳ |
 
+## Kultywacja i zdarzenia
+| ID | Zagrożenie | Kontrola | Status |
+|---|---|---|---|
+| T-CUL-1 | Manipulacja czasem (zegar urządzenia) dla medytacji / nocy Trucizn | Start i koniec sesji tylko z zegara serwera; strefa czasowa świata po stronie serwera | ✅ |
+| T-CUL-2 | Wielokrotne odebranie Qi z jednej sesji | Idempotency-Key + zakończenie sesji w tej samej transakcji; równoległe żądania → jedno przyznanie | ✅ (test #2) |
+| T-CUL-3 | „Przelosowywanie” nieudanego przełomu | Wynik zapisany pod kluczem idempotencji (replay, nie nowy rzut); wymagany `expectedVersion`; odchylenie Qi blokuje kolejne próby | ✅ |
+| T-CUL-4 | Fałszywe kroki (emulator, potrząsanie) | Limit kroków/min od ostatniego raportu i dzienny; przycinanie + sygnał w audycie; brak automatycznych kar | 🟡 heurystyka; korelacja z GPS w Etapie 5 |
+| T-CUL-5 | Wyłudzenie RNG | Seed z CSPRNG serwera, rzut deterministyczny, zapis seed/rzut/szansa; CHECK `success = roll < chance` w bazie | ✅ |
+| T-EVT-1 | Utrata zdarzenia przy awarii | Outbox w tej samej transakcji; przetwarzanie jedna wiadomość = jedna transakcja | ✅ (test #10, prawdziwy proces) |
+| T-EVT-2 | Podwójny efekt przy ponownym dostarczeniu | Idempotentne handlery (`UNIQUE(account_id, source_message_id)`) | ✅ |
+
 ## Walka, GPS, komunikacja
 | ID | Zagrożenie | Kontrola | Status |
 |---|---|---|---|

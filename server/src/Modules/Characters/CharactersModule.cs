@@ -1,4 +1,5 @@
 using System.Text.Json;
+using JianghuGo.Infrastructure;
 using JianghuGo.Modules.Characters.Application;
 using JianghuGo.Modules.Characters.Domain;
 using JianghuGo.Modules.Characters.Infrastructure;
@@ -19,9 +20,18 @@ public static class CharactersModule
         }
 
         services.AddSingleton(LoadConfig(path));
-        services.AddSingleton<ICharacterRepository, InMemoryCharacterRepository>();
-        services.AddSingleton<IDestinyTokenLedger, InMemoryDestinyTokenLedger>();
+        if (StorageProvider.From(configuration) == StorageKind.Postgres)
+        {
+            services.AddSingleton<ICharacterRepository, PostgresCharacterRepository>();
+            services.AddSingleton<IDestinyTokenLedger, PostgresDestinyTokenLedger>();
+        }
+        else
+        {
+            services.AddSingleton<ICharacterRepository, InMemoryCharacterRepository>();
+            services.AddSingleton<IDestinyTokenLedger, InMemoryDestinyTokenLedger>();
+        }
         services.AddScoped<CharacterService>();
+        services.AddSingleton<Contracts.ICharacterDirectory, Contracts.CharacterDirectory>();
         return services;
     }
 

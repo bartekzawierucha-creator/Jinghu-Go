@@ -4,10 +4,10 @@
     <UserSecretsId>jianghu-go-api</UserSecretsId>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../Modules/Identity/JianghuGo.Modules.Identity.csproj" />
-    <ProjectReference Include="../Modules/Characters/JianghuGo.Modules.Characters.csproj" />
+    <ProjectReference Include="../Composition/JianghuGo.Composition.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="../../../database/migrations/*.sql" Link="migrations/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <Content Include="../../../content/game-config/**/*.json" Link="game-config/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

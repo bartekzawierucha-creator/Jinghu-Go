@@ -104,7 +104,7 @@ internal sealed class InMemoryDestinyTokenLedger : IDestinyTokenLedger
             return Task.FromResult<Result<DestinyTokenEntry>>(Error.InsufficientFunds("insufficient_destiny_tokens", $"Not enough Destiny Tokens (have {current}, need {-delta})."));
         }
 
-        var entry = new DestinyTokenEntry(Guid.CreateVersion7(), accountId, delta, after, reason, referenceId, now);
+        var entry = new DestinyTokenEntry(Uuid7.New(), accountId, delta, after, reason, referenceId, now);
         var entries = u.Table<Guid, DestinyTokenEntry>(Entries);
         if (entries.Values.Any(e => e.AccountId == accountId && e.Reason == reason && e.ReferenceId == referenceId))
         {

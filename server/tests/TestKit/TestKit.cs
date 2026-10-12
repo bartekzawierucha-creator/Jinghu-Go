@@ -21,6 +21,9 @@ public interface IAsyncLifetime
 
 public sealed class AssertionException(string message) : Exception(message);
 
+/// <summary>Thrown to mark a test NOT RUN (e.g. required database not configured). Never counted as passed.</summary>
+public sealed class SkipException(string reason) : Exception(reason);
+
 public static class Assert
 {
     public static void True(bool condition, string? message = null)
@@ -140,6 +143,7 @@ public static class TestRunner
             .ToList();
 
         var failures = new List<string>();
+        var skipped = new List<string>();
         var total = Stopwatch.StartNew();
         foreach (var (type, method, cat) in tests)
         {
@@ -150,6 +154,11 @@ public static class TestRunner
                 using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(60));
                 await RunOneAsync(type, method).WaitAsync(timeout.Token);
                 Console.WriteLine($"  PASS  {name} ({sw.ElapsedMilliseconds} ms)");
+            }
+            catch (Exception ex) when ((ex is TargetInvocationException { InnerException: SkipException } ? ex.InnerException : ex) is SkipException skip)
+            {
+                skipped.Add(name);
+                Console.WriteLine($"  SKIP  {name} — NOT RUN: {skip.Message}");
             }
             catch (Exception ex)
             {
@@ -170,8 +179,8 @@ public static class TestRunner
         }
 
         Console.WriteLine();
-        Console.WriteLine($"{assembly.GetName().Name}: {tests.Count - failures.Count} passed, {failures.Count} failed, {tests.Count} total in {total.Elapsed.TotalSeconds:0.0}s");
-        if (tests.Count == 0)
+        Console.WriteLine($"{assembly.GetName().Name}: {tests.Count - failures.Count - skipped.Count} passed, {failures.Count} failed, {skipped.Count} NOT RUN, {tests.Count} total in {total.Elapsed.TotalSeconds:0.0}s");
+        if (tests.Count - skipped.Count == 0)
         {
             Console.WriteLine("ERROR: no tests matched; treating as failure.");
             return 2;

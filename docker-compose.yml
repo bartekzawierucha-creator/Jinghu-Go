@@ -46,8 +46,21 @@ services:
       migrate: { condition: service_completed_successfully }
     environment:
       ASPNETCORE_ENVIRONMENT: Development
-      Storage__Provider: InMemory   # PostgreSQL adapter pending: docs/decisions/0002-storage-adapter.md
+      Storage__Provider: Postgres
+      ConnectionStrings__Jianghu: Host=postgres;Database=jianghu;Username=${POSTGRES_USER:-jianghu};Password=${POSTGRES_PASSWORD:-jianghu-dev}
+      Worker__RunInProcess: "false"   # the worker service below drains the outbox
     ports: ["127.0.0.1:8080:8080"]
+
+  worker:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/worker.Dockerfile
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+    environment:
+      DOTNET_ENVIRONMENT: Development
+      ConnectionStrings__Jianghu: Host=postgres;Database=jianghu;Username=${POSTGRES_USER:-jianghu};Password=${POSTGRES_PASSWORD:-jianghu-dev}
+    restart: unless-stopped
 
 volumes:
   pgdata:

@@ -1,3 +1,4 @@
+using JianghuGo.Infrastructure;
 using JianghuGo.Modules.Identity.Api;
 using JianghuGo.Modules.Identity.Application;
 using JianghuGo.Modules.Identity.Domain;
@@ -21,8 +22,16 @@ public static class IdentityModule
 
         // PBKDF2-HMAC-SHA512 (Identity v3 format), 100k iterations in .NET 10.
         services.AddSingleton<IPasswordHasher<Account>, PasswordHasher<Account>>();
-        services.AddSingleton<IAccountRepository, InMemoryAccountRepository>();
-        services.AddSingleton<ISessionRepository, InMemorySessionRepository>();
+        if (StorageProvider.From(configuration) == StorageKind.Postgres)
+        {
+            services.AddSingleton<IAccountRepository, PostgresAccountRepository>();
+            services.AddSingleton<ISessionRepository, PostgresSessionRepository>();
+        }
+        else
+        {
+            services.AddSingleton<IAccountRepository, InMemoryAccountRepository>();
+            services.AddSingleton<ISessionRepository, InMemorySessionRepository>();
+        }
         services.AddScoped<IdentityService>();
 
         services.AddAuthentication(JianghuClaims.Scheme)
