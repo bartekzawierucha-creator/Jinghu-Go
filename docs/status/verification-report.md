@@ -27,7 +27,7 @@ Data: 2026-10-12. Wszystko oznaczone ✅ zostało **uruchomione** w środowisku 
 | `JianghuGo.Api migrate` na pustej bazie + API w `Production` na PostgreSQL: `/health/ready` = Healthy | ✅ |
 | Skrypty Unity (UI, adaptery) | ⚠️ tylko kontrola typów: projekt `tools/unity-typecheck` kompiluje wszystkie skrypty (C# 9, `UNITY_ANDROID`) względem ręcznie napisanych atrap API Unity — od Etapu 6 jest częścią solution, więc build i CI go uruchamiają (wcześniej tylko doraźnie w sandboxie). Wykrył błąd składni w nowym ekranie sakwy, który został poprawiony. Ekrany Laboratorium Dao i sekt sprawdzone tak samo. Nie zastępuje kompilacji w edytorze Unity ani uruchomienia |
 | Docker Compose, Dockerfile'e | ❌ NIEURUCHOMIONE (brak rejestrów obrazów) |
-| CI GitHub Actions | ✅ zielone dla commitów Etapu 6 (server, database, secrets); pierwszy przebieg wykrył fałszywy alarm gitleaks (przykładowe hasło w README) — oznaczony i usunięty. Kroki Etapu 8 (smoke load, drill) — wynik po pushu |
+| CI GitHub Actions | ✅ zielone dla commitów Etapu 6 (server, database, secrets); pierwszy przebieg wykrył fałszywy alarm gitleaks (przykładowe hasło w README) — oznaczony i usunięty. Przebieg dla commitu Etapu 8 (`5e78e1a`): ✅ wszystkie kroki, w tym build, oba zestawy integracyjne, smoke load (20 graczy, bramka: 0 błędów i p95 < 3 s), testy SQL i ćwiczenie backup/restore |
 
 ## Obowiązkowe testy akceptacyjne (§14)
 
