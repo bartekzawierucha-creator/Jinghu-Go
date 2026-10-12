@@ -36,10 +36,11 @@ docker compose up --build                    # Postgres+PostGIS, migracje, Redis
 dotnet JianghuGo.Api.dll migrate             # ConnectionStrings__Jianghu=…
 ```
 
-Przykład:
+Przykład (hasło: dowolne, min. 10 znaków):
 ```bash
-curl -XPOST localhost:5000/api/v1/auth/register -H 'content-type: application/json' -d '{"email":"ja@example.com","password":"miecz-wudang-123"}'
-curl -XPOST localhost:5000/api/v1/auth/login    -H 'content-type: application/json' -d '{"email":"ja@example.com","password":"miecz-wudang-123"}'
+read -rs PASS
+curl -XPOST localhost:5000/api/v1/auth/register -H 'content-type: application/json' -d "{\"email\":\"ja@example.com\",\"password\":\"$PASS\"}"
+curl -XPOST localhost:5000/api/v1/auth/login    -H 'content-type: application/json' -d "{\"email\":\"ja@example.com\",\"password\":\"$PASS\"}"
 curl -XPOST localhost:5000/api/v1/characters/drafts -H "Authorization: Bearer jga_…"
 ```
 

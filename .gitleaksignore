@@ -1,0 +1,4 @@
+# Reviewed false positives (gitleaks 'generic-api-key'): an example password in a README curl command of the
+# first commit — a documentation placeholder, never a credential. The README now uses a shell variable instead.
+68a9bafa99f95fdc49419ee640853ceb941075bd:README.md:generic-api-key:33
+68a9bafa99f95fdc49419ee640853ceb941075bd:README.md:generic-api-key:34
