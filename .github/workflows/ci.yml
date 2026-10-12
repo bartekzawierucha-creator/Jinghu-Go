@@ -42,6 +42,20 @@ jobs:
         run: dotnet run --project server/tests/IntegrationTests -c Release --no-build
         env:
           JIANGHU_TEST_STORAGE: Postgres
+      - name: Load smoke test (20 players, 30 s, 500 ms think time, real API on PostgreSQL; gate = no errors, gameplay p95 < 3 s)
+        env:
+          Storage__Provider: Postgres
+          ConnectionStrings__Jianghu: Host=localhost;Username=jianghu;Password=ci-only-password;Database=postgres
+          RateLimiting__AuthPermitsPerMinute: "100000"
+          RateLimiting__GlobalPermitsPerMinute: "1000000"
+          Worker__RunInProcess: "true"
+          DOTNET_ENVIRONMENT: Staging
+          ASPNETCORE_ENVIRONMENT: Staging
+        run: |
+          dotnet server/src/Api/bin/Release/net10.0/JianghuGo.Api.dll migrate
+          dotnet server/src/Api/bin/Release/net10.0/JianghuGo.Api.dll --urls http://127.0.0.1:8080 > api.log 2>&1 &
+          for i in $(seq 1 60); do curl -fs http://127.0.0.1:8080/health/ready && break; sleep 1; done
+          dotnet run --project tools/load-test -c Release --no-build -- --url http://127.0.0.1:8080 --users 20 --seconds 30 --think-ms 500 --max-error-rate 0.01 --max-p95-ms 3000
       - name: Vulnerable dependency check
         run: dotnet list server/JianghuGo.sln package --vulnerable --include-transitive 2>&1 | tee vuln.txt && ! grep -q "has the following vulnerable packages" vuln.txt
 
@@ -66,6 +80,11 @@ jobs:
         env:
           ADMIN_URL: postgres://jianghu:ci-only-password@localhost:5432/postgres
         run: ./database/test.sh
+
+      - name: Backup/restore drill (pg_dump → pg_restore → identical, reconciled, guarded)
+        env:
+          ADMIN_URL: postgres://jianghu:ci-only-password@localhost:5432/postgres
+        run: ./database/backup-restore-test.sh
 
   secrets:
     runs-on: ubuntu-24.04

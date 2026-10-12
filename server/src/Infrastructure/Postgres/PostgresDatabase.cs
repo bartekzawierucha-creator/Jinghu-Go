@@ -81,12 +81,20 @@ public sealed class PostgresUnitOfWork : IUnitOfWork
     public async Task CommitAsync(CancellationToken cancellationToken)
     {
         ObjectDisposedException.ThrowIf(_completed, this);
-        await Translate(async () =>
+        try
         {
-            await _tx.CommitAsync(cancellationToken);
-            return 0;
-        });
-        _completed = true;
+            await Translate(async () =>
+            {
+                await _tx.CommitAsync(cancellationToken);
+                return 0;
+            });
+        }
+        finally
+        {
+            // A commit that fails (e.g. a SERIALIZABLE conflict detected at commit time) still ends the transaction:
+            // rolling it back again in DisposeAsync would throw and mask the retryable TransientConflictException.
+            _completed = true;
+        }
     }
 
     public async ValueTask DisposeAsync()
@@ -98,9 +106,9 @@ public sealed class PostgresUnitOfWork : IUnitOfWork
             {
                 await _tx.RollbackAsync();
             }
-            catch (NpgsqlException)
+            catch (Exception e) when (e is NpgsqlException or InvalidOperationException)
             {
-                // connection already broken: the server rolls back on its own
+                // connection broken or transaction already ended: the server has rolled back on its own
             }
         }
 

@@ -32,6 +32,20 @@ Status: ✅ zaimplementowane i przetestowane · 🟡 częściowo · ⏳ zaplanow
 | T-ECO-8 | Przewidywanie łupu przed walką | Ziarno łupu = f(id wiadomości outboxa), nieznane klientowi; nagradzane tylko zwycięstwa w dziennym limicie | ✅ |
 | T-ECO-9 | DoS przez kosztowną rekonsyliację | `/health/economy` buforuje wynik (skan najwyżej co 5 min); docelowo tylko sieć wewnętrzna | ✅ / ⏳ ingress |
 
+## Laboratorium Dao, sekty, terytoria (Etapy 6+–7)
+| ID | Zagrożenie | Kontrola | Status |
+|---|---|---|---|
+| T-DAO-1 | Technika „zbyt silna” (ominięcie balansu) | Twarde limity + budżet mocy liczone na serwerze; klient wysyła tylko komponenty; CHECK `allowance >= points` w bazie | ✅ (`DaoLabTests`, test kalibracji) |
+| T-DAO-2 | Użycie cudzej techniki bez nauki | Zestaw walki akceptuje tylko techniki znane postaci (`known_techniques`) | ✅ |
+| T-DAO-3 | Podmiana definicji po fakcie | Definicje niezmienne (trigger), zamrażane w migawce walki | ✅ |
+| T-SECT-1 | Eskalacja uprawnień w sekcie | `SectPolicy` sprawdzana na serwerze przy każdej akcji; usunięcie tylko niższej rangi; zmiana ról tylko przez przywódcę | ✅ (`Roles_decide_what_members_may_do`, testy jednostkowe macierzy) |
+| T-SECT-2 | Działanie cudzą postacią w sekcie | Każde żądanie wskazuje postać, której własność sprawdza `ICharacterDirectory` | ✅ |
+| T-SECT-3 | Wyścigi członkostwa (dwie sekty naraz, przepełnienie) | PK `members(character_id)`, wersja sekty, limit członków sprawdzany w tej samej transakcji | ✅ |
+| T-SECT-4 | Siedziba ujawnia dokładną lokalizację gracza | Zaokrąglenie do ~100 m, brak współrzędnych w historii i audycie; siedziba jest celowo publiczna | ✅ |
+| T-TER-1 | Zajęcie terytorium zdalnie (fałszywy klucz) | Klucz wyłącznie z pozycji zweryfikowanej przez Geolocation | ✅ |
+| T-TER-2 | Nabijanie punktów wojny powtórzonym zdarzeniem walki | `war_battles (war_id, battle_id)`; punkty tylko w oknie wojny; wyniki tylko rosną (trigger) | ✅ |
+| T-TER-3 | „Farmienie” punktów ustawionymi walkami między multikontami | Brak automatycznej detekcji (wymaga AntiAbuse: korelacja kont/urządzeń) | ⏳ |
+
 ## Kultywacja i zdarzenia
 | ID | Zagrożenie | Kontrola | Status |
 |---|---|---|---|

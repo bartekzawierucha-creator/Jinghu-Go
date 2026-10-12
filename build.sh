@@ -13,4 +13,4 @@ if [[ -n "${JIANGHU_TEST_POSTGRES:-}" ]]; then
 else
   echo "PostgreSQL integration suite: NOT RUN (set JIANGHU_TEST_POSTGRES)"
 fi
-if [[ -n "${ADMIN_URL:-}" ]]; then ./database/test.sh; else echo "Database SQL suite: NOT RUN (set ADMIN_URL)"; fi
+if [[ -n "${ADMIN_URL:-}" ]]; then ./database/test.sh && ./database/backup-restore-test.sh; else echo "Database SQL suite and backup/restore drill: NOT RUN (set ADMIN_URL)"; fi

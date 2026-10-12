@@ -1,4 +1,4 @@
-# Raport weryfikacji — Etapy 0–6
+# Raport weryfikacji — Etapy 0–8
 
 Data: 2026-10-12. Wszystko oznaczone ✅ zostało **uruchomione** w środowisku budowy; reszta jest wyraźnie oznaczona.
 
@@ -18,14 +18,16 @@ Data: 2026-10-12. Wszystko oznaczone ✅ zostało **uruchomione** w środowisku 
 | Sprawdzenie | Wynik |
 |---|---|
 | Build Release całego solution, ostrzeżenia = błędy | ✅ 0 ostrzeżeń |
-| Testy jednostkowe (RNG, UUIDv7, reguły postaci i kultywacji, silnik walki, walidacja próbek GPS, generator świata, haversine, przedmioty/łupy, rzemiosło, targ, spójność plików konfiguracji) | ✅ 68/68 |
-| Zestaw integracyjny na **in-memory** | ✅ 121/122, 1 NOT RUN (restart procesu wymaga trwałej bazy) |
-| Zestaw integracyjny na **PostgreSQL** (te same testy + migracje + prawdziwy proces Workera) | ✅ 122/122; powtórzony 3× bez niestabilności (w tym test równoczesnych zakupów) |
-| Testy SQL: migracje, ponowne uruchomienie (no-op), wykrycie zmiany, integralność (28 + 14 + 16 + 9 + 24 asercji, w tym zgodność haversine z PostGIS `ST_Distance` na 2000 losowych par oraz rejestry, przedmioty, oferty i dziennik rzemiosła) | ✅ |
+| Testy jednostkowe (RNG, UUIDv7, reguły postaci i kultywacji, silnik walki, walidacja próbek GPS, generator świata, haversine, przedmioty/łupy, rzemiosło, targ, Laboratorium Dao, macierz uprawnień sekt, reguły terytoriów, spójność plików konfiguracji) | ✅ 78/78 |
+| Zestaw integracyjny na **in-memory** | ✅ 138/140, 2 NOT RUN (restart procesu i retencja wymagają trwałej bazy) |
+| Zestaw integracyjny na **PostgreSQL** (te same testy + migracje + prawdziwy proces Workera + retencja + konflikt SERIALIZABLE przy COMMIT) | ✅ 140/140 (Etapy 0–6 powtórzone 3× bez niestabilności; po zmianach Etapu 8 — 1 pełny przebieg) |
+| Testy SQL: migracje, ponowne uruchomienie (no-op), wykrycie zmiany, integralność (28 + 14 + 16 + 9 + 24 + 11 + 26 asercji, w tym zgodność haversine z PostGIS `ST_Distance` na 2000 losowych par oraz rejestry, przedmioty, oferty, dziennik rzemiosła, techniki Dao, sekty, skarbiec, wojny) | ✅ |
+| Ćwiczenie kopii zapasowej (`database/backup-restore-test.sh`): pg_dump → pg_restore → 43 tabele identyczne co do wiersza, migrator „up to date”, rekonsyliacja czysta, triggery aktywne | ✅ |
+| Test obciążeniowy (`tools/load-test`, wyniki niżej) | ✅ uruchomiony; ⚠️ budżet opóźnień walki NIESPEŁNIONY |
 | `JianghuGo.Api migrate` na pustej bazie + API w `Production` na PostgreSQL: `/health/ready` = Healthy | ✅ |
-| Skrypty Unity (UI, adaptery) | ⚠️ tylko kontrola typów: projekt `tools/unity-typecheck` kompiluje wszystkie skrypty (C# 9, `UNITY_ANDROID`) względem ręcznie napisanych atrap API Unity — od Etapu 6 jest częścią solution, więc build i CI go uruchamiają (wcześniej tylko doraźnie w sandboxie). Wykrył błąd składni w nowym ekranie sakwy, który został poprawiony. Nie zastępuje kompilacji w edytorze Unity ani uruchomienia |
+| Skrypty Unity (UI, adaptery) | ⚠️ tylko kontrola typów: projekt `tools/unity-typecheck` kompiluje wszystkie skrypty (C# 9, `UNITY_ANDROID`) względem ręcznie napisanych atrap API Unity — od Etapu 6 jest częścią solution, więc build i CI go uruchamiają (wcześniej tylko doraźnie w sandboxie). Wykrył błąd składni w nowym ekranie sakwy, który został poprawiony. Ekrany Laboratorium Dao i sekt sprawdzone tak samo. Nie zastępuje kompilacji w edytorze Unity ani uruchomienia |
 | Docker Compose, Dockerfile'e | ❌ NIEURUCHOMIONE (brak rejestrów obrazów) |
-| CI GitHub Actions | ⚠️ workflow wypchnięty na GitHub; jego wyniku stąd nie widać — NIEPOTWIERDZONE |
+| CI GitHub Actions | ✅ zielone dla commitów Etapu 6 (server, database, secrets); pierwszy przebieg wykrył fałszywy alarm gitleaks (przykładowe hasło w README) — oznaczony i usunięty. Kroki Etapu 8 (smoke load, drill) — wynik po pushu |
 
 ## Obowiązkowe testy akceptacyjne (§14)
 
@@ -45,13 +47,26 @@ Data: 2026-10-12. Wszystko oznaczone ✅ zostało **uruchomione** w środowisku 
 | 12 | Migracja bez utraty danych | ✅ `Upgrade_from_stage2_schema_preserves_existing_data` + nieudana migracja wycofana w całości |
 | 13 | Wygasła/unieważniona sesja | ✅ |
 
+## Etap 8 — wyniki i znalezione defekty
+
+**Test obciążeniowy** (2 vCPU współdzielone przez API, PostgreSQL i generator; 50 graczy, 60 s; pełne wyniki: `docs/status/release-readiness.md`):
+
+| Profil | Żądania/s | Błędy | p95 odczytów | p95 walki (`pve_action`) |
+|---|---|---|---|---|
+| realistyczny (500 ms namysłu) | 101 | 0 % | 112–138 ms | 3,4 s |
+| stres (bez namysłu) | 70 | 0 % | 176–283 ms | 4,0 s |
+
+Defekty znalezione testem obciążeniowym i **naprawione** (z testami regresji / ponownym pomiarem):
+1. Konflikt SERIALIZABLE wykryty dopiero przy COMMIT zostawiał jednostkę pracy „otwartą”; jej zamknięcie rzucało `InvalidOperationException` (HTTP 500) i maskowało ponawialny konflikt → `PostgresUnitOfWorkTests` (80 błędów 500 → 0).
+2. Hashe tokenów jako `char(64)` przy parametrach `text` → rzutowanie kolumny, brak użycia indeksu, pełny skan `identity.sessions` przy KAŻDYM uwierzytelnionym żądaniu i blokady predykatowe całej tabeli → migracja `V0016__session_hash_text.sql`.
+3. Skany sekwencyjne małych tabel pod SERIALIZABLE (blokady predykatowe na całą relację) → sesje aplikacji z `enable_seqscan=off` (zalecenie dokumentacji PostgreSQL dla SSI) i `jit=off`; po pomiarze 0 skanów sekwencyjnych.
+4. Wyczerpane ponowienia konfliktu kończyły się 500 → teraz `503 busy_retry` + `Retry-After` (klient ponawia z tym samym kluczem idempotencji); wykładniczy backoff z jitterem.
+
+**Testy bezpieczeństwa Etapu 8:** `RobustnessTests` — każdy endpoint POST/PUT × 7 wrogich ciał (zły JSON, typy, nieznane pola, przepełnienia, 5000-znakowe napisy, znaki sterujące) → zawsze 4xx bez śladu stosu; każdy chroniony endpoint × brak/fałszywy token → 401. ✅
+
+**Przepływ end-to-end:** `EndToEndTests` (eksploracja → zbiór → handel → medytacja → sekta → rekrutacja → wkłady → zajęcie terytorium → rekonsyliacja). ✅
+
+**Profilowanie klienta:** ❌ NIEWYKONANE — Unity niedostępne w środowisku budowy.
+
 ## Znane ograniczenia
-- GPS: serwer nie wykryje fałszywego GPS, który porusza się „realistycznie” — potrzebna atestacja urządzenia (Play Integrity / App Attest), Etap 8. Zadania retencji (czyszczenie zebrań po 7 dniach) jeszcze nie istnieją. Mapa w kliencie: abstrakcja `IMapProvider` + projekcja Web Mercator gotowe, renderer zwoju to prototyp listy. `UnityLocationSource` (w tym uprawnienia Androida) niesprawdzone w Unity.
-- Walka: brak Laboratorium Dao i zwojów technik (następny krok po Etapie 6); klient ma tekstowy prototyp zamiast animowanego widoku bocznego; historyczne pliki reguł walki trzeba będzie archiwizować przy pierwszej zmianie `rulesVersion`.
-- Ścieżka Płomienia nie ma jeszcze 12 punktów geograficznych (wymaga Etapu 5).
-- Brak testów obciążeniowych; wpływ SERIALIZABLE na przepustowość niezmierzony.
-- Backup/restore niećwiczone; zadania retencji (czyszczenie outboxa, idempotencji, sesji) jeszcze nie istnieją.
-- Rate limiting w pamięci procesu (wiele instancji API → Redis).
-- Refresh token w kliencie w PlayerPrefs (tylko DEV).
-- Powiadomienia tylko w grze (bez push na urządzenia).
-- Ekonomia (Etap 6): balans liczb (ceny, szanse, przepływ KD) to pierwsza propozycja bez symulacji gospodarki; targ ma tylko listę „najnowsze” z filtrem przedmiotu (bez sortowania po cenie i wyszukiwania tekstowego); brak zadań retencji dla rejestrów i zamkniętych ofert; ekrany sakwy/rzemiosła/targu w Unity to prototyp listy (sprawdzony tylko typowo); pranie waluty między różnymi kontami wykrywa dopiero AntiAbuse (Etap 8).
+Pełna, aktualna lista (z oceną wpływu i warunkiem usunięcia) jest w `docs/status/release-readiness.md`.

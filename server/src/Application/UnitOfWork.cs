@@ -41,8 +41,8 @@ public static class UnitOfWorkFactoryExtensions
             }
             catch (TransientConflictException) when (attempt < MaxAttempts)
             {
-                // Jittered backoff so racing transactions do not collide again in lockstep.
-                await Task.Delay(TimeSpan.FromMilliseconds(Random.Shared.Next(1, 5 * Math.Min(attempt, 10))), ct);
+                // Exponential backoff with full jitter (cap 250 ms) so racing transactions spread out instead of colliding again.
+                await Task.Delay(TimeSpan.FromMilliseconds(Random.Shared.Next(1, Math.Min(250, 4 << Math.Min(attempt, 6)))), ct);
             }
         }
     }

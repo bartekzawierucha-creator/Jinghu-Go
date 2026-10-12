@@ -14,6 +14,8 @@
 | `JianghuGo.Modules.Geolocation` | Characters.Contracts, Identity (claims), Infrastructure, Application, Domain |
 | `JianghuGo.Modules.World` | Geolocation.Contracts (`IPositionVerifier`), Combat.Contracts (`ICombatEncounters`), Characters.Contracts, Identity, Infrastructure, Application, Domain |
 | `JianghuGo.Modules.Cultivation` | Characters.Contracts, Combat.Contracts, World.Contracts i Inventory.Contracts (zdarzenia nagród i pigułek), Identity (claims), Infrastructure, Application, Domain |
+| `JianghuGo.Modules.Sects` | Characters.Contracts, Inventory.Contracts (wpłaty, opłaty), Geolocation.Contracts (siedziba), Identity, Infrastructure, Application, Domain |
+| `JianghuGo.Modules.Territory` | Sects.Contracts (`ISectDirectory`: członkostwo, uprawnienia, skarbiec), Geolocation.Contracts, Combat.Contracts (zdarzenia walk), Characters.Contracts, Identity, Infrastructure, Application, Domain |
 | `JianghuGo.Modules.Notifications` | zdarzenia publikowane przez Characters, Cultivation, Combat i Market (konsumowane z outboxa), Identity (claims), Infrastructure, Application, Domain |
 | `JianghuGo.Composition` | wszystkie moduły — wspólna rejestracja usług dla hostów |
 | `JianghuGo.Api`, `JianghuGo.Worker` | Composition (hosty) |
@@ -28,15 +30,15 @@ Wewnątrz modułu: `Domain/` (czyste reguły), `Application/` (przypadki użycia
 | 1 | Identity | ✅ Etap 2 |
 | 2 | Characters | ✅ Etap 2 (tworzenie postaci; rozwój postaci w kolejnych etapach) |
 | 3 | Cultivation | ✅ Etap 3 (Płomień: punkty GPS w Etapie 5) |
-| 4 | Combat | ✅ Etap 4 + premie ekwipunku (Etap 6); Laboratorium Dao i zwoje — kolejny krok |
+| 4 | Combat | ✅ Etap 4 + premie ekwipunku (Etap 6) + Laboratorium Dao i zwoje (ADR 0010) |
 | 5 | Inventory | ✅ Etap 6 (rejestry KD i stosów, ekwipunek, pigułki, łupy, materiały ze świata) |
 | 6 | Crafting | ✅ Etap 6 (kucie, alchemia, ulepszanie +1…+15) |
 | 7 | Geolocation | ✅ Etap 5 |
 | 8 | World | ✅ Etap 5 + materiały z punktów (Etap 6) |
-| 9 | Sects | Etap 7 |
-| 10 | Territory | Etap 7 |
+| 9 | Sects | ✅ Etap 7 (członkostwo, role, prośby, wkłady, skarbiec, siedziba, historia) |
+| 10 | Territory | ✅ Etap 7 (zajmowanie, wojny GvG, danina, historia własności) |
 | 11 | Market | ✅ Etap 6 (oferty z depozytem, opłata, podatek, atomowy zakup) |
-| 12 | Social | po Etapie 7 |
+| 12 | Social | ⏳ po wydaniu (czat i znajomi poza zakresem v1 — patrz `docs/status/release-readiness.md`) |
 | 13 | Notifications | ✅ Etap 3 (powiadomienia w grze; push na urządzenia później) |
 | 14 | AntiAbuse | częściowo (rozproszone): rate limiting, blokada konta, idempotencja, anomalie GPS, przycinanie kroków, audyt sygnałów; osobny moduł z regułami i panelem — Etap 8 |
 

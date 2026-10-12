@@ -33,7 +33,10 @@ public static class CombatModule
 
         services.AddSingleton(LoadDaoLabConfig(daoPath, Inventory.InventoryModule.LoadCatalog(configuration)));
         if (StorageProvider.From(configuration) == StorageKind.Postgres)
+        {
             services.AddSingleton<ICombatRepository, PostgresCombatRepository>();
+            services.AddSingleton(new JianghuGo.Application.RetentionPolicy("combat.intents", "DELETE FROM combat.intents WHERE ctid IN (SELECT ctid FROM combat.intents WHERE submitted_at < $1 - interval '7 days' AND battle_id IN (SELECT id FROM combat.battles WHERE status IN ('finished', 'declined', 'expired')) LIMIT 1000)"));
+        }
         else
             services.AddSingleton<ICombatRepository, InMemoryCombatRepository>();
         services.AddScoped<CombatService>();

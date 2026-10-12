@@ -56,6 +56,7 @@ public static class JianghuApi
             ctx.ProblemDetails.Extensions["correlationId"] = ctx.HttpContext.TraceIdentifier;
         });
         services.AddHttpContextAccessor();
+        services.AddExceptionHandler<JianghuGo.Infrastructure.Http.ConflictExceptionHandler>();
         // Strict request bodies: unknown fields (e.g. a client-sent "stats" or "damage") are rejected, not ignored.
         services.ConfigureHttpJsonOptions(o => o.SerializerOptions.UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow);
         services.AddScoped<ICorrelationContext, HttpCorrelationContext>();

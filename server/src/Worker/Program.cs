@@ -18,6 +18,7 @@ if (StorageProvider.From(builder.Configuration) != StorageKind.Postgres)
 
 builder.Services.AddJianghuCore(builder.Configuration, builder.Environment);
 builder.Services.AddHostedService(sp => sp.GetRequiredService<OutboxDispatcher>());
+builder.Services.AddHostedService(sp => sp.GetRequiredService<JianghuGo.Infrastructure.Postgres.RetentionRunner>());
 builder.Services.Configure<HostOptions>(o => o.ShutdownTimeout = TimeSpan.FromSeconds(20));
 
 await builder.Build().RunAsync();

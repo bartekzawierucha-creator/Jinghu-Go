@@ -234,7 +234,10 @@ public static class NotificationsModule
     public static IServiceCollection AddNotificationsModule(this IServiceCollection services, IConfiguration configuration)
     {
         if (StorageProvider.From(configuration) == StorageKind.Postgres)
+        {
             services.AddSingleton<INotificationRepository, PostgresNotificationRepository>();
+            services.AddSingleton(new JianghuGo.Application.RetentionPolicy("notifications.notifications", "DELETE FROM notifications.notifications WHERE ctid IN (SELECT ctid FROM notifications.notifications WHERE created_at < $1 - interval '90 days' LIMIT 1000)"));
+        }
         else
             services.AddSingleton<INotificationRepository, InMemoryNotificationRepository>();
 

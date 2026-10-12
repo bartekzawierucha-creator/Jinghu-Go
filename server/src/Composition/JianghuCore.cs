@@ -59,12 +59,26 @@ public static class JianghuCore
             case StorageKind.Postgres:
                 var connectionString = configuration.GetConnectionString("Jianghu")
                     ?? throw new InvalidOperationException("ConnectionStrings:Jianghu is required for Storage:Provider=Postgres.");
-                services.AddSingleton(_ => NpgsqlDataSource.Create(connectionString));
+                // SERIALIZABLE + sequential scans = relation-level predicate locks, so unrelated players' transactions
+                // conflict on small tables (measured in the Stage 8 load test). Following the PostgreSQL SSI guidance,
+                // every query here is index-backed and seq scans are discouraged for the application's sessions.
+                // JIT compilation only adds latency to short OLTP queries (and is triggered by the seq-scan penalty).
+                var csb = new NpgsqlConnectionStringBuilder(connectionString);
+                csb.Options = $"{csb.Options} -c jit=off".Trim();
+                if (configuration.GetValue("Storage:PreferIndexScans", true))
+                {
+                    csb.Options += " -c enable_seqscan=off";
+                }
+
+                services.AddSingleton(_ => NpgsqlDataSource.Create(csb.ConnectionString));
                 services.AddSingleton<PostgresDatabase>();
                 services.AddSingleton<IUnitOfWorkFactory>(sp => sp.GetRequiredService<PostgresDatabase>());
                 services.AddSingleton<IIdempotencyStore, PostgresIdempotencyStore>();
                 services.AddSingleton<IAuditLog, PostgresAuditLog>();
                 services.AddSingleton<IOutbox, PostgresOutbox>();
+                services.AddSingleton(new JianghuGo.Application.RetentionPolicy("platform.idempotency_records", "DELETE FROM platform.idempotency_records WHERE ctid IN (SELECT ctid FROM platform.idempotency_records WHERE created_at < $1 - interval '7 days' LIMIT 1000)"));
+                services.AddSingleton(new JianghuGo.Application.RetentionPolicy("platform.outbox_messages", "DELETE FROM platform.outbox_messages WHERE ctid IN (SELECT ctid FROM platform.outbox_messages WHERE status = 'processed' AND processed_at < $1 - interval '7 days' LIMIT 1000)"));
+                services.AddSingleton<RetentionRunner>();
                 break;
             case StorageKind.InMemory:
                 if (environment.IsProduction())

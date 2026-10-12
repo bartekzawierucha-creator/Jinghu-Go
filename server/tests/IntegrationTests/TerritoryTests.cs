@@ -39,8 +39,11 @@ public class TerritoryTests : IAsyncLifetime
     private Task PublishDuelAsync(Guid battleId, (Player P, JsonObject C) winner, (Player P, JsonObject C) loser) =>
         _host.Service<IUnitOfWorkFactory>().RunAsync(async uow =>
         {
-            var w = new CombatEvents.Participant(Guid.NewGuid(), Guid.Parse(Id(winner)), "a", "won", 0);
-            var l = new CombatEvents.Participant(Guid.NewGuid(), Guid.Parse(Id(loser)), "b", "lost", 0);
+            var directory = _host.Service<JianghuGo.Modules.Characters.Contracts.ICharacterDirectory>();
+            var wc = (await directory.FindAsync(uow, Guid.Parse(Id(winner)), CancellationToken.None))!;
+            var lc = (await directory.FindAsync(uow, Guid.Parse(Id(loser)), CancellationToken.None))!;
+            var w = new CombatEvents.Participant(wc.AccountId.Value, wc.Id.Value, "a", "won", 0);
+            var l = new CombatEvents.Participant(lc.AccountId.Value, lc.Id.Value, "b", "lost", 0);
             await _host.Service<IOutbox>().EnqueueAsync(uow, OutboxMessage.Create(CombatEvents.BattleFinished,
                 new CombatEvents.BattleFinishedV1(battleId, "pvp", "a_won", null, [w, l]), _host.Clock.GetUtcNow(), null), CancellationToken.None);
             await uow.CommitAsync(CancellationToken.None);

@@ -31,6 +31,7 @@ public static class InventoryModule
         if (StorageProvider.From(configuration) == StorageKind.Postgres)
         {
             services.AddSingleton<IInventoryRepository, PostgresInventoryRepository>();
+            services.AddSingleton(new JianghuGo.Application.RetentionPolicy("inventory.grants", "DELETE FROM inventory.grants WHERE ctid IN (SELECT ctid FROM inventory.grants WHERE granted_at < $1 - interval '30 days' LIMIT 1000)"));
         }
         else
         {

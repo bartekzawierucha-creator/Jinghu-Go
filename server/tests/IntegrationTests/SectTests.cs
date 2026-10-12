@@ -29,10 +29,14 @@ internal sealed class Cultivators(ApiHost host)
             return r.Value;
         }, CancellationToken.None);
 
-    /// <summary>Starts exploration and sends two stationary samples so the server holds a verified position.</summary>
+    /// <summary>
+    /// Ends any running exploration session, starts a new one and sends two stationary samples, so the server holds a
+    /// verified position there (a jump inside one session would rightly trigger the relocation cooldown).
+    /// </summary>
     public async Task StandAtAsync(Player p, JsonObject c, GeoPoint at)
     {
         var id = c.Str("id");
+        await p.PostAsync($"/api/v1/characters/{id}/exploration/stop");
         Assert.Equal(HttpStatusCode.OK, (await p.PostAsync($"/api/v1/characters/{id}/exploration/start")).StatusCode);
         for (var i = 0; i < 2; i++)
         {

@@ -12,4 +12,6 @@
 - **Ekonomia (Etap 6):** `GET /health/economy` — rekonsyliacja rejestrów: każde saldo KD i każdy stos musi równać się sumie swoich wpisów (`inventory.wallet_mismatches`, `inventory.stack_mismatches`). Niezgodność → `503 Unhealthy` z liczbami w danych sprawdzenia. Celowo **poza** `/health/ready` (to alarm dla operatora, nie powód do odcięcia ruchu). Skan wykonywany najwyżej raz na 5 min (wynik buforowany), więc anonimowe odpytywanie nie obciąża bazy; w produkcji endpoint wystawić tylko w sieci wewnętrznej i odpytywać co 5 min.
 - Audyt ekonomii: `inventory.reward_granted`, `inventory.consumable_used`, `crafting.crafted`/`upgraded` (z ziarnem), `market.listed`/`bought`/`cancelled`.
 
+- **Retencja (Etap 8):** `Meter` `JianghuGo.Retention`: `jianghu.retention.purged{policy}`; log JSON po każdej niepustej partii; błędy runnera logowane jako `Error` i ponawiane w kolejnym interwale.
+
 **Planowane:** eksporter OTLP (wymaga paczek OpenTelemetry); rekonsyliacja Żetonów Losu (`characters.destiny_ledger_mismatches`) w tym samym sprawdzeniu; metryki obrotu targu (wolumen, podatek) jako `Meter`.

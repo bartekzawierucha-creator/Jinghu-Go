@@ -23,3 +23,8 @@ Zadania czyszczące: do dodania jako okresowe zadania Workera (Etap 8, razem z t
 | `inventory.grants` | jednorazowość nagród z outboxa | 30 dni (dłużej niż retencja przetworzonych wiadomości) | serwer |
 | `crafting.log` | audyt i odtwarzanie rzutów | 180 dni (do potwierdzenia) | właściciel, operator |
 | `market.listings` | handel, spory | aktywne: do zamknięcia; zamknięte: 1 rok (do potwierdzenia) | strony transakcji, operator |
+| `combat.custom_techniques`, `combat.known_techniques` | techniki autorskie i wiedza | bez limitu (odwołują się do nich walki i zwoje) | serwer |
+| `sects.*` (sekty, członkowie, prośby, skarbiec, historia) | organizacja graczy, audyt uprawnień | sekty i historia: bez limitu; zamknięte prośby: 180 dni (do potwierdzenia) | członkowie, operator |
+| `territory.*` (terytoria, wojny, punktacja, historia własności) | kontrola mapy, rozstrzyganie sporów | bez limitu (mały wolumen) | publiczne (bez danych osobowych) |
+
+**Wykonanie (Etap 8, ADR 0012).** `RetentionRunner` w procesie Worker usuwa partiami: `platform.idempotency_records` > 7 dni, przetworzone `platform.outbox_messages` > 7 dni, `notifications.notifications` > 90 dni, `world.node_claims` > 7 dni, `inventory.grants` > 30 dni, `combat.intents` > 7 dni zakończonych walk. Pozostałe okresy z tabeli („do potwierdzenia”) wymagają decyzji prawnej przed wydaniem i nie są jeszcze automatyczne.

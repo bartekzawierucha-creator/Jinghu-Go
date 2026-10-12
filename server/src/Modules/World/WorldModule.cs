@@ -23,7 +23,10 @@ public static class WorldModule
 
         services.AddSingleton(new WorldSecret(parsed));
         if (StorageProvider.From(configuration) == StorageKind.Postgres)
+        {
             services.AddSingleton<IWorldRepository, PostgresWorldRepository>();
+            services.AddSingleton(new JianghuGo.Application.RetentionPolicy("world.node_claims", "DELETE FROM world.node_claims WHERE ctid IN (SELECT ctid FROM world.node_claims WHERE claimed_at < $1 - interval '7 days' LIMIT 1000)"));
+        }
         else
             services.AddSingleton<IWorldRepository, InMemoryWorldRepository>();
         services.AddScoped<WorldService>();
