@@ -36,6 +36,7 @@ public class WorkerProcessTests : IAsyncLifetime
         var psi = new ProcessStartInfo("dotnet", [WorkerDll()]) { RedirectStandardOutput = true, RedirectStandardError = true };
         psi.Environment["ConnectionStrings__Jianghu"] = TestDatabase.ConnectionStringFor(_host.Database!);
         psi.Environment["Storage__Provider"] = "Postgres";
+        psi.Environment["World__Seed"] = "1234567890123";
         psi.Environment["DOTNET_ENVIRONMENT"] = "Production";
         psi.Environment["Outbox__PollInterval"] = "00:00:00.200";
         var p = Process.Start(psi)!;

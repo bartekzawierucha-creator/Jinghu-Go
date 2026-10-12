@@ -63,7 +63,7 @@ public sealed class CombatService(
     ICorrelationContext correlation,
     IRandomSeedSource seeds,
     CombatConfig config,
-    TimeProvider clock)
+    TimeProvider clock) : ICombatEncounters
 {
     public const int MaxConsecutiveTimeouts = 3;
     public const int MaxPendingChallenges = 3;
@@ -142,28 +142,40 @@ public sealed class CombatService(
         {
             var result = await Idempotency.ExecuteAsync(idempotency, uow, clock, accountId, "combat.pve.start", key, cmd, async Task<Result<BattleView>> () =>
             {
-                var now = clock.GetUtcNow();
-                var c = await characters.FindOwnedAsync(uow, accountId, cmd.CharacterId, ct);
-                if (c is null) return CharacterNotFound;
-                if (cmd.NpcId is null || config.Npc(cmd.NpcId) is not { } npc) return Error.Validation("npc_not_found", "Unknown opponent.");
-                if (await HasActiveBattleAsync(uow, c.Id, now, ct)) return Error.Conflict("already_in_battle", "This character is already fighting.");
-
-                var a = await SnapshotAsync(uow, c, ct);
-                var b = NpcCombatant(npc);
-                var battle = NewBattle(BattleKinds.Pve, BattleStatuses.Active, c, null, npc.Id, now) with
-                {
-                    CombatantA = a,
-                    CombatantB = b,
-                    State = CombatEngine.Start(config, a, b),
-                    Deadline = now.AddSeconds(config.TurnDeadlineSeconds),
-                };
-                await repo.AddBattleAsync(uow, battle, ct);
-                await AuditAsync(uow, accountId, "combat.pve_started", battle.Id, new { characterId = c.Id.Value, npc = npc.Id, battle.SeedHash }, now, ct);
-                return await ViewAsync(uow, battle, 'a', ct);
+                var started = await StartPveCoreAsync(uow, accountId, cmd.CharacterId, cmd.NpcId, ct);
+                return started.IsSuccess ? await ViewAsync(uow, started.Value, 'a', ct) : started.Error!;
             }, ct);
             if (result.IsSuccess) await uow.CommitAsync(ct);
             return result;
         }, ct);
+
+    public async Task<Result<Guid>> StartEncounterAsync(IUnitOfWork uow, AccountId accountId, Guid characterId, string npcId, CancellationToken ct)
+    {
+        var started = await StartPveCoreAsync(uow, accountId, characterId, npcId, ct);
+        return started.IsSuccess ? started.Value.Id : started.Error!;
+    }
+
+    private async Task<Result<Battle>> StartPveCoreAsync(IUnitOfWork uow, AccountId accountId, Guid characterId, string? npcId, CancellationToken ct)
+    {
+        var now = clock.GetUtcNow();
+        var c = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
+        if (c is null) return CharacterNotFound;
+        if (npcId is null || config.Npc(npcId) is not { } npc) return Error.Validation("npc_not_found", "Unknown opponent.");
+        if (await HasActiveBattleAsync(uow, c.Id, now, ct)) return Error.Conflict("already_in_battle", "This character is already fighting.");
+
+        var a = await SnapshotAsync(uow, c, ct);
+        var b = NpcCombatant(npc);
+        var battle = NewBattle(BattleKinds.Pve, BattleStatuses.Active, c, null, npc.Id, now) with
+        {
+            CombatantA = a,
+            CombatantB = b,
+            State = CombatEngine.Start(config, a, b),
+            Deadline = now.AddSeconds(config.TurnDeadlineSeconds),
+        };
+        await repo.AddBattleAsync(uow, battle, ct);
+        await AuditAsync(uow, accountId, "combat.pve_started", battle.Id, new { characterId = c.Id.Value, npc = npc.Id, battle.SeedHash }, now, ct);
+        return battle;
+    }
 
     public Task<Result<BattleView>> ChallengeAsync(AccountId accountId, string? key, ChallengeCommand cmd, CancellationToken ct) =>
         uowFactory.RunAsync<Result<BattleView>>(async uow =>

@@ -203,3 +203,75 @@ namespace JianghuGo.Client.Application
         public bool IsMine(TurnEventDto e) => e.Actor == MySide;
     }
 }
+
+namespace JianghuGo.Client.Application
+{
+    public sealed class ExplorationSessionDto
+    {
+        public Guid Id { get; set; }
+        public string Status { get; set; }
+        public double DistanceM { get; set; }
+        public int AcceptedSamples { get; set; }
+        public int DroppedSamples { get; set; }
+        public int Anomalies { get; set; }
+        public bool Flagged { get; set; }
+        public bool PositionVerified { get; set; }
+        public string PositionProblem { get; set; }
+        public DateTimeOffset? RelocationUntil { get; set; }
+    }
+
+    public sealed class SamplesResultDto
+    {
+        public List<string> Outcomes { get; set; } = new List<string>();
+        public ExplorationSessionDto Session { get; set; }
+    }
+
+    public sealed class NodeDto
+    {
+        public string Key { get; set; }
+        public string Kind { get; set; }
+        public string NamePl { get; set; }
+        public double Lat { get; set; }
+        public double Lon { get; set; }
+        public int DistanceM { get; set; }
+        public bool InRange { get; set; }
+        public bool Harvested { get; set; }
+        public long RewardQi { get; set; }
+        public DateTimeOffset ExpiresAt { get; set; }
+    }
+
+    public sealed class FlameSiteDto
+    {
+        public string Id { get; set; }
+        public string NamePl { get; set; }
+        public double Lat { get; set; }
+        public double Lon { get; set; }
+        public long DistanceM { get; set; }
+        public bool InRange { get; set; }
+        public DateTimeOffset? AvailableAt { get; set; }
+    }
+
+    public sealed class WorldEventDto
+    {
+        public string Kind { get; set; }
+        public string NamePl { get; set; }
+        public int RewardMultiplierPermille { get; set; }
+        public DateTimeOffset EndsAt { get; set; }
+    }
+
+    public sealed class NearbyDto
+    {
+        public bool PositionVerified { get; set; }
+        public string PositionProblem { get; set; }
+        public WorldEventDto Event { get; set; }
+        public List<NodeDto> Nodes { get; set; } = new List<NodeDto>();
+        public FlameSiteDto NearestFlameSite { get; set; }
+    }
+
+    public sealed class WorldInteractionDto
+    {
+        public string Kind { get; set; }
+        public long RewardQi { get; set; }
+        public Guid? BattleId { get; set; }
+    }
+}

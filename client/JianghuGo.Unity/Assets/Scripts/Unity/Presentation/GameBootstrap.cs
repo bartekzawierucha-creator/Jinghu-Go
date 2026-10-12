@@ -163,6 +163,15 @@ namespace JianghuGo.Unity.Presentation
                 var r = await flow.BreakthroughAsync(_lifetime.Token);
                 SetStatus(r == null ? "Stan zmienił się na innym urządzeniu — odświeżono." : r.Success ? "Przełom udany!" : "Przełom nieudany — odchylenie Qi.");
             }));
+            UiKit.ActionButton(s, "Eksploruj świat", () => Run(async () =>
+            {
+                var location = GetComponent<UnityLocationSource>();
+                if (location == null) location = gameObject.AddComponent<UnityLocationSource>(); // not "??": Unity overrides == for destroyed objects
+                var exploration = new ExplorationFlow(_api, location, c.Id);
+                await exploration.StartAsync(_lifetime.Token);
+                ShowWorld(exploration, c);
+            }));
+
             foreach (var npc in new[] { ("training_dummy", "Manekin"), ("grey_wolf", "Szary Wilk"), ("mountain_bandit", "Bandyta") })
             {
                 UiKit.ActionButton(s, "Walcz: " + npc.Item2, () => Run(async () =>
@@ -185,6 +194,101 @@ namespace JianghuGo.Unity.Presentation
                 ShowLogin();
             }));
             Run(() => flow.LoadAsync(_lifetime.Token));
+        }
+
+        /// <summary>
+        /// Prototype world screen: list of nearby nodes instead of the scroll-style map (IMapProvider + WebMercator are
+        /// ready in Core for the map renderer). Ticks on a timer only while this screen is open.
+        /// </summary>
+        private void ShowWorld(ExplorationFlow exploration, CharacterDto c)
+        {
+            var s = NewScreen("Jianghu");
+            var info = UiKit.Label(s, "…", 32);
+            var list = UiKit.Label(s, string.Empty, 30);
+            var open = true;
+
+            void Render()
+            {
+                var n = exploration.Nearby;
+                info.text = (exploration.Problem == null ? "Pozycja potwierdzona" : "Pozycja: " + exploration.Problem) +
+                            (n?.Event != null ? "\nWydarzenie: " + n.Event.NamePl : string.Empty) +
+                            (n?.NearestFlameSite != null ? "\nNajbliższe miejsce Płomienia: " + n.NearestFlameSite.NamePl + " (" + n.NearestFlameSite.DistanceM / 1000 + " km)" : string.Empty);
+                list.text = n == null ? string.Empty : string.Join("\n", n.Nodes.Take(8).Select(x =>
+                    x.NamePl + " — " + x.DistanceM + " m" + (x.Harvested ? " (zebrane)" : x.InRange ? " [w zasięgu]" : string.Empty)));
+            }
+
+            exploration.Changed += Render;
+            UiKit.ActionButton(s, "Zbierz / walcz z najbliższym", () => Run(async () =>
+            {
+                var target = exploration.Nearby?.Nodes.FirstOrDefault(x => x.InRange && !x.Harvested);
+                if (target == null)
+                {
+                    SetStatus("Nic w zasięgu — podejdź bliżej.");
+                    return;
+                }
+
+                var r = await exploration.InteractAsync(target.Key, _lifetime.Token);
+                if (r.BattleId.HasValue)
+                {
+                    open = false;
+                    var combat = new CombatFlow(_api);
+                    await combat.OpenAsync(r.BattleId.Value, _lifetime.Token);
+                    ShowBattle(combat, c);
+                }
+                else
+                {
+                    SetStatus("+" + r.RewardQi + " Qi");
+                }
+            }));
+            UiKit.ActionButton(s, "Dostrój się do Płomienia", () => Run(async () =>
+            {
+                var site = exploration.Nearby?.NearestFlameSite;
+                if (site == null || !site.InRange)
+                {
+                    SetStatus("Musisz stać przy jednym z 12 miejsc Płomienia.");
+                    return;
+                }
+
+                var r = await exploration.AttuneAsync(site.Id, _lifetime.Token);
+                SetStatus("+" + r.RewardQi + " Qi z Płomienia");
+            }));
+            UiKit.ActionButton(s, "Zakończ eksplorację", () => Run(async () =>
+            {
+                open = false;
+                await exploration.StopAsync(_lifetime.Token);
+                ShowCharacter(c);
+            }));
+
+            async void Loop()
+            {
+                while (open && !_lifetime.IsCancellationRequested)
+                {
+                    try
+                    {
+                        await exploration.TickAsync(_lifetime.Token);
+                    }
+                    catch (ApiException e)
+                    {
+                        SetStatus(Describe(e));
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        return;
+                    }
+
+                    try
+                    {
+                        await System.Threading.Tasks.Task.Delay(exploration.RecommendedInterval, _lifetime.Token);
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        return;
+                    }
+                }
+            }
+
+            Render();
+            Loop();
         }
 
         /// <summary>
@@ -279,6 +383,12 @@ namespace JianghuGo.Unity.Presentation
                 case "out_of_range": return "Przeciwnik poza zasięgiem tej techniki.";
                 case "on_cooldown": return "Technika się odnawia.";
                 case "already_in_battle": return "Ta postać już walczy.";
+                case "relocation_cooldown": return "Wykryto skok pozycji — nagrody wrócą za kilka minut.";
+                case "low_accuracy": return "Słaby sygnał GPS — wyjdź na otwartą przestrzeń.";
+                case "moving_too_fast": return "Poruszasz się zbyt szybko.";
+                case "too_far": return "Podejdź bliżej.";
+                case "already_harvested": return "Już to zebrałeś.";
+                case "attunement_cooldown": return "Płomień jeszcze się nie odnowił.";
                 default: return "Błąd: " + e.Code + (e.CorrelationId != null ? " (" + e.CorrelationId + ")" : string.Empty);
             }
         }

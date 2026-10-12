@@ -8,7 +8,9 @@
 | `JianghuGo.Modules.Identity` | Infrastructure, Application, Domain |
 | `JianghuGo.Modules.Characters` | Identity (wyłącznie publiczne API: `JianghuClaims`), Infrastructure, Application, Domain |
 | `JianghuGo.Modules.Combat` | Characters (**tylko** `Characters.Contracts`), Identity (claims), Infrastructure, Application, Domain |
-| `JianghuGo.Modules.Cultivation` | Characters.Contracts, Combat.Contracts (zdarzenie nagrody), Identity (claims), Infrastructure, Application, Domain |
+| `JianghuGo.Modules.Geolocation` | Characters.Contracts, Identity (claims), Infrastructure, Application, Domain |
+| `JianghuGo.Modules.World` | Geolocation.Contracts (`IPositionVerifier`), Combat.Contracts (`ICombatEncounters`), Characters.Contracts, Identity, Infrastructure, Application, Domain |
+| `JianghuGo.Modules.Cultivation` | Characters.Contracts, Combat.Contracts i World.Contracts (zdarzenia nagród), Identity (claims), Infrastructure, Application, Domain |
 | `JianghuGo.Modules.Notifications` | zdarzenia publikowane przez Characters i Cultivation (konsumowane z outboxa), Identity (claims), Infrastructure, Application, Domain |
 | `JianghuGo.Composition` | wszystkie moduły — wspólna rejestracja usług dla hostów |
 | `JianghuGo.Api`, `JianghuGo.Worker` | Composition (hosty) |
@@ -26,13 +28,13 @@ Wewnątrz modułu: `Domain/` (czyste reguły), `Application/` (przypadki użycia
 | 4 | Combat | ✅ Etap 4 (Laboratorium Dao i zwoje — Etap 6) |
 | 5 | Inventory | Etap 6 |
 | 6 | Crafting | Etap 6 |
-| 7 | Geolocation | Etap 5 |
-| 8 | World | Etap 5 |
+| 7 | Geolocation | ✅ Etap 5 |
+| 8 | World | ✅ Etap 5 (materiały z ziół → Etap 6) |
 | 9 | Sects | Etap 7 |
 | 10 | Territory | Etap 7 |
 | 11 | Market | Etap 6 |
 | 12 | Social | po Etapie 7 |
 | 13 | Notifications | ✅ Etap 3 (powiadomienia w grze; push na urządzenia później) |
-| 14 | AntiAbuse | częściowo: rate limiting, blokada konta, idempotencja; reguły GPS w Etapie 5 |
+| 14 | AntiAbuse | częściowo (rozproszone): rate limiting, blokada konta, idempotencja, anomalie GPS, przycinanie kroków, audyt sygnałów; osobny moduł z regułami i panelem — Etap 8 |
 
 Moduły nieistniejące nie mają pustych projektów — powstają w etapie, w którym dostają działający kod i testy.

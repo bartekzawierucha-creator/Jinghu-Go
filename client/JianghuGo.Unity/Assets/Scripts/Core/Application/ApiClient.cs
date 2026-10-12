@@ -148,6 +148,33 @@ namespace JianghuGo.Client.Application
             SendAsync<BattleDto>("POST", "/api/v1/combat/battles/" + battle.Id + "/actions",
                 new { turn = battle.Turn, slot, direction }, true, NewIdempotencyKey(), ct);
 
+        // ---- exploration & world ------------------------------------------------------------------
+
+        private static string Exploration(Guid characterId) => "/api/v1/characters/" + characterId + "/exploration";
+
+        public Task<ExplorationSessionDto> StartExplorationAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<ExplorationSessionDto>("POST", Exploration(characterId) + "/start", null, true, null, ct);
+
+        public Task<ExplorationSessionDto> StopExplorationAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<ExplorationSessionDto>("POST", Exploration(characterId) + "/stop", null, true, null, ct);
+
+        /// <summary>Safe to retry as-is: the server drops samples it has already seen.</summary>
+        public Task<SamplesResultDto> SendSamplesAsync(Guid characterId, IList<Infrastructure.LocationFix> fixes, CancellationToken ct)
+        {
+            var samples = new List<object>();
+            foreach (var f in fixes) samples.Add(new { lat = f.Lat, lon = f.Lon, accuracyM = f.AccuracyM, capturedAt = f.CapturedAt });
+            return SendAsync<SamplesResultDto>("POST", Exploration(characterId) + "/samples", new { samples }, true, null, ct, retryPost: true);
+        }
+
+        public Task<NearbyDto> GetNearbyAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<NearbyDto>("GET", "/api/v1/characters/" + characterId + "/world/nearby", null, true, null, ct);
+
+        public Task<WorldInteractionDto> InteractAsync(Guid characterId, string nodeKey, CancellationToken ct) =>
+            SendAsync<WorldInteractionDto>("POST", "/api/v1/world/interactions", new { characterId, nodeKey }, true, NewIdempotencyKey(), ct);
+
+        public Task<WorldInteractionDto> AttuneAsync(Guid characterId, string siteId, CancellationToken ct) =>
+            SendAsync<WorldInteractionDto>("POST", "/api/v1/world/flame-attunements", new { characterId, siteId }, true, NewIdempotencyKey(), ct);
+
         // ---- notifications ----------------------------------------------------------------------
 
         public Task<NotificationPageDto> GetNotificationsAsync(bool unreadOnly, int limit, Guid? before, CancellationToken ct) =>
@@ -161,7 +188,7 @@ namespace JianghuGo.Client.Application
 
         public static string NewIdempotencyKey() => Guid.NewGuid().ToString("N");
 
-        private async Task<T> SendAsync<T>(string method, string path, object body, bool authenticated, string idempotencyKey, CancellationToken ct)
+        private async Task<T> SendAsync<T>(string method, string path, object body, bool authenticated, string idempotencyKey, CancellationToken ct, bool retryPost = false)
         {
             var json = body == null ? null : _json.Serialize(body);
             var refreshed = false;
@@ -179,7 +206,7 @@ namespace JianghuGo.Client.Application
                     continue;
                 }
 
-                var result = await SendWithNetworkRetryAsync(method, path, json, authenticated ? token : null, idempotencyKey, ct).ConfigureAwait(false);
+                var result = await SendWithNetworkRetryAsync(method, path, json, authenticated ? token : null, idempotencyKey, ct, retryPost).ConfigureAwait(false);
                 if (result.StatusCode == 401 && authenticated && !refreshed)
                 {
                     refreshed = true;
@@ -200,14 +227,14 @@ namespace JianghuGo.Client.Application
             }
         }
 
-        private async Task<HttpResult> SendWithNetworkRetryAsync(string method, string path, string json, string token, string idempotencyKey, CancellationToken ct)
+        private async Task<HttpResult> SendWithNetworkRetryAsync(string method, string path, string json, string token, string idempotencyKey, CancellationToken ct, bool retryPost = false)
         {
             var headers = new Dictionary<string, string>();
             if (token != null) headers["Authorization"] = "Bearer " + token;
             if (idempotencyKey != null) headers["Idempotency-Key"] = idempotencyKey;
 
             // GETs are safe to retry; POSTs only when protected by an idempotency key.
-            var attempts = method == "GET" || idempotencyKey != null ? 1 + _networkRetries : 1;
+            var attempts = method == "GET" || idempotencyKey != null || retryPost ? 1 + _networkRetries : 1;
             HttpResult result = null;
             for (var i = 0; i < attempts; i++)
             {

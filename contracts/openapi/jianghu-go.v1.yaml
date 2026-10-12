@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: Jianghu Go API
-  version: 1.0.0-stage4
+  version: 1.0.0-stage5
   description: |
     Authoritative game server API. Only endpoints implemented and covered by tests are listed here;
     tests/IntegrationTests/ContractTests verifies that this file and the running server expose the
@@ -18,6 +18,8 @@ tags:
   - name: Cultivation
   - name: Notifications
   - name: Combat
+  - name: Exploration
+  - name: World
 paths:
   /health/live:
     get:
@@ -456,6 +458,135 @@ paths:
       responses:
         "200": { description: OK }
         "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/exploration:
+    get:
+      tags: [Exploration]
+      summary: Current exploration session (aggregates only; the server keeps no location history).
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ExplorationSession" } } } }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/exploration/start:
+    post:
+      tags: [Exploration]
+      summary: Start (or continue) an exploration session.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ExplorationSession" } } } }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/exploration/stop:
+    post:
+      tags: [Exploration]
+      summary: End the session. The last position is deleted.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/ExplorationSession" } } } }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/exploration/samples:
+    post:
+      tags: [Exploration]
+      summary: |
+        Batch of device GPS samples (max 20). Each is validated (range, accuracy, clock skew, age, order, rate, speed);
+        an implausible jump moves the position but blocks rewards for a cooldown. Re-sending a batch is harmless.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [samples]
+              properties:
+                samples:
+                  type: array
+                  minItems: 1
+                  maxItems: 20
+                  items:
+                    type: object
+                    additionalProperties: false
+                    required: [lat, lon, accuracyM, capturedAt]
+                    properties:
+                      lat: { type: number, minimum: -90, maximum: 90 }
+                      lon: { type: number, minimum: -180, maximum: 180 }
+                      accuracyM: { type: number, exclusiveMinimum: 0 }
+                      capturedAt: { type: string, format: date-time }
+      responses:
+        "200":
+          description: Per-sample outcomes (accepted, accepted_low_accuracy, relocated, invalid, future, stale, out_of_order, rate_limited)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  outcomes: { type: array, items: { type: string } }
+                  session: { $ref: "#/components/schemas/ExplorationSession" }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/world/nearby:
+    get:
+      tags: [World]
+      summary: Nodes within 600 m of the last known position, the active regional event and the nearest Flame site.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/world/flame-sites:
+    get:
+      tags: [World]
+      summary: The 12 fixed Flame-path sites.
+      responses:
+        "200": { description: OK }
+  /api/v1/world/interactions:
+    post:
+      tags: [World]
+      summary: |
+        Harvest a node or engage a spirit beast (returns battleId). Requires a verified position within 40 m, a node of the
+        current spawn period, one claim per node and character, and the hourly limit. Node keys go in the body (never URLs/logs).
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [characterId, nodeKey]
+              properties:
+                characterId: { type: string, format: uuid }
+                nodeKey: { type: string }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/WorldInteraction" } } } }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/world/flame-attunements:
+    post:
+      tags: [World]
+      summary: Attune at a Flame site (verified position within 150 m; once per site per 20 h; Flame path earns most).
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [characterId, siteId]
+              properties:
+                characterId: { type: string, format: uuid }
+                siteId: { type: string }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/WorldInteraction" } } } }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
 components:
   securitySchemes:
     bearer:
@@ -640,3 +771,24 @@ components:
         seedHash: { type: string, description: "SHA-256 of the battle seed, published at the start." }
         seed: { type: [string, "null"], description: "Revealed when the battle has finished." }
         rewardQi: { type: integer }
+    ExplorationSession:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        status: { type: string, enum: [active, ended] }
+        startedAt: { type: string, format: date-time }
+        endedAt: { type: [string, "null"], format: date-time }
+        distanceM: { type: number }
+        acceptedSamples: { type: integer }
+        droppedSamples: { type: integer }
+        anomalies: { type: integer }
+        flagged: { type: boolean }
+        positionVerified: { type: boolean }
+        positionProblem: { type: [string, "null"], enum: [no_session, session_flagged, stale_position, low_accuracy, relocation_cooldown, moving_too_fast, null] }
+        relocationUntil: { type: [string, "null"], format: date-time }
+    WorldInteraction:
+      type: object
+      properties:
+        kind: { type: string }
+        rewardQi: { type: integer }
+        battleId: { type: [string, "null"], format: uuid }

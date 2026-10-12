@@ -49,6 +49,7 @@ services:
       Storage__Provider: Postgres
       ConnectionStrings__Jianghu: Host=postgres;Database=jianghu;Username=${POSTGRES_USER:-jianghu};Password=${POSTGRES_PASSWORD:-jianghu-dev}
       Worker__RunInProcess: "false"   # the worker service below drains the outbox
+      World__Seed: ${WORLD_SEED:-7231994812734417}   # dev default; production: a secret
     ports: ["127.0.0.1:8080:8080"]
 
   worker:
@@ -59,6 +60,7 @@ services:
       migrate: { condition: service_completed_successfully }
     environment:
       DOTNET_ENVIRONMENT: Development
+      World__Seed: ${WORLD_SEED:-7231994812734417}
       ConnectionStrings__Jianghu: Host=postgres;Database=jianghu;Username=${POSTGRES_USER:-jianghu};Password=${POSTGRES_PASSWORD:-jianghu-dev}
     restart: unless-stopped
 

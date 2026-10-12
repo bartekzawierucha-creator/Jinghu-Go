@@ -29,6 +29,7 @@ public static class CombatModule
         else
             services.AddSingleton<ICombatRepository, InMemoryCombatRepository>();
         services.AddScoped<CombatService>();
+        services.AddScoped<Contracts.ICombatEncounters>(sp => sp.GetRequiredService<CombatService>());
         return services;
     }
 

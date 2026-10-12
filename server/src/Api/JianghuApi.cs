@@ -8,6 +8,8 @@ using JianghuGo.Infrastructure.Postgres;
 using JianghuGo.Modules.Characters.Api;
 using JianghuGo.Modules.Combat.Api;
 using JianghuGo.Modules.Cultivation.Api;
+using JianghuGo.Modules.Geolocation.Api;
+using JianghuGo.Modules.World.Api;
 using JianghuGo.Modules.Identity.Api;
 using JianghuGo.Modules.Notifications;
 using Microsoft.AspNetCore.Diagnostics;
@@ -83,6 +85,8 @@ public static class JianghuApi
         app.MapCharacterEndpoints();
         app.MapCultivationEndpoints();
         app.MapCombatEndpoints();
+        app.MapGeolocationEndpoints();
+        app.MapWorldEndpoints();
         app.MapNotificationEndpoints();
         return app;
     }

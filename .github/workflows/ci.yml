@@ -24,6 +24,7 @@ jobs:
           --health-cmd "pg_isready -U jianghu" --health-interval 5s --health-timeout 3s --health-retries 20
     env:
       JIANGHU_TEST_POSTGRES: Host=localhost;Username=jianghu;Password=ci-only-password;Database=postgres
+      World__Seed: "1234567890123"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4

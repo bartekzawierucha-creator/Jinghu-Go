@@ -53,6 +53,7 @@ public sealed class ApiHost : IAsyncDisposable
                 ["RateLimiting:AuthPermitsPerMinute"] = "10000",
                 ["RateLimiting:GlobalPermitsPerMinute"] = "100000",
                 ["Storage:Provider"] = usePostgres ? "Postgres" : "InMemory",
+                ["World:Seed"] = "1234567890123",
                 ["Worker:RunInProcess"] = "false", // tests drain the outbox explicitly (OutboxDispatcher.DrainAsync)
                 ["ConnectionStrings:Jianghu"] = usePostgres ? TestDatabase.ConnectionStringFor(database!) : null,
             });

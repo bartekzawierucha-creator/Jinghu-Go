@@ -12,6 +12,9 @@
 | `combat.turns`, `combat.battles` | rozstrzyganie sporów, odtwarzanie walk | 180 dni po zakończeniu (do potwierdzenia) | uczestnicy walki, operator |
 | `combat.intents` | bieżąca tura | po rozstrzygnięciu tury redundantne z `combat.turns`; czyszczenie po 7 dniach | serwer |
 | `notifications.notifications` | powiadomienia w grze | 90 dni (do potwierdzenia) | właściciel konta |
-| lokalizacja (Etap 5) | walidacja eksploracji | **minimalna**: surowe próbki ≤ 24 h, potem tylko agregaty sesji | serwer |
+| `geolocation.sessions.last_position` | weryfikacja pozycji do nagród | tylko **ostatni** punkt, kasowany przy końcu sesji (CHECK); surowe próbki nie są zapisywane wcale | serwer |
+| `geolocation.sessions` (agregaty) | statystyki, anty-nadużycia | 90 dni | serwer, zespół anty-nadużyć |
+| `world.node_claims` | jednorazowość zebrań | 7 dni (klucz ≈ komórka ~550 m) | serwer |
+| `world.flame_attunements` | cooldown miejsc Płomienia | do usunięcia postaci (12 publicznych miejsc) | serwer |
 
 Zadania czyszczące: do dodania jako okresowe zadania Workera (Etap 8, razem z testami obciążeniowymi); indeksy pod nie już istnieją. Usunięcie konta z postaciami: blokowane przez FK (`ON DELETE RESTRICT`) — wymaga procedury anonimizacji (do zaprojektowania przed wydaniem).

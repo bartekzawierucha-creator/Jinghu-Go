@@ -1,0 +1,43 @@
+{
+  "rulesVersion": "world-1",
+  "cellSizeDegrees": 0.005,
+  "nodeEpochHours": 6,
+  "nodesPerCell": { "min": 0, "max": 3 },
+  "nearbyRadiusM": 600,
+  "interactionRadiusM": 40,
+  "interactionsPerHour": 60,
+  "nodeKinds": [
+    { "id": "qi_spring",    "namePl": "Źródło Qi",       "nameEn": "Qi Spring",    "weight": 50, "rewardQi": 15, "npcId": null },
+    { "id": "spirit_herb",  "namePl": "Duchowe Zioło",   "nameEn": "Spirit Herb",  "weight": 35, "rewardQi": 10, "npcId": null },
+    { "id": "spirit_beast", "namePl": "Duchowa Bestia",  "nameEn": "Spirit Beast", "weight": 15, "rewardQi": 0,  "npcId": "grey_wolf" }
+  ],
+  "flame": {
+    "radiusM": 150,
+    "cooldownHours": 20,
+    "rewardQiFlamePath": 250,
+    "rewardQiOtherPaths": 40,
+    "sites": [
+      { "id": "wudang",  "namePl": "Góry Wudang",            "lat": 32.4000,  "lon": 111.0040 },
+      { "id": "shaolin", "namePl": "Klasztor Shaolin",       "lat": 34.5076,  "lon": 112.9355 },
+      { "id": "emei",    "namePl": "Góra Emei",              "lat": 29.5199,  "lon": 103.3328 },
+      { "id": "huashan", "namePl": "Góra Hua",               "lat": 34.4778,  "lon": 110.0889 },
+      { "id": "taishan", "namePl": "Góra Tai",               "lat": 36.2561,  "lon": 117.1004 },
+      { "id": "kailash", "namePl": "Góra Kajlas",            "lat": 31.0675,  "lon": 81.3119 },
+      { "id": "fuji",    "namePl": "Góra Fudżi",             "lat": 35.3606,  "lon": 138.7274 },
+      { "id": "wawel",   "namePl": "Smocza Jama, Wawel",     "lat": 50.0533,  "lon": 19.9332 },
+      { "id": "etna",    "namePl": "Etna",                   "lat": 37.7510,  "lon": 14.9934 },
+      { "id": "teide",   "namePl": "Teide",                  "lat": 28.2724,  "lon": -16.6425 },
+      { "id": "kilauea", "namePl": "Kīlauea",                "lat": 19.4069,  "lon": -155.2834 },
+      { "id": "uluru",   "namePl": "Uluru",                  "lat": -25.3444, "lon": 131.0369 }
+    ]
+  },
+  "events": {
+    "regionSizeDegrees": 0.05,
+    "epochHours": 2,
+    "chancePermille": 150,
+    "kinds": [
+      { "id": "qi_storm",        "namePl": "Burza Qi",          "nameEn": "Qi Storm",        "weight": 1, "rewardMultiplierPermille": 2000 },
+      { "id": "spirit_blessing", "namePl": "Błogosławieństwo",  "nameEn": "Spirit Blessing", "weight": 2, "rewardMultiplierPermille": 1500 }
+    ]
+  }
+}

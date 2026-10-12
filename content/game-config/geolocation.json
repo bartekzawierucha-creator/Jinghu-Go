@@ -1,0 +1,16 @@
+{
+  "rulesVersion": "geo-1",
+  "maxAccuracyM": 5000,
+  "trustedAccuracyM": 50,
+  "maxClockSkewSeconds": 30,
+  "maxSampleAgeSeconds": 120,
+  "maxSamplesPerBatch": 20,
+  "maxSamplesPerMinute": 30,
+  "teleportSpeedMps": 60,
+  "interactionMaxSpeedMps": 10,
+  "relocationCooldownSeconds": 300,
+  "freshnessSeconds": 60,
+  "sessionMaxMinutes": 240,
+  "sessionIdleMinutes": 10,
+  "flagAfterAnomalies": 5
+}

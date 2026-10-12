@@ -47,7 +47,11 @@ Status: ✅ zaimplementowane i przetestowane · 🟡 częściowo · ⏳ zaplanow
 | T-CMB-4 | Manipulacja RNG / „ustawiona” walka przez serwer | Seed z CSPRNG, commit-reveal, pełny log tur — walkę odtworzy każdy | ✅ |
 | T-CMB-5 | Wymuszanie walkowerów / spam wyzwań | Wyzwania nie blokują postaci, maks. 3 oczekujące, wygasają po 10 min; walkower dopiero po 3 przegapionych turach | 🟡 |
 | T-CMB-6 | Farmienie Qi na NPC / win-trading PvP | Limit 20 nagradzanych zwycięstw PvE / 24 h; PvP bez nagród w Qi | ✅ |
-| T-GPS-* | Spoofing lokalizacji, teleportacja, farmienie | Etap 5: walidacja prędkości/dokładności/kolejności, scoring zamiast automatycznych kar, minimalizacja przechowywania | ⏳ |
+| T-GPS-1 | Teleportacja / spoofing pozycji | Prędkość z odjęciem promieni błędu, okres przenosin 5 min, oznaczenie sesji po 5 anomaliach, audyt | ✅ (test #9) — fałszywy GPS poruszający się „realistycznie” nie jest wykrywalny po stronie serwera (⏳ atestacja urządzenia: Play Integrity / App Attest) |
+| T-GPS-2 | Manipulacja czasem próbek | Okno ±30 s / 120 s wobec zegara serwera, ścisła kolejność, limit tempa | ✅ |
+| T-GPS-3 | Farmienie punktów | Raz na postać na punkt, 60 interakcji/h, punkty znikają co 6 h | ✅ |
+| T-GPS-4 | Fałszowanie / przewidywanie punktów | Punkt odtwarzany po stronie serwera z tajnego seeda; nieznany klucz → 404 | ✅ |
+| T-GPS-5 | Wyciek historii lokalizacji | Tylko ostatnia pozycja, kasowana przy końcu sesji (CHECK w bazie); brak współrzędnych w logach/audycie; retencja zebrań 7 dni | ✅ (retencja: zadanie czyszczące ⏳) |
 | T-COM-1 | Podsłuch | Klient release wymusza HTTPS (`UnityWebRequestTransport`); TLS terminowany na ingressie | 🟡 (ingress ⏳) |
 | T-COM-2 | Duże/zniekształcone żądania | Limit body 64 KiB, walidacja JSON → 400 | ✅ |
 | T-OPS-1 | Sekrety w repo | `.gitignore` dla `.env`; gitleaks w CI | 🟡 (CI nieuruchomione tutaj) |
