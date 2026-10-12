@@ -22,6 +22,37 @@ internal sealed class InMemoryCombatRepository : ICombatRepository
     private const string Battles = "combat.battles";
     private const string Intents = "combat.intents";
     private const string Turns = "combat.turns";
+    private const string Custom = "combat.custom_techniques";
+    private const string Known = "combat.known_techniques";
+
+    public Task AddCustomTechniqueAsync(IUnitOfWork uow, CustomTechnique technique, CancellationToken ct)
+    {
+        U(uow).SetTable(Custom, U(uow).Table<string, CustomTechnique>(Custom).Add(technique.Id, technique));
+        return Task.CompletedTask;
+    }
+
+    public Task<CustomTechnique?> FindCustomTechniqueAsync(IUnitOfWork uow, string id, CancellationToken ct) =>
+        Task.FromResult(U(uow).Table<string, CustomTechnique>(Custom).GetValueOrDefault(id));
+
+    public Task<int> CountDesignsAsync(IUnitOfWork uow, CharacterId author, CancellationToken ct) =>
+        Task.FromResult(U(uow).Table<string, CustomTechnique>(Custom).Values.Count(t => t.AuthorCharacterId == author));
+
+    public Task<bool> TryAddKnownAsync(IUnitOfWork uow, KnownTechnique known, CancellationToken ct)
+    {
+        var t = U(uow).Table<(CharacterId, string), KnownTechnique>(Known);
+        if (t.ContainsKey((known.CharacterId, known.TechniqueId))) return Task.FromResult(false);
+        U(uow).SetTable(Known, t.Add((known.CharacterId, known.TechniqueId), known));
+        return Task.FromResult(true);
+    }
+
+    public Task<IReadOnlyList<(KnownTechnique Known, CustomTechnique Technique)>> ListKnownCustomAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct)
+    {
+        var custom = U(uow).Table<string, CustomTechnique>(Custom);
+        IReadOnlyList<(KnownTechnique, CustomTechnique)> list = [.. U(uow).Table<(CharacterId, string), KnownTechnique>(Known).Values
+            .Where(k => k.CharacterId == characterId).OrderBy(k => k.LearnedAt).ThenBy(k => k.TechniqueId, StringComparer.Ordinal)
+            .Select(k => (k, custom[k.TechniqueId]))];
+        return Task.FromResult(list);
+    }
 
     private static InMemoryUnitOfWork U(IUnitOfWork uow) => InMemoryUnitOfWork.From(uow);
 
@@ -109,6 +140,36 @@ internal sealed class InMemoryCombatRepository : ICombatRepository
 
 internal sealed class PostgresCombatRepository : ICombatRepository
 {
+    private const string CustomColumns = "id, author_character_id, author_account_id, author_name, definition::text, points, allowance, rules_version, created_at";
+
+    private static CustomTechnique MapCustom(NpgsqlDataReader r, int o = 0) => new(
+        r.GetString(o), new CharacterId(r.GetGuid(o + 1)), new AccountId(r.GetGuid(o + 2)), r.GetString(o + 3), CombatJson.Read<TechniqueDefinition>(r.GetString(o + 4)),
+        r.GetInt32(o + 5), r.GetInt32(o + 6), r.GetString(o + 7), r.GetFieldValue<DateTimeOffset>(o + 8));
+
+    public Task AddCustomTechniqueAsync(IUnitOfWork uow, CustomTechnique t, CancellationToken ct) =>
+        PostgresUnitOfWork.From(uow).ExecuteAsync(
+            "INSERT INTO combat.custom_techniques (id, author_character_id, author_account_id, author_name, slot, definition, points, allowance, rules_version, created_at) " +
+            "VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10)",
+            ct, t.Id, t.AuthorCharacterId.Value, t.AuthorAccountId.Value, t.AuthorName, t.Definition.Slot, CombatJson.Write(t.Definition), t.Points, t.Allowance, t.RulesVersion, t.CreatedAt);
+
+    public Task<CustomTechnique?> FindCustomTechniqueAsync(IUnitOfWork uow, string id, CancellationToken ct) =>
+        PostgresUnitOfWork.From(uow).QuerySingleOrDefaultAsync($"SELECT {CustomColumns} FROM combat.custom_techniques WHERE id = $1", r => MapCustom(r), ct, id);
+
+    public async Task<int> CountDesignsAsync(IUnitOfWork uow, CharacterId author, CancellationToken ct) =>
+        (int)(await PostgresUnitOfWork.From(uow).QueryAsync("SELECT count(*) FROM combat.custom_techniques WHERE author_character_id = $1",
+            r => r.GetInt64(0), ct, author.Value)).Single();
+
+    public async Task<bool> TryAddKnownAsync(IUnitOfWork uow, KnownTechnique k, CancellationToken ct) =>
+        await PostgresUnitOfWork.From(uow).ExecuteAsync(
+            "INSERT INTO combat.known_techniques (character_id, technique_id, source, learned_at) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
+            ct, k.CharacterId.Value, k.TechniqueId, k.Source, k.LearnedAt) == 1;
+
+    public async Task<IReadOnlyList<(KnownTechnique Known, CustomTechnique Technique)>> ListKnownCustomAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
+        await PostgresUnitOfWork.From(uow).QueryAsync(
+            "SELECT k.source, k.learned_at, t.id, t.author_character_id, t.author_account_id, t.author_name, t.definition::text, t.points, t.allowance, t.rules_version, t.created_at " +
+            "FROM combat.known_techniques k JOIN combat.custom_techniques t ON t.id = k.technique_id WHERE k.character_id = $1 ORDER BY k.learned_at, k.technique_id",
+            r => (new KnownTechnique(characterId, r.GetString(2), r.GetString(0), r.GetFieldValue<DateTimeOffset>(1)), MapCustom(r, 2)), ct, characterId.Value);
+
     private const string BattleColumns =
         "id, kind, status, rules_version, seed, seed_hash, character_a, account_a, character_b, account_b, npc_id, combatant_a::text, combatant_b::text, state::text, " +
         "version, deadline, timeouts_a, timeouts_b, reward_qi, created_at, updated_at, finished_at";

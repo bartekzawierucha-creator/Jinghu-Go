@@ -89,7 +89,7 @@ public sealed class CombatService(
             var c = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
             if (c is null) return CharacterNotFound;
             if (cmd.Slots is null) return Error.Validation("loadout_invalid", "slots are required.");
-            if (LoadoutRules.Validate(config, c.Path, cmd.Slots) is { } problem) return Error.Validation("loadout_invalid", problem);
+            if (LoadoutRules.Validate(config, c.Path, cmd.Slots, await DaoTechniquesAsync(uow, c, ct)) is { } problem) return Error.Validation("loadout_invalid", problem);
 
             var stored = await repo.FindLoadoutAsync(uow, c.Id, ct);
             var version = stored?.Version ?? 0;
@@ -106,17 +106,22 @@ public sealed class CombatService(
         return stored is null ? ([.. config.StarterLoadouts[c.Path].Cast<string?>()], 0) : (stored.Slots, stored.Version);
     }
 
+    /// <summary>Dao Lab techniques this character knows, by id.</summary>
+    private async Task<IReadOnlyDictionary<string, TechniqueDefinition>> DaoTechniquesAsync(IUnitOfWork uow, CharacterSummary c, CancellationToken ct) =>
+        (await repo.ListKnownCustomAsync(uow, c.Id, ct)).ToDictionary(x => x.Technique.Id, x => x.Technique.Definition);
+
     private async Task<LoadoutView> LoadoutViewAsync(IUnitOfWork uow, CharacterSummary c, CancellationToken ct)
     {
         var (slots, version) = await CurrentLoadoutAsync(uow, c, ct);
         var mastery = (await repo.ListMasteryAsync(uow, c.Id, ct)).ToDictionary(m => m.TechniqueId);
+        var dao = await DaoTechniquesAsync(uow, c, ct);
         int Level(string id) => mastery.TryGetValue(id, out var m) ? m.Level : 1;
         var slotViews = slots.Select((id, i) =>
         {
-            var t = id is null ? null : config.Technique(id);
+            var t = id is null ? null : dao.GetValueOrDefault(id) ?? config.Technique(id);
             return new SlotView(i, SlotKinds.Layout[i], id, t?.NamePl, id is null ? 0 : Level(id), t?.QiCost ?? 0, 0, null);
         }).ToList();
-        var known = config.KnownBy(c.Path).Select(t =>
+        var known = config.KnownBy(c.Path).Concat(dao.Values).Select(t =>
         {
             var m = mastery.GetValueOrDefault(t.Id);
             var level = m?.Level ?? 1;
@@ -130,10 +135,11 @@ public sealed class CombatService(
     {
         var (slots, _) = await CurrentLoadoutAsync(uow, c, ct);
         var mastery = (await repo.ListMasteryAsync(uow, c.Id, ct)).ToDictionary(m => m.TechniqueId, m => m.Level);
+        var dao = await DaoTechniquesAsync(uow, c, ct);
         // Equipment bonuses are frozen into the snapshot: changing gear mid-battle has no effect.
         var bonuses = await equipment.BonusesAsync(uow, c.Id, ct);
         var stats = c.Stats.ToDictionary(s => s.Key, s => s.Value + bonuses.GetValueOrDefault(s.Key));
-        return new Combatant(c.Name, stats, [.. slots.Select(id => id is null ? null : new EquippedTechnique(id, mastery.GetValueOrDefault(id, 1)))],
+        return new Combatant(c.Name, stats, [.. slots.Select(id => id is null ? null : new EquippedTechnique(id, mastery.GetValueOrDefault(id, 1), dao.GetValueOrDefault(id)))],
             null, config.PathHpBonusPermille[c.Path]);
     }
 
@@ -517,7 +523,7 @@ public sealed class CombatService(
             ? []
             : me.Slots.Select((eq, i) =>
             {
-                var t = eq is null ? null : config.Technique(eq.Id);
+                var t = eq is null ? null : config.Technique(eq);
                 var probe = eq is null ? null : t!.Movement is not null
                     ? (CombatEngine.Validate(config, me, state.Of(side), state.Distance, new Intent(i, Directions.Advance)) is null
                        || CombatEngine.Validate(config, me, state.Of(side), state.Distance, new Intent(i, Directions.Retreat)) is null

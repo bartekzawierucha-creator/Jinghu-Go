@@ -26,7 +26,7 @@ public sealed record CreateListingCommand(Guid CharacterId, string? ItemId, long
 public sealed record BuyCommand(Guid CharacterId);
 
 public sealed record ListingView(Guid Id, string ItemId, string ItemNamePl, string Rarity, long Quantity, Guid? InstanceId, int UpgradeLevel, long Price,
-    Guid SellerCharacterId, string SellerName, string Status, DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt, bool Expired);
+    Guid SellerCharacterId, string SellerName, string Status, DateTimeOffset CreatedAt, DateTimeOffset ExpiresAt, bool Expired, string? InstanceRef);
 
 public sealed record MyListingView(ListingView Listing, long Fee, long Tax, long? Proceeds, Guid? BuyerCharacterId, DateTimeOffset? ClosedAt);
 
@@ -72,6 +72,7 @@ public sealed class MarketService(
                 string itemId;
                 long quantity;
                 var level = 0;
+                string? instanceRef = null;
                 if (cmd.InstanceId is { } instanceId)
                 {
                     var item = await inventory.FindInstanceAsync(uow, instanceId, ct);
@@ -79,7 +80,7 @@ public sealed class MarketService(
                     if (cmd.ExpectedVersion is not { } version) return Error.Validation("expected_version_required", "expectedVersion is required for unique items.");
                     var listed = await inventory.SetListedAsync(uow, instanceId, version, true, "market:" + reference, ct);
                     if (!listed.IsSuccess) return listed.Error!;
-                    (itemId, quantity, level) = (item.ItemId, 1, item.UpgradeLevel);
+                    (itemId, quantity, level, instanceRef) = (item.ItemId, 1, item.UpgradeLevel, item.BoundRef);
                 }
                 else
                 {
@@ -100,7 +101,7 @@ public sealed class MarketService(
                 }
 
                 var listing = new Listing(id, c.Id, accountId, c.Name, itemId, quantity, cmd.InstanceId, level, cmd.Price, fee, ListingStatuses.Active,
-                    null, null, 0, 1, now, now.AddHours(config.ListingHours), null);
+                    null, null, 0, 1, now, now.AddHours(config.ListingHours), null, instanceRef);
                 await repo.AddAsync(uow, listing, ct);
                 await AuditAsync(uow, accountId, "market.listed", id, new { characterId = c.Id.Value, itemId, quantity, cmd.InstanceId, cmd.Price, fee }, now, ct);
                 return View(listing, now);
@@ -226,7 +227,7 @@ public sealed class MarketService(
     {
         var item = catalog.Find(l.ItemId);
         return new ListingView(l.Id, l.ItemId, item?.NamePl ?? l.ItemId, item?.Rarity ?? "mortal", l.Quantity, l.InstanceId, l.UpgradeLevel, l.Price,
-            l.SellerCharacterId.Value, l.SellerName, l.Status, l.CreatedAt, l.ExpiresAt, l.Status == ListingStatuses.Active && l.ExpiresAt <= now);
+            l.SellerCharacterId.Value, l.SellerName, l.Status, l.CreatedAt, l.ExpiresAt, l.Status == ListingStatuses.Active && l.ExpiresAt <= now, l.InstanceRef);
     }
 
     private Task AuditAsync(IUnitOfWork uow, AccountId accountId, string action, Guid listingId, object data, DateTimeOffset now, CancellationToken ct) =>

@@ -10,7 +10,7 @@ namespace JianghuGo.Modules.Inventory.Application;
 public sealed record StackView(string ItemId, string NamePl, string Type, string Rarity, long Quantity);
 
 public sealed record InstanceView(Guid Id, string ItemId, string NamePl, string Rarity, string? Slot, int UpgradeLevel, string State, int Version,
-    IReadOnlyDictionary<string, int> Stats);
+    IReadOnlyDictionary<string, int> Stats, string? BoundRef);
 
 public sealed record InventoryView(Guid CharacterId, string RulesVersion, long Balance, int SlotsUsed, int Capacity,
     IReadOnlyList<StackView> Stacks, IReadOnlyList<InstanceView> Items, IReadOnlyDictionary<string, Guid> Equipped, IReadOnlyDictionary<string, int> Bonuses);
@@ -64,7 +64,7 @@ public sealed class InventoryService(
             if (item.Version != cmd.ExpectedVersion) return Concurrent;
             if (item.State == InstanceStates.Equipped) return await ViewAsync(uow, c.Id, ct);
             if (item.State != InstanceStates.Bag) return Error.Conflict("item_listed", "The item is listed on the market.");
-            var slot = InventoryRules.SlotOf(config, item.ItemId)!;
+            if (InventoryRules.SlotOf(config, item.ItemId) is not { } slot) return Error.Validation("item_not_equippable", "This item cannot be equipped.");
             var previous = instances.FirstOrDefault(i => i.State == InstanceStates.Equipped && InventoryRules.SlotOf(config, i.ItemId) == slot);
 
             var after = instances.Select(i => i.Id == item.Id ? i with { State = InstanceStates.Equipped }
@@ -208,7 +208,7 @@ public sealed class InventoryService(
             {
                 var d = config.Item(i.ItemId);
                 var stats = d.Equipment?.Stats.ToDictionary(s => s.Key, s => InventoryRules.ScaledStat(config, s.Value, i.UpgradeLevel)) ?? [];
-                return new InstanceView(i.Id, i.ItemId, d.NamePl, d.Rarity, d.Equipment?.Slot, i.UpgradeLevel, i.State, i.Version, stats);
+                return new InstanceView(i.Id, i.ItemId, d.NamePl, d.Rarity, d.Equipment?.Slot, i.UpgradeLevel, i.State, i.Version, stats, i.BoundRef);
             })],
             equipped.ToDictionary(i => InventoryRules.SlotOf(config, i.ItemId)!, i => i.Id),
             InventoryRules.Bonuses(config, equipped));

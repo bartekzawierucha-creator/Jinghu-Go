@@ -26,6 +26,9 @@ namespace JianghuGo.Client.Application
         public int Version { get; set; }
         public Dictionary<string, int> Stats { get; set; } = new Dictionary<string, int>();
 
+        /// <summary>For scrolls: the Dao technique they teach.</summary>
+        public string BoundRef { get; set; }
+
         public bool InBag => State == "bag";
         public bool IsEquipped => State == "equipped";
     }
@@ -161,6 +164,9 @@ namespace JianghuGo.Client.Application
         public DateTimeOffset CreatedAt { get; set; }
         public DateTimeOffset ExpiresAt { get; set; }
         public bool Expired { get; set; }
+
+        /// <summary>For scrolls: the Dao technique they teach (inspect it with GetDaoTechniqueAsync before buying).</summary>
+        public string InstanceRef { get; set; }
     }
 
     public sealed class ListingPageDto

@@ -23,6 +23,7 @@ tags:
   - name: Inventory
   - name: Crafting
   - name: Market
+  - name: DaoLab
 paths:
   /health/live:
     get:
@@ -842,6 +843,74 @@ paths:
       responses:
         "200": { description: OK }
         "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/dao-lab/rules:
+    get:
+      tags: [DaoLab]
+      summary: Dao Lab rules — component limits, power budget weights, design fee, scroll cost.
+      responses:
+        "200": { description: OK }
+  /api/v1/dao-lab/preview:
+    post:
+      tags: [DaoLab]
+      summary: Validate a design without saving it (points vs allowance and every problem found).
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/DaoDesign" } } } }
+      responses:
+        "200": { description: OK }
+  /api/v1/dao-lab/techniques/{techniqueId}:
+    get:
+      tags: [DaoLab]
+      summary: Public view of a Dao technique (e.g. before buying its scroll).
+      parameters: [{ name: techniqueId, in: path, required: true, schema: { type: string, pattern: "^dao_[a-p]{16}$" } }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/dao-lab/techniques/{techniqueId}/scrolls:
+    post:
+      tags: [DaoLab]
+      summary: The author inscribes a tradable scroll of the technique (costs stones and a material).
+      parameters: [{ name: techniqueId, in: path, required: true, schema: { type: string } }, { $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, additionalProperties: false, required: [characterId], properties: { characterId: { type: string, format: uuid } } } } }
+      responses:
+        "201": { description: Scroll created in the author's bag }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/dao-lab/techniques:
+    get:
+      tags: [DaoLab]
+      summary: Dao techniques the character knows (designed or learned) — equippable through the loadout.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/dao-lab/designs:
+    post:
+      tags: [DaoLab]
+      summary: Create a technique from approved components within the power budget (design fee; at most 6 per character).
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/DaoDesign" } } } }
+      responses:
+        "201": { description: Designed and known by the author }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/dao-lab/scrolls/{instanceId}/learn:
+    post:
+      tags: [DaoLab]
+      summary: Read a scroll from the bag — learn its technique; the scroll is used up (kept if already known).
+      parameters:
+        - { $ref: "#/components/parameters/CharacterId" }
+        - { name: instanceId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { $ref: "#/components/parameters/IdempotencyKey" }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, additionalProperties: false, required: [expectedVersion], properties: { expectedVersion: { type: integer } } } } }
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
 components:
   securitySchemes:
     bearer:
@@ -1070,3 +1139,26 @@ components:
         items: { type: array, items: { type: object } }
         equipped: { type: object, additionalProperties: { type: string, format: uuid } }
         bonuses: { type: object, additionalProperties: { type: integer } }
+    DaoDesign:
+      type: object
+      additionalProperties: false
+      required: [name, slot, qiCost, cooldown, speed]
+      description: Exactly one component matching the slot (attack | defense | movement | counter). Server validates limits and budget.
+      properties:
+        name: { type: string, minLength: 2, maxLength: 32 }
+        slot: { type: string, enum: [attack, defense, movement, counter] }
+        qiCost: { type: integer }
+        cooldown: { type: integer }
+        speed: { type: integer }
+        attack:
+          type: [object, "null"]
+          properties:
+            power: { type: integer }
+            scaling: { type: string, enum: [strength, spirit, agility] }
+            rangeMin: { type: integer }
+            rangeMax: { type: integer }
+            accuracyPermille: { type: integer }
+            effect: { type: [object, "null"], properties: { type: { type: string, enum: [bleed, stun, weaken] }, chancePermille: { type: integer }, magnitude: { type: integer }, duration: { type: integer } } }
+        defense: { type: [object, "null"], properties: { blockPermille: { type: integer } } }
+        movement: { type: [object, "null"], properties: { evasionPermille: { type: integer } } }
+        counter: { type: [object, "null"], properties: { reflectPermille: { type: integer }, qiSteal: { type: integer } } }

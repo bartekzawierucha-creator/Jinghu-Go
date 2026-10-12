@@ -91,6 +91,7 @@ public static class JianghuApi
         app.MapCharacterEndpoints();
         app.MapCultivationEndpoints();
         app.MapCombatEndpoints();
+        app.MapDaoLabEndpoints();
         app.MapGeolocationEndpoints();
         app.MapWorldEndpoints();
         app.MapInventoryEndpoints();

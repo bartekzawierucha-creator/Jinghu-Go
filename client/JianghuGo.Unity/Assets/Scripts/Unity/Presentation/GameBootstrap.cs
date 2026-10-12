@@ -182,6 +182,14 @@ namespace JianghuGo.Unity.Presentation
                 }));
             }
 
+            UiKit.ActionButton(s, "Laboratorium Dao", () => Run(async () =>
+            {
+                var lab = new DaoLabFlow(_api, c.Id);
+                await lab.LoadAsync(_lifetime.Token);
+                var economy = new EconomyFlow(_api, c.Id);
+                await economy.LoadAsync(_lifetime.Token);
+                ShowDaoLab(lab, economy, c);
+            }));
             UiKit.ActionButton(s, "Sakwa i ekwipunek", () => Run(async () =>
             {
                 var economy = new EconomyFlow(_api, c.Id);
@@ -466,6 +474,72 @@ namespace JianghuGo.Unity.Presentation
             UiKit.ActionButton(s, "Wróć do sakwy", () => ShowBag(economy, c));
         }
 
+        // ---- Dao Lab (prototype: attack designs only; the server validates every component and the budget) -------
+
+        private void ShowDaoLab(DaoLabFlow lab, EconomyFlow economy, CharacterDto c)
+        {
+            var s = NewScreen("Laboratorium Dao");
+            var name = UiKit.TextField(s, "Nazwa techniki");
+            var power = UiKit.TextField(s, "Moc (1–30)");
+            var qi = UiKit.TextField(s, "Koszt Qi (0–20)");
+            var cooldown = UiKit.TextField(s, "Odnowienie w turach (0–4)");
+            var reach = UiKit.TextField(s, "Zasięg maks. (1–3)");
+            var verdict = UiKit.Label(s, "Ułóż technikę i sprawdź budżet.", 28);
+
+            DaoDesignDto Compose()
+            {
+                var d = DaoLabFlow.StarterStrike(name.text);
+                if (int.TryParse(power.text, out var p)) d.Attack.Power = p;
+                if (int.TryParse(qi.text, out var q)) d.QiCost = q;
+                if (int.TryParse(cooldown.text, out var cd)) d.Cooldown = cd;
+                if (int.TryParse(reach.text, out var r)) d.Attack.RangeMax = r;
+                return d;
+            }
+
+            string Describe(DaoPreviewDto p) =>
+                (p.Valid ? "Dozwolona" : "Niedozwolona") + " — moc " + p.Points + " / budżet " + p.Allowance +
+                (p.Problems.Count > 0 ? "\n" + string.Join("\n", p.Problems) : string.Empty);
+
+            UiKit.ActionButton(s, "Sprawdź budżet", () => Run(async () => verdict.text = Describe(await lab.PreviewAsync(Compose(), _lifetime.Token))));
+            UiKit.ActionButton(s, "Stwórz technikę (opłata w KD)", () => Run(async () =>
+            {
+                var created = await lab.CreateAsync(Compose(), _lifetime.Token);
+                if (created == null) { verdict.text = Describe(lab.LastPreview); return; }
+                ShowDaoLab(lab, economy, c);
+                SetStatus("Powstała technika: " + created.Technique.NamePl);
+            }));
+
+            foreach (var k in lab.Known)
+            {
+                var known = k;
+                UiKit.ActionButton(s, "Załóż: " + known.Technique.NamePl + " (" + known.Technique.Slot + ")", () => Run(async () =>
+                {
+                    var ok = await lab.EquipAsync(known.Technique.Id, known.Technique.Slot, _lifetime.Token);
+                    SetStatus(ok ? "Technika w zestawie walki." : "Zestaw zmienił się na innym urządzeniu — odświeżono.");
+                }));
+                if (known.Source == "designed")
+                    UiKit.ActionButton(s, "  Spisz zwój: " + known.Technique.NamePl, () => Run(async () =>
+                    {
+                        await lab.InscribeAsync(known.Technique.Id, _lifetime.Token);
+                        SetStatus("Zwój trafił do sakwy — możesz go wystawić na targu.");
+                    }));
+            }
+
+            foreach (var it in economy.Inventory.Items.Where(i => i.BoundRef != null && i.InBag))
+            {
+                var scroll = it;
+                UiKit.ActionButton(s, "Przeczytaj zwój (" + scroll.BoundRef + ")", () => Run(async () =>
+                {
+                    var learned = await lab.LearnAsync(scroll, _lifetime.Token);
+                    await economy.ReloadAsync(_lifetime.Token);
+                    ShowDaoLab(lab, economy, c);
+                    SetStatus("Poznano technikę: " + learned.Technique.NamePl);
+                }));
+            }
+
+            UiKit.ActionButton(s, "Wróć", () => ShowCharacter(c));
+        }
+
         private static string Describe(NotificationDto n)
         {
             switch (n.Type)
@@ -531,6 +605,11 @@ namespace JianghuGo.Unity.Presentation
                 case "max_upgrade_level": return "Maksymalny poziom ulepszenia.";
                 case "own_listing": return "Nie możesz kupić własnej oferty.";
                 case "listing_limit": return "Za dużo aktywnych ofert.";
+                case "design_invalid": return "Technika łamie zasady Dao: " + e.Message;
+                case "design_limit": return "Osiągnięto limit autorskich technik.";
+                case "not_author": return "Tylko autor może spisywać zwoje tej techniki.";
+                case "technique_already_known": return "Znasz już tę technikę — zwój zostaje w sakwie.";
+                case "loadout_invalid": return "Ten zestaw technik jest niedozwolony.";
                 default: return "Błąd: " + e.Code + (e.CorrelationId != null ? " (" + e.CorrelationId + ")" : string.Empty);
             }
         }

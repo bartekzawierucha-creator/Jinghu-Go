@@ -23,6 +23,9 @@ public sealed record CombatConfig(
     public TechniqueDefinition Technique(string id) =>
         Techniques.FirstOrDefault(t => t.Id == id) ?? throw new KeyNotFoundException($"Unknown technique '{id}'.");
 
+    /// <summary>Rules of an equipped technique: its frozen Dao Lab definition, or the official one.</summary>
+    public TechniqueDefinition Technique(EquippedTechnique equipped) => equipped.Definition ?? Technique(equipped.Id);
+
     public NpcDefinition? Npc(string id) => Npcs.FirstOrDefault(n => n.Id == id);
 
     /// <summary>Techniques a character of this path knows: all path-less ones plus its path's signature technique(s).</summary>
@@ -195,10 +198,12 @@ public static class CombatConfigValidator
 public static class LoadoutRules
 {
     /// <summary>Null = valid. 8 entries; each non-null technique must be known by the path and fit the slot; no duplicates; ≥1 attack.</summary>
-    public static string? Validate(CombatConfig c, string path, IReadOnlyList<string?> slots)
+    /// <param name="daoTechniques">Dao Lab techniques the character knows (designed or learned from scrolls).</param>
+    public static string? Validate(CombatConfig c, string path, IReadOnlyList<string?> slots, IReadOnlyDictionary<string, TechniqueDefinition>? daoTechniques = null)
     {
         if (slots.Count != 8) return "a loadout has exactly 8 slots.";
         var known = c.KnownBy(path).ToDictionary(t => t.Id);
+        foreach (var (id, t) in daoTechniques ?? new Dictionary<string, TechniqueDefinition>()) known[id] = t;
         for (var i = 0; i < 8; i++)
         {
             if (slots[i] is not { } id) continue;

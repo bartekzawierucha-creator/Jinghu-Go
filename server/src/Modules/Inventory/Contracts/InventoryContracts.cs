@@ -3,7 +3,7 @@ using JianghuGo.Domain;
 
 namespace JianghuGo.Modules.Inventory.Contracts;
 
-public sealed record InstanceInfo(Guid Id, Guid CharacterId, Guid AccountId, string ItemId, int UpgradeLevel, string State, int Version, bool Tradable);
+public sealed record InstanceInfo(Guid Id, Guid CharacterId, Guid AccountId, string ItemId, int UpgradeLevel, string State, int Version, bool Tradable, string? BoundRef);
 
 /// <summary>
 /// Asset operations for other modules (Crafting, Market). Everything runs inside the CALLER's unit of work, so
@@ -22,7 +22,11 @@ public interface IInventory
     /// <summary>Whether one more unit of <paramref name="itemId"/> fits (existing stack with room, or a free bag slot).</summary>
     Task<bool> HasRoomAsync(IUnitOfWork uow, CharacterId characterId, string itemId, long quantity, CancellationToken ct);
 
-    Task<Result<InstanceInfo>> CreateInstanceAsync(IUnitOfWork uow, CharacterId characterId, AccountId accountId, string itemId, string reason, string referenceId, CancellationToken ct);
+    /// <param name="boundRef">Immutable reference stored with the item (a scroll's technique id); null for ordinary items.</param>
+    Task<Result<InstanceInfo>> CreateInstanceAsync(IUnitOfWork uow, CharacterId characterId, AccountId accountId, string itemId, string reason, string referenceId, CancellationToken ct, string? boundRef = null);
+
+    /// <summary>Uses up a unique item from the owner's bag (e.g. a scroll when its technique is learned).</summary>
+    Task<Result<InstanceInfo>> ConsumeInstanceAsync(IUnitOfWork uow, Guid instanceId, int expectedVersion, string reason, CancellationToken ct);
     Task<InstanceInfo?> FindInstanceAsync(IUnitOfWork uow, Guid instanceId, CancellationToken ct);
     Task<Result<InstanceInfo>> SetUpgradeLevelAsync(IUnitOfWork uow, Guid instanceId, int expectedVersion, int level, string reason, CancellationToken ct);
 

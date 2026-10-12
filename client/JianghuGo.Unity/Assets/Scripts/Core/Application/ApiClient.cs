@@ -248,6 +248,34 @@ namespace JianghuGo.Client.Application
         public Task<MyListingPageDto> GetMyListingsAsync(Guid characterId, CancellationToken ct) =>
             SendAsync<MyListingPageDto>("GET", "/api/v1/characters/" + characterId + "/market/listings", null, true, null, ct);
 
+        // ---- loadout & Dao Lab ------------------------------------------------------------------
+
+        public Task<LoadoutDto> GetLoadoutAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<LoadoutDto>("GET", "/api/v1/characters/" + characterId + "/combat/loadout", null, true, null, ct);
+
+        /// <summary>slots: 8 technique ids (null = empty), in slot order.</summary>
+        public Task<LoadoutDto> SetLoadoutAsync(Guid characterId, int expectedVersion, IList<string> slots, CancellationToken ct) =>
+            SendAsync<LoadoutDto>("PUT", "/api/v1/characters/" + characterId + "/combat/loadout", new { expectedVersion, slots }, true, null, ct);
+
+        public Task<DaoPreviewDto> PreviewDesignAsync(DaoDesignDto design, CancellationToken ct) =>
+            SendAsync<DaoPreviewDto>("POST", "/api/v1/dao-lab/preview", design, true, null, ct, retryPost: true);
+
+        public Task<KnownDaoTechniqueDto> DesignAsync(Guid characterId, DaoDesignDto design, CancellationToken ct) =>
+            SendAsync<KnownDaoTechniqueDto>("POST", "/api/v1/characters/" + characterId + "/dao-lab/designs", design, true, NewIdempotencyKey(), ct);
+
+        public Task<KnownDaoPageDto> GetKnownDaoTechniquesAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<KnownDaoPageDto>("GET", "/api/v1/characters/" + characterId + "/dao-lab/techniques", null, true, null, ct);
+
+        public Task<DaoTechniqueDto> GetDaoTechniqueAsync(string techniqueId, CancellationToken ct) =>
+            SendAsync<DaoTechniqueDto>("GET", "/api/v1/dao-lab/techniques/" + Uri.EscapeDataString(techniqueId), null, true, null, ct);
+
+        public Task<ScrollDto> InscribeScrollAsync(Guid characterId, string techniqueId, CancellationToken ct) =>
+            SendAsync<ScrollDto>("POST", "/api/v1/dao-lab/techniques/" + Uri.EscapeDataString(techniqueId) + "/scrolls", new { characterId }, true, NewIdempotencyKey(), ct);
+
+        public Task<KnownDaoTechniqueDto> LearnScrollAsync(Guid characterId, ItemInstanceDto scroll, CancellationToken ct) =>
+            SendAsync<KnownDaoTechniqueDto>("POST", "/api/v1/characters/" + characterId + "/dao-lab/scrolls/" + scroll.Id + "/learn",
+                new { expectedVersion = scroll.Version }, true, NewIdempotencyKey(), ct);
+
         // ---- plumbing ---------------------------------------------------------------------------
 
         public static string NewIdempotencyKey() => Guid.NewGuid().ToString("N");

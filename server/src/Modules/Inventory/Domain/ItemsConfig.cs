@@ -26,7 +26,7 @@ public sealed record ItemDefinition(
     ConsumableSpec? Consumable,
     EquipmentSpec? Equipment)
 {
-    public bool Stackable => Type != ItemTypes.Equipment;
+    public bool Stackable => Type is not (ItemTypes.Equipment or ItemTypes.Scroll);
 }
 
 public sealed record ConsumableSpec(long Qi);
@@ -42,7 +42,8 @@ public static class ItemTypes
     public const string Material = "material";
     public const string Consumable = "consumable";
     public const string Equipment = "equipment";
-    public static readonly IReadOnlyList<string> All = [Material, Consumable, Equipment];
+    public const string Scroll = "scroll"; // unique, carries a reference (e.g. the Dao technique it teaches); not equippable
+    public static readonly IReadOnlyList<string> All = [Material, Consumable, Equipment, Scroll];
 }
 
 public static class Rarities

@@ -91,18 +91,30 @@ public sealed class InventoryLedger(IInventoryRepository repo, ItemsConfig confi
         return (InventoryRules.SlotsUsed(stacks.Count, instances), InventoryRules.Capacity(config, instances.Where(i => i.State == InstanceStates.Equipped)));
     }
 
-    public async Task<Result<InstanceInfo>> CreateInstanceAsync(IUnitOfWork uow, CharacterId characterId, AccountId accountId, string itemId, string reason, string referenceId, CancellationToken ct)
+    public async Task<Result<InstanceInfo>> CreateInstanceAsync(IUnitOfWork uow, CharacterId characterId, AccountId accountId, string itemId, string reason, string referenceId, CancellationToken ct, string? boundRef = null)
     {
-        if (config.Find(itemId) is not { Stackable: false }) return UnknownItem(itemId);
+        if (config.Find(itemId) is not { Stackable: false } def) return UnknownItem(itemId);
+        if ((def.Type == ItemTypes.Scroll) != (boundRef is not null)) return Error.Validation("bound_ref_invalid", "Scrolls (and only scrolls) carry a reference.");
         if (!await HasRoomAsync(uow, characterId, itemId, 1, ct)) return BagFull;
-        return Info(await CreateUncheckedAsync(uow, characterId, accountId, itemId, reason, referenceId, ct));
+        return Info(await CreateUncheckedAsync(uow, characterId, accountId, itemId, reason, referenceId, ct, boundRef));
+    }
+
+    public async Task<Result<InstanceInfo>> ConsumeInstanceAsync(IUnitOfWork uow, Guid instanceId, int expectedVersion, string reason, CancellationToken ct)
+    {
+        var i = await repo.FindInstanceAsync(uow, instanceId, ct);
+        if (i is null || i.State == InstanceStates.Destroyed) return InstanceNotFound;
+        if (i.State != InstanceStates.Bag) return Error.Conflict("item_not_in_bag", "Only items in the bag can be used.");
+        var updated = i with { State = InstanceStates.Destroyed, Version = expectedVersion + 1 };
+        if (!await repo.TryUpdateInstanceAsync(uow, updated, expectedVersion, ct)) return Concurrent;
+        await EventAsync(uow, updated, "consumed", new { reason }, ct);
+        return Info(updated);
     }
 
     /// <summary>Creates a unique item regardless of bag space (reward grants only).</summary>
-    public async Task<ItemInstance> CreateUncheckedAsync(IUnitOfWork uow, CharacterId characterId, AccountId accountId, string itemId, string reason, string referenceId, CancellationToken ct)
+    public async Task<ItemInstance> CreateUncheckedAsync(IUnitOfWork uow, CharacterId characterId, AccountId accountId, string itemId, string reason, string referenceId, CancellationToken ct, string? boundRef = null)
     {
         var now = clock.GetUtcNow();
-        var instance = new ItemInstance(Uuid7.New(), characterId, accountId, itemId, 0, InstanceStates.Bag, 1, now);
+        var instance = new ItemInstance(Uuid7.New(), characterId, accountId, itemId, 0, InstanceStates.Bag, 1, now, boundRef);
         await repo.AddInstanceAsync(uow, instance, ct);
         await EventAsync(uow, instance, "created", new { reason, referenceId }, ct);
         return instance;
@@ -190,7 +202,7 @@ public sealed class InventoryLedger(IInventoryRepository repo, ItemsConfig confi
         InventoryRules.Bonuses(config, (await repo.ListInstancesAsync(uow, characterId, ct)).Where(i => i.State == InstanceStates.Equipped));
 
     public InstanceInfo Info(ItemInstance i) =>
-        new(i.Id, i.CharacterId.Value, i.AccountId.Value, i.ItemId, i.UpgradeLevel, i.State, i.Version, config.Find(i.ItemId)?.Tradable ?? false);
+        new(i.Id, i.CharacterId.Value, i.AccountId.Value, i.ItemId, i.UpgradeLevel, i.State, i.Version, config.Find(i.ItemId)?.Tradable ?? false, i.BoundRef);
 
     public Task EventAsync(IUnitOfWork uow, ItemInstance i, string kind, object data, CancellationToken ct) =>
         repo.AddItemEventAsync(uow, new ItemEvent(Uuid7.New(), i.Id, i.CharacterId, kind, JsonSerializer.Serialize(data, Idempotency.Json), clock.GetUtcNow()), ct);

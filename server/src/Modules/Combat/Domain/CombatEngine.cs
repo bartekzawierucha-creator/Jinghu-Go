@@ -2,7 +2,11 @@ using JianghuGo.Domain;
 
 namespace JianghuGo.Modules.Combat.Domain;
 
-public sealed record EquippedTechnique(string Id, int Level);
+/// <summary>
+/// A technique in a fighter's snapshot. <see cref="Definition"/> is set for Dao Lab (player-designed) techniques: their
+/// rules are frozen into the battle, so the battle replays identically whatever happens to the design later.
+/// </summary>
+public sealed record EquippedTechnique(string Id, int Level, TechniqueDefinition? Definition = null);
 
 /// <summary>Immutable snapshot of a fighter's build, frozen when the battle starts (later loadout changes do not leak in).</summary>
 public sealed record Combatant(string Name, IReadOnlyDictionary<string, int> Stats, IReadOnlyList<EquippedTechnique?> Slots, int? HpOverride, int HpBonusPermille = 0)
@@ -88,7 +92,7 @@ public static class CombatEngine
 
         if (slot is < 0 or > 7) return "slot_invalid";
         if (who.Slots.ElementAtOrDefault(slot) is not { } equipped) return "slot_empty";
-        var t = c.Technique(equipped.Id);
+        var t = c.Technique(equipped);
         if (f.Cooldowns[slot] > 0) return "on_cooldown";
         if (f.Qi < t.QiCost) return "insufficient_qi";
         if (t.Movement is null && intent.Direction is not null) return "direction_only_for_movement";
@@ -145,8 +149,8 @@ public static class CombatEngine
 
         // 2. Timeline order: stances/movement/rest before attacks; within a phase by initiative.
         int Priority(Combatant who, Intent? intent) =>
-            intent?.Slot is { } slot && c.Technique(who.Slots[slot]!.Id).Attack is not null ? 1 : 0;
-        int Speed(Combatant who, Intent? intent) => intent?.Slot is { } slot ? c.Technique(who.Slots[slot]!.Id).Speed : 0;
+            intent?.Slot is { } slot && c.Technique(who.Slots[slot]!).Attack is not null ? 1 : 0;
+        int Speed(Combatant who, Intent? intent) => intent?.Slot is { } slot ? c.Technique(who.Slots[slot]!).Speed : 0;
 
         var initA = ca.Stat("agility") + Speed(ca, effA) + rng.NextInt(0, c.InitiativeRandom);
         var initB = cb.Stat("agility") + Speed(cb, effB) + rng.NextInt(0, c.InitiativeRandom);
@@ -174,7 +178,7 @@ public static class CombatEngine
             }
 
             var eq = who.Slots[slot]!;
-            var t = c.Technique(eq.Id);
+            var t = c.Technique(eq);
             me.Qi -= t.QiCost;
             me.Cd[slot] = t.Cooldown + 1;
 
@@ -307,7 +311,7 @@ public static class CombatAi
         for (var slot = 0; slot < 8; slot++)
         {
             if (self.Slots[slot] is not { } eq) continue;
-            var t = c.Technique(eq.Id);
+            var t = c.Technique(eq);
             if (t.Movement is not null)
             {
                 foreach (var dir in new[] { Directions.Advance, Directions.Retreat })

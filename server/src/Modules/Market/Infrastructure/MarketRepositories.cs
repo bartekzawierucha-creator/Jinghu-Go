@@ -54,7 +54,7 @@ internal sealed class PostgresMarketRepository : IMarketRepository
 {
     private const string Columns =
         "id, seller_character_id, seller_account_id, seller_name, item_id, quantity, instance_id, upgrade_level, price, fee, status, " +
-        "buyer_character_id, buyer_account_id, tax, version, created_at, expires_at, closed_at";
+        "buyer_character_id, buyer_account_id, tax, version, created_at, expires_at, closed_at, instance_ref";
 
     private static PostgresUnitOfWork Pg(IUnitOfWork uow) => PostgresUnitOfWork.From(uow);
 
@@ -62,12 +62,13 @@ internal sealed class PostgresMarketRepository : IMarketRepository
         r.GetGuid(0), new CharacterId(r.GetGuid(1)), new AccountId(r.GetGuid(2)), r.GetString(3), r.GetString(4), r.GetInt64(5),
         r.IsDBNull(6) ? null : r.GetGuid(6), r.GetInt32(7), r.GetInt64(8), r.GetInt64(9), r.GetString(10),
         r.IsDBNull(11) ? null : new CharacterId(r.GetGuid(11)), r.IsDBNull(12) ? null : new AccountId(r.GetGuid(12)), r.GetInt64(13), r.GetInt32(14),
-        r.GetFieldValue<DateTimeOffset>(15), r.GetFieldValue<DateTimeOffset>(16), r.IsDBNull(17) ? null : r.GetFieldValue<DateTimeOffset>(17));
+        r.GetFieldValue<DateTimeOffset>(15), r.GetFieldValue<DateTimeOffset>(16), r.IsDBNull(17) ? null : r.GetFieldValue<DateTimeOffset>(17),
+        r.IsDBNull(18) ? null : r.GetString(18));
 
     public Task AddAsync(IUnitOfWork uow, Listing l, CancellationToken ct) =>
-        Pg(uow).ExecuteAsync($"INSERT INTO market.listings ({Columns}) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)",
+        Pg(uow).ExecuteAsync($"INSERT INTO market.listings ({Columns}) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)",
             ct, l.Id, l.SellerCharacterId.Value, l.SellerAccountId.Value, l.SellerName, l.ItemId, l.Quantity, l.InstanceId, l.UpgradeLevel, l.Price, l.Fee,
-            l.Status, l.BuyerCharacterId?.Value, l.BuyerAccountId?.Value, l.Tax, l.Version, l.CreatedAt, l.ExpiresAt, l.ClosedAt);
+            l.Status, l.BuyerCharacterId?.Value, l.BuyerAccountId?.Value, l.Tax, l.Version, l.CreatedAt, l.ExpiresAt, l.ClosedAt, l.InstanceRef);
 
     public Task<Listing?> FindAsync(IUnitOfWork uow, Guid id, CancellationToken ct) =>
         Pg(uow).QuerySingleOrDefaultAsync($"SELECT {Columns} FROM market.listings WHERE id = $1", Map, ct, id);

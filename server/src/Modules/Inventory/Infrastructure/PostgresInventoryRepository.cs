@@ -13,9 +13,9 @@ internal sealed class PostgresInventoryRepository : IInventoryRepository
     private static PostgresUnitOfWork Pg(IUnitOfWork uow) => PostgresUnitOfWork.From(uow);
 
     private static ItemInstance MapInstance(NpgsqlDataReader r) => new(
-        r.GetGuid(0), new CharacterId(r.GetGuid(1)), new AccountId(r.GetGuid(2)), r.GetString(3), r.GetInt32(4), r.GetString(5), r.GetInt32(6), r.GetFieldValue<DateTimeOffset>(7));
+        r.GetGuid(0), new CharacterId(r.GetGuid(1)), new AccountId(r.GetGuid(2)), r.GetString(3), r.GetInt32(4), r.GetString(5), r.GetInt32(6), r.GetFieldValue<DateTimeOffset>(7), r.IsDBNull(8) ? null : r.GetString(8));
 
-    private const string InstanceColumns = "id, character_id, account_id, item_id, upgrade_level, state, version, created_at";
+    private const string InstanceColumns = "id, character_id, account_id, item_id, upgrade_level, state, version, created_at, bound_ref";
 
     public async Task<long> QuantityAsync(IUnitOfWork uow, CharacterId characterId, string itemId, CancellationToken ct) =>
         (await Pg(uow).QueryAsync("SELECT quantity FROM inventory.stacks WHERE character_id = $1 AND item_id = $2", r => r.GetInt64(0), ct, characterId.Value, itemId))
@@ -72,8 +72,8 @@ internal sealed class PostgresInventoryRepository : IInventoryRepository
             ct, characterId.Value, before, limit);
 
     public Task AddInstanceAsync(IUnitOfWork uow, ItemInstance i, CancellationToken ct) =>
-        Pg(uow).ExecuteAsync($"INSERT INTO inventory.items ({InstanceColumns}) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)",
-            ct, i.Id, i.CharacterId.Value, i.AccountId.Value, i.ItemId, i.UpgradeLevel, i.State, i.Version, i.CreatedAt);
+        Pg(uow).ExecuteAsync($"INSERT INTO inventory.items ({InstanceColumns}) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)",
+            ct, i.Id, i.CharacterId.Value, i.AccountId.Value, i.ItemId, i.UpgradeLevel, i.State, i.Version, i.CreatedAt, i.BoundRef);
 
     public Task<ItemInstance?> FindInstanceAsync(IUnitOfWork uow, Guid id, CancellationToken ct) =>
         Pg(uow).QuerySingleOrDefaultAsync($"SELECT {InstanceColumns} FROM inventory.items WHERE id = $1", MapInstance, ct, id);

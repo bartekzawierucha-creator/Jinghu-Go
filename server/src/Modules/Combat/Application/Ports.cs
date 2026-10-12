@@ -31,4 +31,15 @@ public interface ICombatRepository
     /// <summary>Throws <see cref="DuplicateKeyException"/> if the turn was already resolved.</summary>
     Task AddTurnAsync(IUnitOfWork uow, TurnRecord turn, CancellationToken ct);
     Task<IReadOnlyList<TurnRecord>> ListTurnsAsync(IUnitOfWork uow, Guid battleId, CancellationToken ct);
+
+    // ---- Dao Lab
+    Task AddCustomTechniqueAsync(IUnitOfWork uow, CustomTechnique technique, CancellationToken ct);
+    Task<CustomTechnique?> FindCustomTechniqueAsync(IUnitOfWork uow, string id, CancellationToken ct);
+    Task<int> CountDesignsAsync(IUnitOfWork uow, CharacterId author, CancellationToken ct);
+
+    /// <summary>False if the character already knows the technique.</summary>
+    Task<bool> TryAddKnownAsync(IUnitOfWork uow, KnownTechnique known, CancellationToken ct);
+
+    /// <summary>Dao techniques the character knows, with their definitions.</summary>
+    Task<IReadOnlyList<(KnownTechnique Known, CustomTechnique Technique)>> ListKnownCustomAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct);
 }

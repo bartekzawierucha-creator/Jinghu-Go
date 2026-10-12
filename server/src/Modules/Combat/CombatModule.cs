@@ -23,14 +23,41 @@ public static class CombatModule
             path = Path.Combine(AppContext.BaseDirectory, path);
         }
 
-        services.AddSingleton(LoadConfig(path));
+        var combat = LoadConfig(path);
+        services.AddSingleton(combat);
+        var daoPath = configuration["GameConfig:DaoLabPath"] ?? "game-config/dao-lab.json";
+        if (!Path.IsPathRooted(daoPath))
+        {
+            daoPath = Path.Combine(AppContext.BaseDirectory, daoPath);
+        }
+
+        services.AddSingleton(LoadDaoLabConfig(daoPath, Inventory.InventoryModule.LoadCatalog(configuration)));
         if (StorageProvider.From(configuration) == StorageKind.Postgres)
             services.AddSingleton<ICombatRepository, PostgresCombatRepository>();
         else
             services.AddSingleton<ICombatRepository, InMemoryCombatRepository>();
         services.AddScoped<CombatService>();
         services.AddScoped<Contracts.ICombatEncounters>(sp => sp.GetRequiredService<CombatService>());
+        services.AddScoped<DaoLabService>();
         return services;
+    }
+
+    public static DaoLabConfig LoadDaoLabConfig(string path, Inventory.Contracts.IItemCatalog catalog)
+    {
+        var config = JsonSerializer.Deserialize<DaoLabConfig>(File.ReadAllText(path), StrictJson);
+        var errors = DaoLabConfigValidator.Validate(config).ToList();
+        if (config?.Scroll is { } s)
+        {
+            if (catalog.Find(s.ItemId) is not { Type: "scroll" }) errors.Add($"scroll.itemId '{s.ItemId}' must be an item of type scroll.");
+            if (s.MaterialQuantity > 0 && catalog.Find(s.Material) is not { Stackable: true }) errors.Add($"scroll.material '{s.Material}' must be a stackable item.");
+        }
+
+        if (errors.Count > 0)
+        {
+            throw new InvalidOperationException($"Invalid Dao Lab config '{path}':{Environment.NewLine}- " + string.Join(Environment.NewLine + "- ", errors));
+        }
+
+        return config!;
     }
 
     public static CombatConfig LoadConfig(string path)

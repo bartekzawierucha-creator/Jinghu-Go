@@ -41,7 +41,8 @@ public sealed record Listing(
     int Version,
     DateTimeOffset CreatedAt,
     DateTimeOffset ExpiresAt,
-    DateTimeOffset? ClosedAt)
+    DateTimeOffset? ClosedAt,
+    string? InstanceRef = null) // copied from the unique item (a scroll's technique id) so buyers see what they buy
 {
     public bool IsBuyable(DateTimeOffset now) => Status == ListingStatuses.Active && ExpiresAt > now;
 }

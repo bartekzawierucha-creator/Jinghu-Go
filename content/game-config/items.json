@@ -21,6 +21,7 @@
       "equipment": { "slot": "talisman", "stats": { "spirit": 3, "insight": 2 } } },
     { "id": "spatial_ring",     "namePl": "Pierścień Przestrzeni", "nameEn": "Spatial Ring",      "type": "equipment",  "rarity": "spirit",   "tradable": true,
       "equipment": { "slot": "ring", "stats": { "focus": 2 }, "bagBonus": 20 } },
+    { "id": "technique_scroll", "namePl": "Zwój Techniki",        "nameEn": "Technique Scroll",   "type": "scroll",     "rarity": "earth",    "tradable": true },
     { "id": "phoenix_feather",  "namePl": "Pióro Feniksa",        "nameEn": "Phoenix Feather",    "type": "equipment",  "rarity": "heavenly", "tradable": true,
       "equipment": { "slot": "treasure", "stats": { "fate": 3, "spirit": 3 } } }
   ],

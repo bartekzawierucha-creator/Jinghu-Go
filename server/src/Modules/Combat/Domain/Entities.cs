@@ -4,6 +4,19 @@ namespace JianghuGo.Modules.Combat.Domain;
 
 public sealed record TechniqueMastery(CharacterId CharacterId, string TechniqueId, int Level, int Xp);
 
+/// <summary>A Dao Lab design. Immutable once created: battles and scrolls refer to exactly these rules.</summary>
+public sealed record CustomTechnique(string Id, CharacterId AuthorCharacterId, AccountId AuthorAccountId, string AuthorName, TechniqueDefinition Definition,
+    int Points, int Allowance, string RulesVersion, DateTimeOffset CreatedAt);
+
+/// <summary>A Dao technique a character can equip: designed by them or learned from a scroll.</summary>
+public sealed record KnownTechnique(CharacterId CharacterId, string TechniqueId, string Source, DateTimeOffset LearnedAt);
+
+public static class KnownSources
+{
+    public const string Designed = "designed";
+    public const string Scroll = "scroll";
+}
+
 public sealed record Loadout(CharacterId CharacterId, AccountId AccountId, IReadOnlyList<string?> Slots, int Version);
 
 public static class BattleKinds

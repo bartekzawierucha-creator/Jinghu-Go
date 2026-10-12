@@ -88,7 +88,7 @@ internal sealed class InMemoryInventoryRepository : IInventoryRepository
     public Task<bool> TryUpdateInstanceAsync(IUnitOfWork uow, ItemInstance instance, int expectedVersion, CancellationToken ct)
     {
         var t = U(uow).Table<Guid, ItemInstance>(Items);
-        if (!t.TryGetValue(instance.Id, out var cur) || cur.Version != expectedVersion || instance.Version != expectedVersion + 1 || cur.ItemId != instance.ItemId)
+        if (!t.TryGetValue(instance.Id, out var cur) || cur.Version != expectedVersion || instance.Version != expectedVersion + 1 || cur.ItemId != instance.ItemId || cur.BoundRef != instance.BoundRef)
             return Task.FromResult(false);
         U(uow).SetTable(Items, t.SetItem(instance.Id, instance));
         return Task.FromResult(true);

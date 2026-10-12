@@ -25,7 +25,8 @@ public sealed record ItemInstance(
     int UpgradeLevel,
     string State,
     int Version,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    string? BoundRef = null); // immutable reference fixed at creation (a scroll's technique id)
 
 /// <summary>Append-only provenance of a unique item: created, upgraded, equipped, listed, transferred …</summary>
 public sealed record ItemEvent(Guid Id, Guid ItemInstanceId, CharacterId CharacterId, string Kind, string DataJson, DateTimeOffset At);
