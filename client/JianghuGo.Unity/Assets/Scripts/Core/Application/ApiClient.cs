@@ -276,6 +276,55 @@ namespace JianghuGo.Client.Application
             SendAsync<KnownDaoTechniqueDto>("POST", "/api/v1/characters/" + characterId + "/dao-lab/scrolls/" + scroll.Id + "/learn",
                 new { expectedVersion = scroll.Version }, true, NewIdempotencyKey(), ct);
 
+        // ---- sects & territories ----------------------------------------------------------------
+
+        public Task<SectPageDto> ListSectsAsync(Guid? before, CancellationToken ct) =>
+            SendAsync<SectPageDto>("GET", "/api/v1/sects?limit=30" + (before.HasValue ? "&before=" + before.Value : string.Empty), null, true, null, ct);
+
+        public Task<SectDto> GetSectAsync(Guid sectId, CancellationToken ct) => SendAsync<SectDto>("GET", "/api/v1/sects/" + sectId, null, true, null, ct);
+
+        public Task<MySectDto> GetMySectAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<MySectDto>("GET", "/api/v1/characters/" + characterId + "/sect", null, true, null, ct);
+
+        public Task<MySectDto> FoundSectAsync(Guid characterId, string name, CancellationToken ct) =>
+            SendAsync<MySectDto>("POST", "/api/v1/sects", new { characterId, name }, true, NewIdempotencyKey(), ct);
+
+        public Task<SectApplicationDto> ApplyToSectAsync(Guid characterId, Guid sectId, string message, CancellationToken ct) =>
+            SendAsync<SectApplicationDto>("POST", "/api/v1/sects/" + sectId + "/applications", new { characterId, message }, true, NewIdempotencyKey(), ct);
+
+        public Task<SectApplicationDto> DecideApplicationAsync(Guid characterId, Guid applicationId, bool accept, CancellationToken ct) =>
+            SendAsync<SectApplicationDto>("POST", "/api/v1/sects/applications/" + applicationId + "/decision", new { characterId, accept }, true, null, ct);
+
+        public Task<SectDto> LeaveSectAsync(Guid characterId, Guid sectId, CancellationToken ct) =>
+            SendAsync<SectDto>("POST", "/api/v1/sects/" + sectId + "/leave", new { characterId }, true, null, ct);
+
+        public Task<SectDto> KickAsync(Guid characterId, Guid sectId, Guid targetCharacterId, CancellationToken ct) =>
+            SendAsync<SectDto>("POST", "/api/v1/sects/" + sectId + "/kick", new { characterId, targetCharacterId }, true, null, ct);
+
+        public Task<SectDto> SetRoleAsync(Guid characterId, Guid sectId, Guid targetCharacterId, string role, CancellationToken ct) =>
+            SendAsync<SectDto>("POST", "/api/v1/sects/" + sectId + "/roles", new { characterId, targetCharacterId, role }, true, null, ct);
+
+        public Task<MySectDto> DonateAsync(Guid characterId, Guid sectId, long amount, CancellationToken ct) =>
+            SendAsync<MySectDto>("POST", "/api/v1/sects/" + sectId + "/donations", new { characterId, amount }, true, NewIdempotencyKey(), ct);
+
+        public Task<MySectDto> SetSeatAsync(Guid characterId, Guid sectId, CancellationToken ct) =>
+            SendAsync<MySectDto>("POST", "/api/v1/sects/" + sectId + "/seat", new { characterId }, true, NewIdempotencyKey(), ct);
+
+        public Task<TerritoryDto> GetTerritoryHereAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<TerritoryDto>("GET", "/api/v1/characters/" + characterId + "/territory/here", null, true, null, ct);
+
+        public Task<SectTerritoriesDto> GetSectTerritoriesAsync(Guid sectId, CancellationToken ct) =>
+            SendAsync<SectTerritoriesDto>("GET", "/api/v1/sects/" + sectId + "/territories", null, true, null, ct);
+
+        public Task<TerritoryDto> ClaimTerritoryAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<TerritoryDto>("POST", "/api/v1/territories/claim", new { characterId }, true, NewIdempotencyKey(), ct);
+
+        public Task<WarDto> ChallengeTerritoryAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<WarDto>("POST", "/api/v1/territories/challenge", new { characterId }, true, NewIdempotencyKey(), ct);
+
+        public Task<TerritoryDto> CollectTributeAsync(Guid characterId, string territoryKey, CancellationToken ct) =>
+            SendAsync<TerritoryDto>("POST", "/api/v1/territories/" + Uri.EscapeDataString(territoryKey) + "/tribute", new { characterId }, true, NewIdempotencyKey(), ct);
+
         // ---- plumbing ---------------------------------------------------------------------------
 
         public static string NewIdempotencyKey() => Guid.NewGuid().ToString("N");

@@ -11,6 +11,8 @@ using JianghuGo.Modules.Cultivation;
 using JianghuGo.Modules.Geolocation;
 using JianghuGo.Modules.Inventory;
 using JianghuGo.Modules.Market;
+using JianghuGo.Modules.Sects;
+using JianghuGo.Modules.Territory;
 using JianghuGo.Modules.World;
 using JianghuGo.Modules.Identity;
 using JianghuGo.Modules.Notifications;
@@ -44,6 +46,8 @@ public static class JianghuCore
         services.AddCombatModule(configuration);
         services.AddGeolocationModule(configuration);
         services.AddWorldModule(configuration);
+        services.AddSectsModule(configuration);
+        services.AddTerritoryModule(configuration);
         services.AddNotificationsModule(configuration);
         return services;
     }

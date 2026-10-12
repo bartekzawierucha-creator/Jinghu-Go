@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>JianghuGo.Modules.Territory</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../../Infrastructure/JianghuGo.Infrastructure.csproj" />
+    <!-- Contracts only: Sects (membership, permissions, treasury), Geolocation (verified position), Combat (battle results), Characters. -->
+    <ProjectReference Include="../Identity/JianghuGo.Modules.Identity.csproj" />
+    <ProjectReference Include="../Characters/JianghuGo.Modules.Characters.csproj" />
+    <ProjectReference Include="../Sects/JianghuGo.Modules.Sects.csproj" />
+    <ProjectReference Include="../Geolocation/JianghuGo.Modules.Geolocation.csproj" />
+    <ProjectReference Include="../Combat/JianghuGo.Modules.Combat.csproj" />
+  </ItemGroup>
+</Project>

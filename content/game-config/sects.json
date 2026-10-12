@@ -1,0 +1,10 @@
+{
+  "rulesVersion": "sects-1",
+  "foundingFeeStones": 500,
+  "maxMembers": 30,
+  "maxPendingApplicationsPerCharacter": 3,
+  "applicationMessageMaxLength": 200,
+  "minDonation": 1,
+  "maxDonation": 1000000,
+  "seat": { "costStones": 300, "moveCooldownDays": 7, "precisionDecimals": 3 }
+}

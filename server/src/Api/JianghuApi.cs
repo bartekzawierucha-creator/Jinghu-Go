@@ -12,6 +12,8 @@ using JianghuGo.Modules.Cultivation.Api;
 using JianghuGo.Modules.Geolocation.Api;
 using JianghuGo.Modules.Inventory.Api;
 using JianghuGo.Modules.Market.Api;
+using JianghuGo.Modules.Sects.Api;
+using JianghuGo.Modules.Territory.Api;
 using JianghuGo.Modules.World.Api;
 using JianghuGo.Modules.Identity.Api;
 using JianghuGo.Modules.Notifications;
@@ -97,6 +99,8 @@ public static class JianghuApi
         app.MapInventoryEndpoints();
         app.MapCraftingEndpoints();
         app.MapMarketEndpoints();
+        app.MapSectEndpoints();
+        app.MapTerritoryEndpoints();
         app.MapNotificationEndpoints();
         return app;
     }

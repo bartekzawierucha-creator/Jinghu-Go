@@ -182,6 +182,12 @@ namespace JianghuGo.Unity.Presentation
                 }));
             }
 
+            UiKit.ActionButton(s, "Sekta i terytoria", () => Run(async () =>
+            {
+                var sect = new SectFlow(_api, c.Id);
+                await sect.LoadAsync(_lifetime.Token);
+                ShowSect(sect, c);
+            }));
             UiKit.ActionButton(s, "Laboratorium Dao", () => Run(async () =>
             {
                 var lab = new DaoLabFlow(_api, c.Id);
@@ -540,6 +546,77 @@ namespace JianghuGo.Unity.Presentation
             UiKit.ActionButton(s, "Wróć", () => ShowCharacter(c));
         }
 
+        // ---- sects & territories (prototype list screen; every permission is checked by the server) ---------------
+
+        private void ShowSect(SectFlow flow, CharacterDto c)
+        {
+            if (flow.Mine == null)
+            {
+                var s0 = NewScreen("Sekty");
+                var name = UiKit.TextField(s0, "Nazwa nowej sekty");
+                UiKit.ActionButton(s0, "Załóż sektę (opłata w KD)", () => Run(async () =>
+                {
+                    await flow.FoundAsync(name.text, _lifetime.Token);
+                    ShowSect(flow, c);
+                }));
+                UiKit.ActionButton(s0, "Pokaż sekty", () => Run(async () =>
+                {
+                    var page = await flow.BrowseAsync(_lifetime.Token);
+                    foreach (var item in page.Items)
+                    {
+                        var sect = item;
+                        UiKit.ActionButton(s0, "Aplikuj: " + sect.Name + " (" + sect.MemberCount + ")", () => Run(async () =>
+                        {
+                            await flow.ApplyAsync(sect.Id, "Proszę o przyjęcie.", _lifetime.Token);
+                            SetStatus("Wysłano prośbę do " + sect.Name + ".");
+                        }));
+                    }
+                }));
+                UiKit.ActionButton(s0, "Wróć", () => ShowCharacter(c));
+                return;
+            }
+
+            var mine = flow.Mine;
+            var s = NewScreen(mine.Sect.Name);
+            UiKit.Label(s, "Twoja ranga: " + mine.MyRole + "   Skarbiec: " + mine.Treasury + " KD   Członkowie: " + mine.Sect.MemberCount + "/" + mine.Sect.MaxMembers, 30);
+            UiKit.Label(s, string.Join("\n", mine.Sect.Members.Select(m => m.Name + " — " + m.Role + " (wkład " + m.Contribution + ")")), 28);
+            if (flow.Territories != null)
+                UiKit.Label(s, "Terytoria: " + flow.Territories.Owned + "/" + flow.Territories.Max +
+                               (flow.Territories.Wars.Count > 0 ? "   Wojny: " + string.Join(", ", flow.Territories.Wars.Select(w => w.TerritoryKey + " " + w.Phase + " " + w.AttackerScore + ":" + w.DefenderScore)) : string.Empty), 28);
+
+            foreach (var a in mine.PendingApplications)
+            {
+                var application = a;
+                UiKit.ActionButton(s, "Przyjmij: " + application.CharacterName, () => Run(async () => { await flow.DecideAsync(application, true, _lifetime.Token); ShowSect(flow, c); }));
+                UiKit.ActionButton(s, "  Odrzuć: " + application.CharacterName, () => Run(async () => { await flow.DecideAsync(application, false, _lifetime.Token); ShowSect(flow, c); }));
+            }
+
+            UiKit.ActionButton(s, "Wpłać 100 KD do skarbca", () => Run(async () => { await flow.DonateAsync(100, _lifetime.Token); ShowSect(flow, c); }));
+            UiKit.ActionButton(s, "Terytorium tutaj", () => Run(async () =>
+            {
+                var here = await flow.HereAsync(_lifetime.Token);
+                SetStatus(here.Key + ": " + (here.OwnerName ?? "niczyje") + (here.War != null ? " — wojna (" + here.War.Phase + ")" : string.Empty));
+            }));
+            if (mine.CanManage)
+            {
+                UiKit.ActionButton(s, "Zajmij terytorium tutaj", () => Run(async () => { var t = await flow.ClaimHereAsync(_lifetime.Token); ShowSect(flow, c); SetStatus("Zajęto " + t.Key + "."); }));
+                UiKit.ActionButton(s, "Wypowiedz wojnę o terytorium tutaj", () => Run(async () =>
+                {
+                    var w = await flow.ChallengeHereAsync(_lifetime.Token);
+                    ShowSect(flow, c);
+                    SetStatus("Wojna o " + w.TerritoryKey + " od " + w.StartsAt.ToLocalTime().ToString("dd.MM HH:mm") + ".");
+                }));
+                foreach (var t in flow.Territories?.Territories ?? new List<TerritoryDto>())
+                {
+                    var territory = t;
+                    UiKit.ActionButton(s, "Danina z " + territory.Key, () => Run(async () => { await flow.CollectTributeAsync(territory, _lifetime.Token); ShowSect(flow, c); }));
+                }
+            }
+
+            UiKit.ActionButton(s, "Opuść sektę", () => Run(async () => { await flow.LeaveAsync(_lifetime.Token); ShowSect(flow, c); }));
+            UiKit.ActionButton(s, "Wróć", () => ShowCharacter(c));
+        }
+
         private static string Describe(NotificationDto n)
         {
             switch (n.Type)
@@ -552,6 +629,10 @@ namespace JianghuGo.Unity.Presentation
                 case "battle_draw": return "Walka nierozstrzygnięta.";
                 case "pvp_challenge": return "Ktoś rzucił ci wyzwanie!";
                 case "market_sold": return "Sprzedano przedmiot na targu.";
+                case "sect_application_accepted": return "Przyjęto cię do sekty!";
+                case "sect_application_rejected": return "Sekta odrzuciła twoją prośbę.";
+                case "war_declared": return "Wypowiedziano wojnę o terytorium twojej sekty!";
+                case "war_resolved": return "Wojna o terytorium rozstrzygnięta.";
                 default: return n.Type;
             }
         }
@@ -610,6 +691,15 @@ namespace JianghuGo.Unity.Presentation
                 case "not_author": return "Tylko autor może spisywać zwoje tej techniki.";
                 case "technique_already_known": return "Znasz już tę technikę — zwój zostaje w sakwie.";
                 case "loadout_invalid": return "Ten zestaw technik jest niedozwolony.";
+                case "sect_permission_denied": return "Twoja ranga w sekcie na to nie pozwala.";
+                case "already_in_sect": return "Należysz już do sekty.";
+                case "sect_name_taken": return "Ta nazwa sekty jest zajęta.";
+                case "insufficient_treasury": return "Za mało kamieni w skarbcu sekty.";
+                case "territory_owned": return "To terytorium ma właściciela — wypowiedz wojnę.";
+                case "war_in_progress": return "O to terytorium toczy się już wojna.";
+                case "territory_limit": return "Sekta nie utrzyma więcej terytoriów.";
+                case "tribute_not_ready": return "Danina jeszcze nie jest gotowa.";
+                case "leader_must_transfer": return "Najpierw przekaż przywództwo.";
                 default: return "Błąd: " + e.Code + (e.CorrelationId != null ? " (" + e.CorrelationId + ")" : string.Empty);
             }
         }

@@ -14,6 +14,8 @@
     <ProjectReference Include="../Modules/Inventory/JianghuGo.Modules.Inventory.csproj" />
     <ProjectReference Include="../Modules/Crafting/JianghuGo.Modules.Crafting.csproj" />
     <ProjectReference Include="../Modules/Market/JianghuGo.Modules.Market.csproj" />
+    <ProjectReference Include="../Modules/Sects/JianghuGo.Modules.Sects.csproj" />
+    <ProjectReference Include="../Modules/Territory/JianghuGo.Modules.Territory.csproj" />
     <ProjectReference Include="../Modules/Notifications/JianghuGo.Modules.Notifications.csproj" />
   </ItemGroup>
 </Project>

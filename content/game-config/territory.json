@@ -1,0 +1,12 @@
+{
+  "rulesVersion": "territory-1",
+  "regionSizeDegrees": 0.05,
+  "claimStones": 200,
+  "challengeStones": 500,
+  "preparationHours": 12,
+  "warHours": 24,
+  "baseTerritories": 1,
+  "membersPerExtraTerritory": 5,
+  "tributeStones": 50,
+  "tributeIntervalHours": 24
+}

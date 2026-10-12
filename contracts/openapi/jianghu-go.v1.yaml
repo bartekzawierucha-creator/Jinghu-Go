@@ -24,6 +24,8 @@ tags:
   - name: Crafting
   - name: Market
   - name: DaoLab
+  - name: Sects
+  - name: Territory
 paths:
   /health/live:
     get:
@@ -911,6 +913,231 @@ paths:
         "200": { description: OK }
         "404": { $ref: "#/components/responses/Problem" }
         "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/sects/rules:
+    get:
+      tags: [Sects]
+      summary: "Sect rules (founding fee, member limit, seat cost and cooldown)."
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/sects:
+    get:
+      tags: [Sects]
+      summary: Active sects, newest first (?before=&limit=).
+      parameters:
+        - { name: before, in: query, required: false, schema: { type: string, format: uuid } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses:
+        "200": { description: OK }
+    post:
+      tags: [Sects]
+      summary: Found a sect (founding fee from the character's wallet); the founder becomes its leader.
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, additionalProperties: false, required: [characterId, name], properties: { characterId: { type: string, format: uuid }, name: { type: string } } } } } }
+      responses:
+        "201": { description: Founded }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/sects/{sectId}:
+    get:
+      tags: [Sects]
+      summary: "Public sect profile: name, seat, members with roles and contributions."
+      parameters: [{ name: sectId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/sects/{sectId}/history:
+    get:
+      tags: [Sects]
+      summary: "Sect history, members only (?characterId= of the reading member)."
+      parameters: [{ name: sectId, in: path, required: true, schema: { type: string, format: uuid } }, { name: characterId, in: query, required: true, schema: { type: string, format: uuid } }, { name: before, in: query, required: false, schema: { type: string, format: uuid } }, { name: limit, in: query, required: false, schema: { type: integer } }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/sects/{sectId}/applications:
+    post:
+      tags: [Sects]
+      summary: "Apply to join (message up to 200 characters; at most 3 pending applications)."
+      parameters: [{ name: sectId, in: path, required: true, schema: { type: string, format: uuid } }, { $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, additionalProperties: false, required: [characterId], properties: { characterId: { type: string, format: uuid }, message: { type: [string, "null"] } } } } } }
+      responses:
+        "201": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/sects/applications/{applicationId}/decision:
+    post:
+      tags: [Sects]
+      summary: "Leader or elder accepts or rejects an application."
+      parameters: [{ name: applicationId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, additionalProperties: false, required: [characterId, accept], properties: { characterId: { type: string, format: uuid }, accept: { type: boolean } } } } } }
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/sects/applications/{applicationId}/withdraw:
+    post:
+      tags: [Sects]
+      summary: "The applicant withdraws a pending application."
+      parameters: [{ name: applicationId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, additionalProperties: false, required: [characterId], properties: { characterId: { type: string, format: uuid } } } } } }
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/sects/{sectId}/leave:
+    post:
+      tags: [Sects]
+      summary: "Leave the sect (the leader must transfer leadership first unless they are the last member)."
+      parameters: [{ name: sectId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, additionalProperties: false, required: [characterId], properties: { characterId: { type: string, format: uuid } } } } } }
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/sects/{sectId}/kick:
+    post:
+      tags: [Sects]
+      summary: "Remove a member of strictly lower rank (leader: anyone; elder: members)."
+      parameters: [{ name: sectId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, additionalProperties: false, required: [characterId, targetCharacterId], properties: { characterId: { type: string, format: uuid }, targetCharacterId: { type: string, format: uuid } } } } } }
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/sects/{sectId}/roles:
+    post:
+      tags: [Sects]
+      summary: "Leader sets a member's role (elder/member) or transfers leadership (role leader)."
+      parameters: [{ name: sectId, in: path, required: true, schema: { type: string, format: uuid } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, additionalProperties: false, required: [characterId, targetCharacterId, role], properties: { characterId: { type: string, format: uuid }, targetCharacterId: { type: string, format: uuid }, role: { type: string, enum: [leader, elder, member] } } } } } }
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/sects/{sectId}/donations:
+    post:
+      tags: [Sects]
+      summary: "Donate Spirit Stones to the treasury (wallet to treasury); raises contribution."
+      parameters: [{ name: sectId, in: path, required: true, schema: { type: string, format: uuid } }, { $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, additionalProperties: false, required: [characterId, amount], properties: { characterId: { type: string, format: uuid }, amount: { type: integer, minimum: 1 } } } } } }
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/sects/{sectId}/seat:
+    post:
+      tags: [Sects]
+      summary: "Leader sets the seat at their verified position (stored rounded ~100 m; treasury pays; 7-day cooldown)."
+      parameters: [{ name: sectId, in: path, required: true, schema: { type: string, format: uuid } }, { $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, additionalProperties: false, required: [characterId], properties: { characterId: { type: string, format: uuid } } } } } }
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/sect:
+    get:
+      tags: [Sects]
+      summary: "The character's sect with member-only details (treasury; pending applications for leader and elders)."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/territories/rules:
+    get:
+      tags: [Territory]
+      summary: "Territory rules (cell size, claim/challenge costs, war timing, tribute)."
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/territories/{key}:
+    get:
+      tags: [Territory]
+      summary: "A territory: owner, current or last war, ownership history. Resolves a war whose window has closed."
+      parameters: [{ name: key, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/territories/claim:
+    post:
+      tags: [Territory]
+      summary: "Claim the unowned territory you stand in (verified position) for your sect; leader or elder; treasury pays."
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, additionalProperties: false, required: [characterId], properties: { characterId: { type: string, format: uuid } } } } } }
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/territories/challenge:
+    post:
+      tags: [Territory]
+      summary: "Declare war on the territory you stand in; leader or elder; treasury pays; preparation, then a war window scored by PvP duels."
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, additionalProperties: false, required: [characterId], properties: { characterId: { type: string, format: uuid } } } } } }
+      responses:
+        "201": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/territories/{territoryKey}/tribute:
+    post:
+      tags: [Territory]
+      summary: "Leader or elder of the owning sect collects tribute into the treasury (once per interval)."
+      parameters: [{ name: territoryKey, in: path, required: true, schema: { type: string } }, { $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, additionalProperties: false, required: [characterId], properties: { characterId: { type: string, format: uuid } } } } } }
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/sects/{sectId}/territories:
+    get:
+      tags: [Territory]
+      summary: "Territories a sect controls (with its limit) and its open wars."
+      parameters: [{ name: sectId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/territory/here:
+    get:
+      tags: [Territory]
+      summary: "The territory at the character's verified position."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
 components:
   securitySchemes:
     bearer:

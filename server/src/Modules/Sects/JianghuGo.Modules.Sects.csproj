@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>JianghuGo.Modules.Sects</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../../Infrastructure/JianghuGo.Infrastructure.csproj" />
+    <!-- Contracts only: Characters (ownership, names), Inventory (wallet for donations and fees), Geolocation (seat). -->
+    <ProjectReference Include="../Identity/JianghuGo.Modules.Identity.csproj" />
+    <ProjectReference Include="../Characters/JianghuGo.Modules.Characters.csproj" />
+    <ProjectReference Include="../Inventory/JianghuGo.Modules.Inventory.csproj" />
+    <ProjectReference Include="../Geolocation/JianghuGo.Modules.Geolocation.csproj" />
+  </ItemGroup>
+</Project>

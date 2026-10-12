@@ -41,6 +41,10 @@ public static class NotificationTypes
     public const string BattleLost = "battle_lost";
     public const string BattleDraw = "battle_draw";
     public const string MarketSold = "market_sold";
+    public const string SectApplicationAccepted = "sect_application_accepted";
+    public const string SectApplicationRejected = "sect_application_rejected";
+    public const string WarDeclared = "war_declared";
+    public const string WarResolved = "war_resolved";
 }
 
 internal sealed class ChallengeReceivedHandler(INotificationRepository repo) : IOutboxHandler
@@ -79,6 +83,46 @@ internal sealed class ListingSoldHandler(INotificationRepository repo) : IOutbox
         var e = message.Payload<JianghuGo.Modules.Market.Contracts.MarketEvents.ListingSoldV1>();
         return NotificationWriter.WriteOnceAsync(repo, uow, e.SellerAccountId, NotificationTypes.MarketSold,
             new { e.ListingId, e.SellerCharacterId, e.ItemId, e.Quantity, e.UpgradeLevel, e.Price, e.Tax, e.Proceeds }, message, ct);
+    }
+}
+
+internal sealed class ApplicationDecidedHandler(INotificationRepository repo) : IOutboxHandler
+{
+    public string EventType => JianghuGo.Modules.Sects.Contracts.SectEvents.ApplicationDecided;
+
+    public Task HandleAsync(IUnitOfWork uow, OutboxMessage message, CancellationToken ct)
+    {
+        var e = message.Payload<JianghuGo.Modules.Sects.Contracts.SectEvents.ApplicationDecidedV1>();
+        return NotificationWriter.WriteOnceAsync(repo, uow, e.AccountId,
+            e.Accepted ? NotificationTypes.SectApplicationAccepted : NotificationTypes.SectApplicationRejected,
+            new { e.SectId, e.SectName, e.CharacterId }, message, ct);
+    }
+}
+
+internal sealed class WarDeclaredHandler(INotificationRepository repo) : IOutboxHandler
+{
+    public string EventType => JianghuGo.Modules.Territory.Contracts.TerritoryEvents.WarDeclared;
+
+    public Task HandleAsync(IUnitOfWork uow, OutboxMessage message, CancellationToken ct)
+    {
+        var e = message.Payload<JianghuGo.Modules.Territory.Contracts.TerritoryEvents.WarDeclaredV1>();
+        return NotificationWriter.WriteOnceAsync(repo, uow, e.DefenderLeaderAccountId, NotificationTypes.WarDeclared,
+            new { e.WarId, e.TerritoryKey, e.AttackerSectId, e.AttackerName, e.StartsAt, e.EndsAt }, message, ct);
+    }
+}
+
+internal sealed class WarResolvedHandler(INotificationRepository repo) : IOutboxHandler
+{
+    public string EventType => JianghuGo.Modules.Territory.Contracts.TerritoryEvents.WarResolved;
+
+    public async Task HandleAsync(IUnitOfWork uow, OutboxMessage message, CancellationToken ct)
+    {
+        var e = message.Payload<JianghuGo.Modules.Territory.Contracts.TerritoryEvents.WarResolvedV1>();
+        foreach (var account in e.LeaderAccountIds.Distinct())
+        {
+            await NotificationWriter.WriteOnceAsync(repo, uow, account, NotificationTypes.WarResolved,
+                new { e.WarId, e.TerritoryKey, e.WinnerSectId, e.AttackerScore, e.DefenderScore }, message, ct);
+        }
     }
 }
 
@@ -198,6 +242,9 @@ public static class NotificationsModule
         services.AddSingleton<IOutboxHandler, ChallengeReceivedHandler>();
         services.AddSingleton<IOutboxHandler, BattleFinishedHandler>();
         services.AddSingleton<IOutboxHandler, ListingSoldHandler>();
+        services.AddSingleton<IOutboxHandler, ApplicationDecidedHandler>();
+        services.AddSingleton<IOutboxHandler, WarDeclaredHandler>();
+        services.AddSingleton<IOutboxHandler, WarResolvedHandler>();
         services.AddSingleton<IOutboxHandler>(sp => new BreakthroughHandler(sp.GetRequiredService<INotificationRepository>(), CultivationEvents.BreakthroughSucceeded));
         services.AddSingleton<IOutboxHandler>(sp => new BreakthroughHandler(sp.GetRequiredService<INotificationRepository>(), CultivationEvents.BreakthroughFailed));
         return services;
