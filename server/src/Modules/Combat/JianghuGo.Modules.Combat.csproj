@@ -5,8 +5,9 @@
   <ItemGroup>
     <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <ProjectReference Include="../../Infrastructure/JianghuGo.Infrastructure.csproj" />
-    <!-- Allowed: Identity (claims), Characters.Contracts only. Rewards flow to Cultivation via outbox events. -->
+    <!-- Allowed: Identity (claims), Characters.Contracts, Inventory.Contracts (equipment bonuses). Rewards flow via outbox events. -->
     <ProjectReference Include="../Identity/JianghuGo.Modules.Identity.csproj" />
     <ProjectReference Include="../Characters/JianghuGo.Modules.Characters.csproj" />
+    <ProjectReference Include="../Inventory/JianghuGo.Modules.Inventory.csproj" />
   </ItemGroup>
 </Project>

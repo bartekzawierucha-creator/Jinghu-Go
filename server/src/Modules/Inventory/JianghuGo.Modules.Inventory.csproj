@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>JianghuGo.Modules.Inventory</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../../Infrastructure/JianghuGo.Infrastructure.csproj" />
+    <!-- Consumes Combat/World events through its own payload mirrors (no project reference: Combat depends on us). -->
+    <ProjectReference Include="../Identity/JianghuGo.Modules.Identity.csproj" />
+    <ProjectReference Include="../Characters/JianghuGo.Modules.Characters.csproj" />
+  </ItemGroup>
+</Project>

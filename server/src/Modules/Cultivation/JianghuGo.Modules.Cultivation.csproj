@@ -10,5 +10,6 @@
     <ProjectReference Include="../Characters/JianghuGo.Modules.Characters.csproj" />
     <ProjectReference Include="../Combat/JianghuGo.Modules.Combat.csproj" />
     <ProjectReference Include="../World/JianghuGo.Modules.World.csproj" />
+    <ProjectReference Include="../Inventory/JianghuGo.Modules.Inventory.csproj" />
   </ItemGroup>
 </Project>

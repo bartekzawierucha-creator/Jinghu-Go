@@ -587,6 +587,106 @@ paths:
         "400": { $ref: "#/components/responses/Problem" }
         "404": { $ref: "#/components/responses/Problem" }
         "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/items:
+    get:
+      tags: [Inventory]
+      summary: Item catalog (current items rules version), currency and bag limits.
+      responses:
+        "200": { description: OK }
+  /api/v1/characters/{characterId}/inventory:
+    get:
+      tags: [Inventory]
+      summary: Bag (stacks and unique items), Spirit Stones balance, equipped slots and total equipment bonuses.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Inventory" } } } }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/inventory/equip:
+    post:
+      tags: [Inventory]
+      summary: Equip a unique item from the bag (swaps with the item in the same slot). Optimistic version required.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/EquipCommand" } } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Inventory" } } } }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/inventory/unequip:
+    post:
+      tags: [Inventory]
+      summary: Move an equipped item back to the bag (needs a free bag slot).
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/EquipCommand" } } } }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Inventory" } } } }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/inventory/use:
+    post:
+      tags: [Inventory]
+      summary: Consume 1-10 pills; Qi is credited asynchronously (exactly once) by Cultivation.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [itemId, quantity]
+              properties:
+                itemId: { type: string }
+                quantity: { type: integer, minimum: 1, maximum: 10 }
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/inventory/discard:
+    post:
+      tags: [Inventory]
+      summary: Destroy stackable items (itemId + quantity) or one unique item from the bag (instanceId).
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                itemId: { type: [string, "null"] }
+                quantity: { type: integer, minimum: 1 }
+                instanceId: { type: [string, "null"], format: uuid }
+      responses:
+        "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/Inventory" } } } }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/inventory/wallet:
+    get:
+      tags: [Inventory]
+      summary: Spirit Stones ledger, newest first (keyset pagination with ?before=<entry id>&limit=1-200).
+      parameters:
+        - { $ref: "#/components/parameters/CharacterId" }
+        - { name: before, in: query, required: false, schema: { type: string, format: uuid } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200 } }
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/inventory/items/{instanceId}/history:
+    get:
+      tags: [Inventory]
+      summary: Provenance of a unique item (created, upgraded, listed, transferred …), visible to its current owner.
+      parameters:
+        - { $ref: "#/components/parameters/CharacterId" }
+        - { name: instanceId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
 components:
   securitySchemes:
     bearer:
@@ -792,3 +892,26 @@ components:
         kind: { type: string }
         rewardQi: { type: integer }
         battleId: { type: [string, "null"], format: uuid }
+        items:
+          type: [array, "null"]
+          description: Materials gathered (credited to the bag asynchronously).
+          items: { type: object, properties: { itemId: { type: string }, quantity: { type: integer } } }
+    EquipCommand:
+      type: object
+      additionalProperties: false
+      required: [instanceId, expectedVersion]
+      properties:
+        instanceId: { type: string, format: uuid }
+        expectedVersion: { type: integer }
+    Inventory:
+      type: object
+      properties:
+        characterId: { type: string, format: uuid }
+        rulesVersion: { type: string }
+        balance: { type: integer, description: Spirit Stones. }
+        slotsUsed: { type: integer }
+        capacity: { type: integer }
+        stacks: { type: array, items: { type: object } }
+        items: { type: array, items: { type: object } }
+        equipped: { type: object, additionalProperties: { type: string, format: uuid } }
+        bonuses: { type: object, additionalProperties: { type: integer } }

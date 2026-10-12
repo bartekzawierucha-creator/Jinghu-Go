@@ -17,7 +17,10 @@ public sealed record WorldConfig(
 
 public sealed record CountRange(int Min, int Max);
 
-public sealed record NodeKind(string Id, string NamePl, string NameEn, int Weight, int RewardQi, string? NpcId);
+public sealed record NodeKind(string Id, string NamePl, string NameEn, int Weight, int RewardQi, string? NpcId, IReadOnlyList<NodeYield>? Yields = null);
+
+/// <summary>Materials a node can give (item ids are validated against items.json by a cross-config test and by Inventory on receipt).</summary>
+public sealed record NodeYield(string Item, int ChancePermille, int Min, int Max);
 
 public sealed record FlameRules(double RadiusM, int CooldownHours, int RewardQiFlamePath, int RewardQiOtherPaths, IReadOnlyList<FlameSite> Sites);
 
@@ -49,6 +52,14 @@ public static class WorldConfigValidator
         if (c.InteractionsPerHour is < 1 or > 1000) e.Add("interactionsPerHour must be 1-1000.");
         if (c.NodeKinds is null || c.NodeKinds.Count == 0 || c.NodeKinds.Any(k => k.Weight <= 0 || k.RewardQi < 0) || c.NodeKinds.Select(k => k.Id).Distinct().Count() != c.NodeKinds.Count)
             e.Add("nodeKinds invalid (unique ids, positive weights, rewards >= 0).");
+        foreach (var k in c.NodeKinds ?? [])
+        {
+            if (k.Yields is null) continue;
+            if (k.NpcId is not null && k.Yields.Count > 0) e.Add($"node {k.Id}: beast nodes give loot through combat, not yields.");
+            if (k.Yields.Any(y => string.IsNullOrWhiteSpace(y.Item) || y.ChancePermille is < 1 or > 1000 || y.Min < 1 || y.Max < y.Min || y.Max > 20))
+                e.Add($"node {k.Id}: yields invalid.");
+        }
+
         if (c.Flame is null || c.Flame.Sites is null || c.Flame.Sites.Count != 12) e.Add("flame path needs exactly 12 fixed sites.");
         else
         {
@@ -164,6 +175,19 @@ public static class WorldGenerator
         }
 
         return null;
+    }
+
+    /// <summary>Materials from one harvest. <paramref name="seed"/> comes from the server CSPRNG (one claim per node and character).</summary>
+    public static IReadOnlyList<(string Item, int Quantity)> RollYields(NodeKind kind, ulong seed)
+    {
+        var rng = new DeterministicRandom(seed);
+        var list = new List<(string, int)>();
+        foreach (var y in kind.Yields ?? [])
+        {
+            if (rng.NextInt(0, 1000) < y.ChancePermille) list.Add((y.Item, rng.NextInt(y.Min, y.Max + 1)));
+        }
+
+        return list;
     }
 
     public static long NodeReward(WorldConfig c, string kind, ActiveEvent? ev) =>

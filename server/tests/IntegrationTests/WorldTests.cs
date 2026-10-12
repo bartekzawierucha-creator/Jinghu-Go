@@ -225,6 +225,28 @@ public class WorldTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Herbs_land_in_the_bag_once_through_the_outbox()
+    {
+        var node = FindNode("spirit_herb");
+        var e = await ExplorerAsync(at: SouthOf(node.Point, 60));
+        await e.WalkToAsync(node.Point);
+        await _host.DrainOutboxAsync();
+        var res = await ApiHost.Json(await e.InteractAsync(node.Key));
+        var gathered = res["items"]!.AsArray().Single()!;
+        Assert.Equal("spirit_herb", gathered.Str("itemId"));
+        var qty = gathered.Int("quantity");
+        Assert.True(qty is >= 1 and <= 3, $"quantity {qty}");
+
+        var inventory = $"/api/v1/characters/{e.Id}/inventory";
+        Assert.Equal(0, (await ApiHost.Json(await e.P.GetAsync(inventory)))["stacks"]!.AsArray().Count, "materials arrive via the worker");
+        Assert.Equal(2, await _host.DrainOutboxAsync(), "Qi reward + items gathered");
+        Assert.Equal(0, await _host.DrainOutboxAsync());
+        var stack = (await ApiHost.Json(await e.P.GetAsync(inventory)))["stacks"]!.AsArray().Single()!;
+        Assert.Equal("spirit_herb", stack.Str("itemId"));
+        Assert.Equal(qty, stack.Int("quantity"));
+    }
+
+    [Fact]
     public async Task Spirit_beast_starts_a_battle_and_blocks_a_second_one()
     {
         var beast = FindNode("spirit_beast");

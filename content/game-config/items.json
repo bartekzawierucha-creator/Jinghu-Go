@@ -1,0 +1,34 @@
+{
+  "rulesVersion": "items-1",
+  "currency": { "id": "spirit_stones", "namePl": "Kamienie Duchowe", "nameEn": "Spirit Stones", "initialGrant": 100 },
+  "bag": { "baseCapacity": 60, "maxStack": 999 },
+  "upgradeBonusPercentPerLevel": 10,
+  "items": [
+    { "id": "spirit_herb",      "namePl": "Duchowe Zioło",        "nameEn": "Spirit Herb",        "type": "material",   "rarity": "mortal",   "tradable": true },
+    { "id": "iron_ore",         "namePl": "Ruda Żelaza",          "nameEn": "Iron Ore",           "type": "material",   "rarity": "mortal",   "tradable": true },
+    { "id": "wolf_fang",        "namePl": "Kieł Duchowego Wilka", "nameEn": "Spirit Wolf Fang",   "type": "material",   "rarity": "spirit",   "tradable": true },
+    { "id": "jade",             "namePl": "Jadeit",               "nameEn": "Jade",               "type": "material",   "rarity": "earth",    "tradable": true },
+    { "id": "refining_stone",   "namePl": "Kamień Rafinacji",     "nameEn": "Refining Stone",     "type": "material",   "rarity": "spirit",   "tradable": true },
+    { "id": "qi_pill",          "namePl": "Pigułka Qi",           "nameEn": "Qi Pill",            "type": "consumable", "rarity": "spirit",   "tradable": true, "consumable": { "qi": 60 } },
+    { "id": "greater_qi_pill",  "namePl": "Wielka Pigułka Qi",    "nameEn": "Greater Qi Pill",    "type": "consumable", "rarity": "earth",    "tradable": true, "consumable": { "qi": 250 } },
+    { "id": "iron_sword",       "namePl": "Żelazny Miecz",        "nameEn": "Iron Sword",         "type": "equipment",  "rarity": "mortal",   "tradable": true,
+      "equipment": { "slot": "weapon", "stats": { "strength": 2 } } },
+    { "id": "wolf_fang_dagger", "namePl": "Sztylet z Wilczego Kła", "nameEn": "Wolf Fang Dagger", "type": "equipment",  "rarity": "spirit",   "tradable": true,
+      "equipment": { "slot": "weapon", "stats": { "agility": 3, "strength": 1 } } },
+    { "id": "herb_silk_robe",   "namePl": "Szata z Ziołowego Jedwabiu", "nameEn": "Herb-Silk Robe", "type": "equipment", "rarity": "mortal", "tradable": true,
+      "equipment": { "slot": "robe", "stats": { "constitution": 2, "willpower": 1 } } },
+    { "id": "jade_talisman",    "namePl": "Jadeitowy Talizman",   "nameEn": "Jade Talisman",      "type": "equipment",  "rarity": "earth",    "tradable": true,
+      "equipment": { "slot": "talisman", "stats": { "spirit": 3, "insight": 2 } } },
+    { "id": "spatial_ring",     "namePl": "Pierścień Przestrzeni", "nameEn": "Spatial Ring",      "type": "equipment",  "rarity": "spirit",   "tradable": true,
+      "equipment": { "slot": "ring", "stats": { "focus": 2 }, "bagBonus": 20 } },
+    { "id": "phoenix_feather",  "namePl": "Pióro Feniksa",        "nameEn": "Phoenix Feather",    "type": "equipment",  "rarity": "heavenly", "tradable": true,
+      "equipment": { "slot": "treasure", "stats": { "fate": 3, "spirit": 3 } } }
+  ],
+  "lootTables": {
+    "training_dummy":  { "stones": 2,  "drops": [] },
+    "grey_wolf":       { "stones": 15, "drops": [ { "item": "wolf_fang", "chancePermille": 600, "min": 1, "max": 2 } ] },
+    "mountain_bandit": { "stones": 30, "drops": [ { "item": "iron_ore", "chancePermille": 700, "min": 1, "max": 3 },
+                                                  { "item": "jade", "chancePermille": 250, "min": 1, "max": 1 },
+                                                  { "item": "phoenix_feather", "chancePermille": 5, "min": 1, "max": 1 } ] }
+  }
+}

@@ -8,6 +8,7 @@ using JianghuGo.Modules.Characters;
 using JianghuGo.Modules.Combat;
 using JianghuGo.Modules.Cultivation;
 using JianghuGo.Modules.Geolocation;
+using JianghuGo.Modules.Inventory;
 using JianghuGo.Modules.World;
 using JianghuGo.Modules.Identity;
 using JianghuGo.Modules.Notifications;
@@ -34,6 +35,7 @@ public static class JianghuCore
 
         services.AddIdentityModule(configuration);
         services.AddCharactersModule(configuration);
+        services.AddInventoryModule(configuration);
         services.AddCultivationModule(configuration);
         services.AddCombatModule(configuration);
         services.AddGeolocationModule(configuration);

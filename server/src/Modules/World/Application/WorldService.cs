@@ -36,7 +36,7 @@ public sealed record InteractCommand(Guid CharacterId, string? NodeKey);
 
 public sealed record AttuneCommand(Guid CharacterId, string? SiteId);
 
-public sealed record InteractionResult(string Kind, long RewardQi, Guid? BattleId);
+public sealed record InteractionResult(string Kind, long RewardQi, Guid? BattleId, IReadOnlyList<WorldEvents.GatheredItem>? Items = null);
 
 public sealed class WorldService(
     IUnitOfWorkFactory uowFactory,
@@ -50,6 +50,7 @@ public sealed class WorldService(
     ICorrelationContext correlation,
     WorldConfig config,
     WorldSecret secret,
+    IRandomSeedSource seeds,
     TimeProvider clock)
 {
     private static readonly Error CharacterNotFound = Error.NotFound("character_not_found", "Character not found.");
@@ -110,6 +111,7 @@ public sealed class WorldService(
                 var kind = config.NodeKinds.First(k => k.Id == node.Kind);
                 Guid? battleId = null;
                 long reward = 0;
+                List<WorldEvents.GatheredItem> gathered = [];
                 if (kind.NpcId is { } npc)
                 {
                     var battle = await encounters.StartEncounterAsync(uow, accountId, c.Id.Value, npc, ct);
@@ -120,10 +122,16 @@ public sealed class WorldService(
                 {
                     reward = WorldGenerator.NodeReward(config, node.Kind, WorldGenerator.EventAt(config, secret.Seed, node.Point, now));
                     await PayAsync(uow, accountId, c.Id, reward, "node:" + node.Kind, now, ct);
+                    gathered = [.. WorldGenerator.RollYields(kind, seeds.NextSeed()).Select(y => new WorldEvents.GatheredItem(y.Item, y.Quantity))];
+                    if (gathered.Count > 0)
+                    {
+                        await outbox.EnqueueAsync(uow, OutboxMessage.Create(WorldEvents.ItemsGathered,
+                            new WorldEvents.ItemsGatheredV1(accountId.Value, c.Id.Value, "node:" + node.Kind, gathered), now, correlation.CorrelationId), ct);
+                    }
                 }
 
-                await AuditAsync(uow, accountId, "world.node_used", c.Id, new { kind = node.Kind, reward, battleId }, now, ct);
-                return new InteractionResult(node.Kind, reward, battleId);
+                await AuditAsync(uow, accountId, "world.node_used", c.Id, new { kind = node.Kind, reward, battleId, items = gathered }, now, ct);
+                return new InteractionResult(node.Kind, reward, battleId, gathered);
             }, ct);
             if (result.IsSuccess) await uow.CommitAsync(ct);
             return result;

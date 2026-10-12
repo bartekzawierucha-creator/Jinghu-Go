@@ -36,6 +36,7 @@ public static class CultivationModule
         services.AddScoped<CultivationService>();
         services.AddSingleton<JianghuGo.Application.IOutboxHandler, CombatRewardHandler>();
         services.AddSingleton<JianghuGo.Application.IOutboxHandler, WorldRewardHandler>();
+        services.AddSingleton<JianghuGo.Application.IOutboxHandler, ConsumableQiHandler>();
         return services;
     }
 

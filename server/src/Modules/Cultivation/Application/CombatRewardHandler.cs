@@ -57,3 +57,16 @@ internal sealed class WorldRewardHandler(ICultivationRepository repo, ICharacter
         return QiCredit.CreditAsync(repo, characters, audit, config, uow, message, e.AccountId, e.CharacterId, e.Qi, new { source = e.Source, qi = e.Qi }, ct);
     }
 }
+
+/// <summary>Qi from consumed pills (inventory.consumable_used).</summary>
+internal sealed class ConsumableQiHandler(ICultivationRepository repo, ICharacterDirectory characters, IAuditLog audit, CultivationConfig config) : IOutboxHandler
+{
+    public string EventType => JianghuGo.Modules.Inventory.Contracts.InventoryEvents.ConsumableUsed;
+
+    public Task HandleAsync(IUnitOfWork uow, OutboxMessage message, CancellationToken ct)
+    {
+        var e = message.Payload<JianghuGo.Modules.Inventory.Contracts.InventoryEvents.ConsumableUsedV1>();
+        return QiCredit.CreditAsync(repo, characters, audit, config, uow, message, e.AccountId, e.CharacterId, e.Qi,
+            new { source = "consumable", item = e.ItemId, e.Quantity, qi = e.Qi }, ct);
+    }
+}

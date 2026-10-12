@@ -5,6 +5,7 @@ using System.Text.Json;
 using JianghuGo.Application;
 using JianghuGo.Domain;
 using JianghuGo.Modules.Characters.Contracts;
+using JianghuGo.Modules.Inventory.Contracts;
 using JianghuGo.Modules.Combat.Contracts;
 using JianghuGo.Modules.Combat.Domain;
 
@@ -57,6 +58,7 @@ public sealed class CombatService(
     IUnitOfWorkFactory uowFactory,
     ICombatRepository repo,
     ICharacterDirectory characters,
+    IEquipmentStats equipment,
     IIdempotencyStore idempotency,
     IAuditLog audit,
     IOutbox outbox,
@@ -128,7 +130,10 @@ public sealed class CombatService(
     {
         var (slots, _) = await CurrentLoadoutAsync(uow, c, ct);
         var mastery = (await repo.ListMasteryAsync(uow, c.Id, ct)).ToDictionary(m => m.TechniqueId, m => m.Level);
-        return new Combatant(c.Name, c.Stats, [.. slots.Select(id => id is null ? null : new EquippedTechnique(id, mastery.GetValueOrDefault(id, 1)))],
+        // Equipment bonuses are frozen into the snapshot: changing gear mid-battle has no effect.
+        var bonuses = await equipment.BonusesAsync(uow, c.Id, ct);
+        var stats = c.Stats.ToDictionary(s => s.Key, s => s.Value + bonuses.GetValueOrDefault(s.Key));
+        return new Combatant(c.Name, stats, [.. slots.Select(id => id is null ? null : new EquippedTechnique(id, mastery.GetValueOrDefault(id, 1)))],
             null, config.PathHpBonusPermille[c.Path]);
     }
 

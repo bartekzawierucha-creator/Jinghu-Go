@@ -1,0 +1,20 @@
+{
+  "rulesVersion": "crafting-1",
+  "recipes": [
+    { "id": "forge_iron_sword",       "kind": "forge",   "inputs": [ { "item": "iron_ore", "quantity": 5 } ], "stones": 20, "output": { "item": "iron_sword", "quantity": 1 }, "successPermille": 1000 },
+    { "id": "forge_wolf_fang_dagger", "kind": "forge",   "inputs": [ { "item": "wolf_fang", "quantity": 3 }, { "item": "iron_ore", "quantity": 2 } ], "stones": 50, "output": { "item": "wolf_fang_dagger", "quantity": 1 }, "successPermille": 1000 },
+    { "id": "weave_herb_silk_robe",   "kind": "forge",   "inputs": [ { "item": "spirit_herb", "quantity": 4 } ], "stones": 30, "output": { "item": "herb_silk_robe", "quantity": 1 }, "successPermille": 1000 },
+    { "id": "carve_jade_talisman",    "kind": "forge",   "inputs": [ { "item": "jade", "quantity": 2 } ], "stones": 80, "output": { "item": "jade_talisman", "quantity": 1 }, "successPermille": 1000 },
+    { "id": "forge_spatial_ring",     "kind": "forge",   "inputs": [ { "item": "iron_ore", "quantity": 10 }, { "item": "wolf_fang", "quantity": 2 } ], "stones": 200, "output": { "item": "spatial_ring", "quantity": 1 }, "successPermille": 1000 },
+    { "id": "refine_stone",           "kind": "forge",   "inputs": [ { "item": "iron_ore", "quantity": 3 } ], "stones": 10, "output": { "item": "refining_stone", "quantity": 1 }, "successPermille": 1000 },
+    { "id": "brew_qi_pill",           "kind": "alchemy", "inputs": [ { "item": "spirit_herb", "quantity": 3 } ], "stones": 5,  "output": { "item": "qi_pill", "quantity": 1 }, "successPermille": 850 },
+    { "id": "brew_greater_qi_pill",   "kind": "alchemy", "inputs": [ { "item": "spirit_herb", "quantity": 5 }, { "item": "wolf_fang", "quantity": 1 } ], "stones": 25, "output": { "item": "greater_qi_pill", "quantity": 1 }, "successPermille": 600 }
+  ],
+  "alchemyInsightBonusPermille": 10,
+  "upgrade": {
+    "maxLevel": 15,
+    "stonesPerLevel": 20,
+    "material": "refining_stone",
+    "successPermilleByTargetLevel": [1000, 1000, 1000, 1000, 1000, 900, 800, 700, 600, 500, 400, 350, 300, 250, 200]
+  }
+}

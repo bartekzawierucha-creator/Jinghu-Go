@@ -1,0 +1,10 @@
+{
+  "rulesVersion": "market-1",
+  "listingFeePermille": 10,
+  "minListingFee": 1,
+  "saleTaxPermille": 50,
+  "minPrice": 1,
+  "maxPrice": 1000000000,
+  "listingHours": 48,
+  "maxActiveListingsPerCharacter": 20
+}
