@@ -16,15 +16,18 @@ public static class InventoryModule
         UnmappedMemberHandling = System.Text.Json.Serialization.JsonUnmappedMemberHandling.Disallow,
     };
 
-    public static IServiceCollection AddInventoryModule(this IServiceCollection services, IConfiguration configuration)
+    private static string ItemsPath(IConfiguration configuration)
     {
         var path = configuration["GameConfig:ItemsPath"] ?? "game-config/items.json";
-        if (!Path.IsPathRooted(path))
-        {
-            path = Path.Combine(AppContext.BaseDirectory, path);
-        }
+        return Path.IsPathRooted(path) ? path : Path.Combine(AppContext.BaseDirectory, path);
+    }
 
-        services.AddSingleton(LoadConfig(path));
+    /// <summary>For other modules' registration-time config validation (fail fast at startup, not on first request).</summary>
+    public static IItemCatalog LoadCatalog(IConfiguration configuration) => new ItemCatalog(LoadConfig(ItemsPath(configuration)));
+
+    public static IServiceCollection AddInventoryModule(this IServiceCollection services, IConfiguration configuration)
+    {
+        services.AddSingleton(LoadConfig(ItemsPath(configuration)));
         if (StorageProvider.From(configuration) == StorageKind.Postgres)
         {
             services.AddSingleton<IInventoryRepository, PostgresInventoryRepository>();
@@ -37,6 +40,7 @@ public static class InventoryModule
         services.AddSingleton<InventoryLedger>();
         services.AddSingleton<IInventory>(sp => sp.GetRequiredService<InventoryLedger>());
         services.AddSingleton<IEquipmentStats>(sp => sp.GetRequiredService<InventoryLedger>());
+        services.AddSingleton<IItemCatalog, ItemCatalog>();
         services.AddScoped<InventoryService>();
         services.AddSingleton<JianghuGo.Application.IOutboxHandler, CombatLootHandler>();
         services.AddSingleton<JianghuGo.Application.IOutboxHandler, WorldItemsHandler>();

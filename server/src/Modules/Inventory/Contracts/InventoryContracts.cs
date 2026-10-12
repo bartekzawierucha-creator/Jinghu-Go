@@ -37,6 +37,15 @@ public interface IInventory
     Task<Result<long>> DebitAsync(IUnitOfWork uow, CharacterId characterId, long amount, string reason, string referenceId, CancellationToken ct);
 }
 
+/// <summary>Read-only item catalog for other modules (the item rules stay owned by Inventory).</summary>
+public sealed record CatalogItem(string Id, string NamePl, string Type, string Rarity, bool Stackable, bool Tradable, string? Slot);
+
+public interface IItemCatalog
+{
+    CatalogItem? Find(string? itemId);
+    int MaxStack { get; }
+}
+
 /// <summary>Stat bonuses from equipped items (Combat adds them to the battle snapshot).</summary>
 public interface IEquipmentStats
 {

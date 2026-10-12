@@ -687,6 +687,57 @@ paths:
       responses:
         "200": { description: OK }
         "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/crafting/recipes:
+    get:
+      tags: [Crafting]
+      summary: Recipes (forging never fails; alchemy chance + Insight bonus) and upgrade costs/chances per level.
+      responses:
+        "200": { description: OK }
+  /api/v1/characters/{characterId}/crafting/craft:
+    post:
+      tags: [Crafting]
+      summary: |
+        Craft a recipe 1-10 times (unique items: once). Materials, stones and output move in one transaction;
+        a missing input, stones or bag space consumes nothing. Rolls are server-side and logged with their seed.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [recipeId, times]
+              properties:
+                recipeId: { type: string }
+                times: { type: integer, minimum: 1, maximum: 10 }
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/crafting/upgrade:
+    post:
+      tags: [Crafting]
+      summary: Upgrade a unique item by +1 (max +15). Costs 1 Refining Stone and 20 × target level stones; failure keeps the level.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/EquipCommand" } } } }
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/crafting/log:
+    get:
+      tags: [Crafting]
+      summary: Crafting and upgrade history with seeds (newest first, ?before=&limit=).
+      parameters:
+        - { $ref: "#/components/parameters/CharacterId" }
+        - { name: before, in: query, required: false, schema: { type: string, format: uuid } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 200 } }
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
 components:
   securitySchemes:
     bearer:

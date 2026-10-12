@@ -7,6 +7,7 @@ using JianghuGo.Infrastructure.Outbox;
 using JianghuGo.Infrastructure.Postgres;
 using JianghuGo.Modules.Characters.Api;
 using JianghuGo.Modules.Combat.Api;
+using JianghuGo.Modules.Crafting.Api;
 using JianghuGo.Modules.Cultivation.Api;
 using JianghuGo.Modules.Geolocation.Api;
 using JianghuGo.Modules.Inventory.Api;
@@ -89,6 +90,7 @@ public static class JianghuApi
         app.MapGeolocationEndpoints();
         app.MapWorldEndpoints();
         app.MapInventoryEndpoints();
+        app.MapCraftingEndpoints();
         app.MapNotificationEndpoints();
         return app;
     }

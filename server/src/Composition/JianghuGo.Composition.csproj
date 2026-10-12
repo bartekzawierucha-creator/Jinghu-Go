@@ -12,6 +12,7 @@
     <ProjectReference Include="../Modules/Geolocation/JianghuGo.Modules.Geolocation.csproj" />
     <ProjectReference Include="../Modules/World/JianghuGo.Modules.World.csproj" />
     <ProjectReference Include="../Modules/Inventory/JianghuGo.Modules.Inventory.csproj" />
+    <ProjectReference Include="../Modules/Crafting/JianghuGo.Modules.Crafting.csproj" />
     <ProjectReference Include="../Modules/Notifications/JianghuGo.Modules.Notifications.csproj" />
   </ItemGroup>
 </Project>

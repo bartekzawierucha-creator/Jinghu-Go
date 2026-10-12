@@ -6,6 +6,7 @@ using JianghuGo.Infrastructure.Outbox;
 using JianghuGo.Infrastructure.Postgres;
 using JianghuGo.Modules.Characters;
 using JianghuGo.Modules.Combat;
+using JianghuGo.Modules.Crafting;
 using JianghuGo.Modules.Cultivation;
 using JianghuGo.Modules.Geolocation;
 using JianghuGo.Modules.Inventory;
@@ -36,6 +37,7 @@ public static class JianghuCore
         services.AddIdentityModule(configuration);
         services.AddCharactersModule(configuration);
         services.AddInventoryModule(configuration);
+        services.AddCraftingModule(configuration);
         services.AddCultivationModule(configuration);
         services.AddCombatModule(configuration);
         services.AddGeolocationModule(configuration);

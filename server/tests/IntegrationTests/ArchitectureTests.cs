@@ -15,6 +15,7 @@ public class ArchitectureTests
         ["JianghuGo.Modules.Identity"] = ["JianghuGo.Infrastructure", "JianghuGo.Application", "JianghuGo.Domain"],
         ["JianghuGo.Modules.Characters"] = ["JianghuGo.Modules.Identity", "JianghuGo.Infrastructure", "JianghuGo.Application", "JianghuGo.Domain"],
         ["JianghuGo.Modules.Inventory"] = ["JianghuGo.Modules.Characters", "JianghuGo.Modules.Identity", "JianghuGo.Infrastructure", "JianghuGo.Application", "JianghuGo.Domain"],
+        ["JianghuGo.Modules.Crafting"] = ["JianghuGo.Modules.Inventory", "JianghuGo.Modules.Characters", "JianghuGo.Modules.Identity", "JianghuGo.Infrastructure", "JianghuGo.Application", "JianghuGo.Domain"],
         ["JianghuGo.Modules.Combat"] = ["JianghuGo.Modules.Inventory", "JianghuGo.Modules.Characters", "JianghuGo.Modules.Identity", "JianghuGo.Infrastructure", "JianghuGo.Application", "JianghuGo.Domain"],
         ["JianghuGo.Modules.Geolocation"] = ["JianghuGo.Modules.Characters", "JianghuGo.Modules.Identity", "JianghuGo.Infrastructure", "JianghuGo.Application", "JianghuGo.Domain"],
         ["JianghuGo.Modules.World"] = ["JianghuGo.Modules.Geolocation", "JianghuGo.Modules.Combat", "JianghuGo.Modules.Inventory", "JianghuGo.Modules.Characters", "JianghuGo.Modules.Identity", "JianghuGo.Infrastructure", "JianghuGo.Application", "JianghuGo.Domain"],
@@ -40,7 +41,7 @@ public class ArchitectureTests
     [Fact]
     public void Cross_module_usage_goes_through_published_contracts()
     {
-        foreach (var consumer in new[] { "JianghuGo.Modules.Cultivation", "JianghuGo.Modules.Notifications", "JianghuGo.Modules.Combat", "JianghuGo.Modules.World", "JianghuGo.Modules.Geolocation", "JianghuGo.Modules.Inventory" })
+        foreach (var consumer in new[] { "JianghuGo.Modules.Cultivation", "JianghuGo.Modules.Notifications", "JianghuGo.Modules.Combat", "JianghuGo.Modules.World", "JianghuGo.Modules.Geolocation", "JianghuGo.Modules.Inventory", "JianghuGo.Modules.Crafting" })
         {
             var asm = Assembly.Load(consumer);
             var used = asm.GetTypes()
