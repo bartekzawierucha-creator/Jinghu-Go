@@ -600,12 +600,12 @@ namespace JianghuGo.Android
             var fights = ui.Column();
             ui.Heading("Droga kultywatora");
             var dao1 = ui.Columns();
-            ui.Tile("📜 Zadania i osiągnięcia", "Dzienne zadania, tytuły, meldunek", Resource.Drawable.place_altar, () => Run(() => ShowQuestsAsync(c)), parent: dao1, heightDp: 120);
-            ui.Tile("☯ Meridiany", "Punkty z każdego etapu", Resource.Drawable.place_qiarray, () => Run(() => ShowMeridiansAsync(c)), parent: dao1, heightDp: 120);
+            ui.Tile("📜 Zadania i osiągnięcia", "Dzienne zadania, tytuły, meldunek", Resource.Drawable.tile_menu_quests, () => Run(() => ShowQuestsAsync(c)), parent: dao1, heightDp: 120);
+            ui.Tile("☯ Meridiany", "Punkty z każdego etapu", Resource.Drawable.tile_menu_meridians, () => Run(() => ShowMeridiansAsync(c)), parent: dao1, heightDp: 120);
             var dao2 = ui.Columns();
-            ui.Tile("🏆 Rankingi", "Najwięksi kultywatorzy", Resource.Drawable.loc_temple, () => Run(() => ShowRankingAsync(c, null)), parent: dao2, heightDp: 120);
-            ui.Tile("🐾 Duchowy towarzysz", "Oswojona bestia", Resource.Drawable.loc_bamboo, () => Run(() => ShowPetAsync(c)), parent: dao2, heightDp: 120);
-            ui.Tile("🥋 Postać i ekwipunek", "Sylwetka, sloty i premie", Resource.Drawable.bg_hero, () => Run(() => ShowHeroAsync(c)), heightDp: 110);
+            ui.Tile("🏆 Rankingi", "Najwięksi kultywatorzy", Resource.Drawable.tile_menu_ranking, () => Run(() => ShowRankingAsync(c, null)), parent: dao2, heightDp: 120);
+            ui.Tile("🐾 Duchowy towarzysz", "Oswojona bestia", Resource.Drawable.tile_menu_pet, () => Run(() => ShowPetAsync(c)), parent: dao2, heightDp: 120);
+            ui.Tile("🥋 Postać i ekwipunek", "Sylwetka, sloty i premie", Resource.Drawable.tile_menu_hero, () => Run(() => ShowHeroAsync(c)), heightDp: 110);
 
             ui.Heading("Ścieżka mistrza");
             var row1 = ui.Columns();
@@ -919,6 +919,8 @@ namespace JianghuGo.Android
                             (exploration.Session != null ? "   ·   przebyto " + Math.Round(exploration.Session.DistanceM) + " m" : string.Empty) +
                             (n?.Event != null ? "\n✨ Wydarzenie: " + n.Event.NamePl : string.Empty) +
                             (n?.NearestFlameSite != null ? "\n🔥 Płomień: " + n.NearestFlameSite.NamePl + " (" + (n.NearestFlameSite.DistanceM < 1000 ? n.NearestFlameSite.DistanceM + " m" : n.NearestFlameSite.DistanceM / 1000 + " km") + ")" : string.Empty);
+                info.SetCompoundDrawables(null, null, null, null);
+                if (n?.Event != null) ui.WithIcon(info, "event_" + n.Event.Kind, 40);
                 map.Player = _location.Last;
                 map.Heading = _compass.Heading;
                 map.Nearby = n;

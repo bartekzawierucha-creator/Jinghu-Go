@@ -227,7 +227,7 @@ namespace JianghuGo.Android
         private async Task ShowQuestsAsync(CharacterDto c)
         {
             var board = await _api.GetQuestsAsync(c.Id, Ct);
-            var ui = NewScreen("Zadania", () => ShowCharacter(c), Resource.Drawable.place_altar, "DZIEŃ " + board.Day);
+            var ui = NewScreen("Zadania", () => ShowCharacter(c), Resource.Drawable.tile_menu_quests, "DZIEŃ " + board.Day);
 
             var checkin = ui.Panel();
             ui.WithIcon(ui.Label("Meldunek — seria " + board.Checkin.Streak + " (rekord " + board.Checkin.BestStreak + ")", 16, Ui.Gold, bold: true, parent: checkin), "menu_checkin", 30);
@@ -282,7 +282,7 @@ namespace JianghuGo.Android
         private async Task ShowMeridiansAsync(CharacterDto c)
         {
             var m = await _api.GetMeridiansAsync(c.Id, Ct);
-            var ui = NewScreen("Meridiany", () => ShowCharacter(c), Resource.Drawable.place_qiarray, "DRZEWO KANAŁÓW QI");
+            var ui = NewScreen("Meridiany", () => ShowCharacter(c), Resource.Drawable.tile_menu_meridians, "DRZEWO KANAŁÓW QI");
             var head = ui.Panel();
             ui.WithIcon(ui.Label("Wolne punkty: " + m.Free + "   (zdobyte " + m.PointsEarned + ", otwarte " + m.PointsSpent + ")", 17, m.Free > 0 ? Ui.Gold : Ui.Ink, bold: true, parent: head), "menu_meridians", 34);
             ui.Label("Każdy osiągnięty etap kultywacji daje 1 punkt. Królestwo dodaje +" + m.RealmBonus + " do wszystkich cech. Premie działają w walce.", 12, Ui.Muted, parent: head);
@@ -324,7 +324,7 @@ namespace JianghuGo.Android
 
         private async Task ShowRankingAsync(CharacterDto c, string metric)
         {
-            var ui = NewScreen("Rankingi", () => ShowCharacter(c), Resource.Drawable.loc_temple, "SŁAWA W JIANGHU");
+            var ui = NewScreen("Rankingi", () => ShowCharacter(c), Resource.Drawable.tile_menu_ranking, "SŁAWA W JIANGHU");
             LinearLayout tabs = null;
             var tab = 0;
             foreach (var (m, label) in new[] { ((string)null, "Kultywacja"), ("pvp_won", "Pojedynki"), ("bosses_won", "Bossowie"), ("battles_won", "Zwycięstwa") })
@@ -362,7 +362,7 @@ namespace JianghuGo.Android
         private async Task ShowPetAsync(CharacterDto c)
         {
             var env = await _api.GetPetAsync(c.Id, Ct);
-            var ui = NewScreen("Duchowy towarzysz", () => ShowCharacter(c), Resource.Drawable.loc_bamboo, "OSWOJONA BESTIA");
+            var ui = NewScreen("Duchowy towarzysz", () => ShowCharacter(c), Resource.Drawable.tile_menu_pet, "OSWOJONA BESTIA");
             var pet = env.Pet;
             if (pet == null)
             {
@@ -419,7 +419,7 @@ namespace JianghuGo.Android
                 // optional extras
             }
 
-            var ui = NewScreen(c.Name, () => ShowCharacter(c), Resource.Drawable.bg_hero, "POSTAĆ I EKWIPUNEK");
+            var ui = NewScreen(c.Name, () => ShowCharacter(c), Resource.Drawable.tile_menu_hero, "POSTAĆ I EKWIPUNEK");
             var doll = new HeroDollView(this) { PetNpcId = pet?.NpcId };
             foreach (var slot in HeroDollView.Slots)
             {
