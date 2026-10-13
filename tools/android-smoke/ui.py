@@ -58,8 +58,7 @@ def wait(text, timeout=30):
         if find(text) is not None:
             return True
         time.sleep(1)
-    print(f"TIMEOUT waiting for '{text}'. Visible texts:", file=sys.stderr)
-    dump(sys.stderr)
+    report(f"TIMEOUT waiting for '{text}'")
     return False
 
 
@@ -78,8 +77,7 @@ def tap(text, timeout=30):
             swipes += 1
         else:
             time.sleep(1)
-    print(f"TIMEOUT tapping '{text}'. Visible texts:", file=sys.stderr)
-    dump(sys.stderr)
+    report(f"TIMEOUT tapping '{text}'")
     return False
 
 
@@ -97,6 +95,13 @@ def field(index, value):
     time.sleep(0.5)
     hide_keyboard()
     return True
+
+
+def report(message):
+    """GitHub annotation with what the screen showed (readable without downloading the logs)."""
+    texts = [n.get("text") for n in nodes() if n.get("text")]
+    print("::error::" + message + " — on screen: " + " | ".join(texts)[:1500])
+    shot("shots/failure.png")
 
 
 def dump(out=sys.stdout):

@@ -86,6 +86,20 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: bash tools/android-smoke/smoke.sh dist/JianghuGo-dev.apk
+      - name: Pack screenshots and logs
+        if: always()
+        run: |
+          cp api.log shots/ 2>/dev/null || true
+          (cd shots && zip -qr ../android-smoke.zip .) || true
+      - name: Publish screenshots and logs (android-smoke pre-release)
+        if: always()
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-smoke
+          name: "Android smoke test — screenshots and logs"
+          prerelease: true
+          files: android-smoke.zip
+          body: Screenshots and logs of the latest emulator smoke test (${{ github.sha }}).
       - name: Upload screenshots and logs
         if: always()
         uses: actions/upload-artifact@v4
