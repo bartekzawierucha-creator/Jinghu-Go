@@ -492,7 +492,8 @@ namespace JianghuGo.Android
             var top = new LinearLayout(this) { Orientation = Orientation.Horizontal };
             card.AddView(top);
             var portrait = new ImageView(this);
-            var portraitArt = new global::Android.Graphics.Drawables.BitmapDrawable(Resources, Ui.Art(this, Resource.Drawable.portrait)) { FilterBitmap = false };
+            var portraitArt = new global::Android.Graphics.Drawables.BitmapDrawable(Resources, Ui.Art(this, Resource.Drawable.portrait));
+            portraitArt.SetFilterBitmap(false);
             portrait.SetImageDrawable(portraitArt);
             portrait.SetScaleType(ImageView.ScaleType.CenterCrop);
             portrait.Background = new FrameDrawable(Resources.DisplayMetrics.Density, Ui.Night, Ui.Gold, Ui.Gold);

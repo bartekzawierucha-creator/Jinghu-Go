@@ -253,7 +253,7 @@ namespace JianghuGo.Android
             {
                 var img = new ImageView(_ctx);
                 var drawable = new BitmapDrawable(_ctx.Resources, Art(_ctx, artRes));
-                drawable.FilterBitmap = !pixelArt;
+                drawable.SetFilterBitmap(!pixelArt);
                 img.SetImageDrawable(drawable);
                 img.SetScaleType(pixelArt ? ImageView.ScaleType.FitCenter : ImageView.ScaleType.CenterCrop);
                 tile.AddView(img, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
