@@ -60,9 +60,9 @@ namespace JianghuGo.Android
             act.LayoutParameters = new LinearLayout.LayoutParams(Px(104), Px(40)) { Gravity = GravityFlags.CenterVertical };
 
             var tools = ui.HRow(page, 44);
-            var placesBtn = ui.Btn("Okolica", () => { }, tools, secondary: true, sp: 12, icon: "map_other");
-            var peopleBtn = ui.Btn("Kultywatorzy", () => { }, tools, secondary: true, sp: 12, icon: "map_cultivator");
-            var flameBtn = ui.Btn("Płomień", () => { }, tools, secondary: true, sp: 12, icon: "map_flame");
+            var placesBtn = ui.Btn("Okolica", () => { }, tools, secondary: true, sp: 11, icon: "map_other");
+            var peopleBtn = ui.Btn("Ludzie", () => { }, tools, secondary: true, sp: 11, icon: "map_cultivator");
+            var flameBtn = ui.Btn("Płomień", () => { }, tools, secondary: true, sp: 11, icon: "map_flame");
 
             NodeDto selected = null;
             var people = new List<NearbyCultivatorDto>();
@@ -156,8 +156,8 @@ namespace JianghuGo.Android
                 map.Nearby = n;
                 map.CultivatorsNearby = people.Count;
                 map.Invalidate();
-                placesBtn.Text = "Okolica" + (n != null ? " (" + n.Nodes.Count(x => !x.Harvested) + ")" : string.Empty);
-                peopleBtn.Text = "Kultywatorzy" + (people.Count > 0 ? " (" + people.Count + ")" : string.Empty);
+                placesBtn.Text = "Okolica" + (n != null ? " " + n.Nodes.Count(x => !x.Harvested) : string.Empty);
+                peopleBtn.Text = "Ludzie" + (people.Count > 0 ? " " + people.Count : string.Empty);
                 RenderCard();
             }
 

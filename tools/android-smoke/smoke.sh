@@ -98,14 +98,14 @@ $UI wait "Trening" 60
 $UI noscroll
 $UI shot shots/06-combat.png
 $UI tap "Drewniany Manekin"
-$UI wait "Odpoczynek" 60
+$UI wait "Odpocznij" 60
 $UI noscroll
 $UI shot shots/06b-battle.png
-$UI tap "Odpoczynek" 20
+$UI tap "Odpocznij" 20
 sleep 3
 $UI shot shots/06c-battle-turn.png
-$UI tap "Poddaj się"
-$UI tap "Dotknij ponownie" 20
+$UI tap "Poddaj"
+$UI tap "Na pewno?" 20
 $UI wait "PORAŻKA" 30
 $UI tap "Dalej" 20
 $UI tap "Wyjdź"
@@ -113,11 +113,11 @@ $UI wait "Trening" 30
 for foe in "Kamienny Golem" "Zdrajca Sekty"; do
   $UI paged "$foe" 6 0.45
   $UI tap "$foe"
-  $UI wait "Odpoczynek" 60
+  $UI wait "Odpocznij" 60
   sleep 2
   $UI shot "shots/06-$(echo "$foe" | tr ' ' '_').png"
-  $UI tap "Poddaj się"
-  $UI tap "Dotknij ponownie" 20
+  $UI tap "Poddaj"
+  $UI tap "Na pewno?" 20
   $UI wait "PORAŻKA" 30
   $UI tap "Dalej" 20
   $UI tap "Wyjdź"

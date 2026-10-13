@@ -103,7 +103,17 @@ namespace JianghuGo.Android
                 canvas.DrawCircle(x, y, r, _p);
                 _text.TextSize = 11 * _d;
                 _text.Color = Ui.Ink;
-                canvas.DrawText(_name(stat), x, y + r + 13 * _d, _text);
+                if (Math.Abs(Nodes[i].X - 0.5f) < 0.01f)
+                {
+                    // spine points sit close together: label them on the side
+                    _text.TextAlign = i % 2 == 0 ? Paint.Align.Left : Paint.Align.Right;
+                    canvas.DrawText(_name(stat), i % 2 == 0 ? x + r + 8 * _d : x - r - 8 * _d, y + 4 * _d, _text);
+                    _text.TextAlign = Paint.Align.Center;
+                }
+                else
+                {
+                    canvas.DrawText(_name(stat), x, y + r + 13 * _d, _text);
+                }
                 if (pts > 0)
                 {
                     _text.TextSize = 12 * _d;

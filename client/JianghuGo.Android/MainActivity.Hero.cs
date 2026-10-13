@@ -207,11 +207,12 @@ namespace JianghuGo.Android
                 var slot = slots[i];
                 var card = ui.Card(cell, 1f, 6, slot.TechniqueId == null ? (Color?)null : slot.Kind == "attack" ? Ui.Cinnabar : Ui.QiBlue, 0);
                 card.Clickable = true;
-                var row = ui.HRow(card, 46, 0);
+                card.SetGravity(GravityFlags.CenterVertical);
+                var row = ui.HRow(card, 40, 0);
                 var icon = slot.TechniqueId != null && ui.ArtId("tech_" + slot.TechniqueId) != 0 ? "tech_" + slot.TechniqueId : "icon_" + slot.Kind;
-                ui.Icon(row, icon, 42);
+                ui.Icon(row, icon, 36);
                 var col = ui.Box(row, 1f, marginDp: 6);
-                ui.Text(slot.NamePl ?? "— pusty —", col, 12, slot.TechniqueId == null ? Ui.Muted : Ui.Ink, bold: true, maxLines: 2);
+                ui.Text(slot.NamePl ?? "— pusty —", col, 12, slot.TechniqueId == null ? Ui.Muted : Ui.Ink, bold: true, maxLines: 1);
                 ui.Text(ActionName(slot.Kind) + (slot.Level > 0 ? " · poz. " + slot.Level : string.Empty) + (slot.QiCost > 0 ? " · " + slot.QiCost + " Qi" : string.Empty), col, 10, Ui.Muted);
                 card.Click += (_, __) => PickTechnique(loadout, slot);
             });

@@ -191,6 +191,45 @@ namespace JianghuGo.Android
             return tile;
         }
 
+        /// <summary>A technique key for the duel grid: icon on top, short name and Qi cost under it.</summary>
+        public LinearLayout SkillTile(ViewGroup row, string icon, string name, string cost, bool primary, System.Action onClick, int heightDp = 58)
+        {
+            var tile = new LinearLayout(_ctx) { Orientation = Orientation.Vertical, Clickable = true, Focusable = true };
+            tile.SetGravity(GravityFlags.Center);
+            tile.Background = ButtonBackground(!primary);
+            tile.SetPadding(Dp(2), Dp(3), Dp(2), Dp(2));
+            var img = new ImageView(_ctx);
+            var id = ArtId(icon);
+            if (id != 0) img.SetImageBitmap(Art(_ctx, id));
+            img.SetScaleType(ImageView.ScaleType.FitCenter);
+            tile.AddView(img, new LinearLayout.LayoutParams(Dp(26), Dp(26)));
+            var t = new TextView(_ctx) { Text = name, Gravity = GravityFlags.Center };
+            t.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 9);
+            t.SetTypeface(Display, TypefaceStyle.Bold);
+            t.SetTextColor(primary ? Ink : Gold);
+            t.SetMaxLines(1);
+            t.Ellipsize = global::Android.Text.TextUtils.TruncateAt.End;
+            t.SetIncludeFontPadding(false);
+            tile.AddView(t, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Dp(2) });
+            if (!string.IsNullOrEmpty(cost))
+            {
+                var c = new TextView(_ctx) { Text = cost, Gravity = GravityFlags.Center };
+                c.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 9);
+                c.SetTextColor(QiBlue);
+                c.SetIncludeFontPadding(false);
+                tile.AddView(c, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent));
+            }
+
+            tile.Click += (_, __) =>
+            {
+                tile.PerformHapticFeedback(FeedbackConstants.VirtualKey);
+                Sfx.Play(Sfx.Click, 0.5f);
+                onClick();
+            };
+            AddFixed(row, tile, heightDp);
+            return tile;
+        }
+
         /// <summary>Small red counter bubble.</summary>
         public TextView Badge(string text)
         {
@@ -339,7 +378,8 @@ namespace JianghuGo.Android
         private TextView Arrow(string glyph, System.Action onClick)
         {
             var t = new TextView(_ui.Context) { Text = glyph, Gravity = GravityFlags.Center, Clickable = true };
-            t.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 24);
+            t.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 20);
+            t.SetIncludeFontPadding(false);
             t.SetTextColor(Ui.Gold);
             t.Click += (_, __) => onClick();
             return t;

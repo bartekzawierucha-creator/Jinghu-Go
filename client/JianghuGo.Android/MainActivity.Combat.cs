@@ -121,49 +121,49 @@ namespace JianghuGo.Android
             var slots = combat.Battle.MySlots.OrderBy(s => s.Slot).ToList();
             for (var r = 0; r < 2; r++)
             {
-                var row = ui.HRow(page, 54, 4);
+                var row = ui.HRow(page, 58, 4);
                 for (var k = 0; k < 4; k++)
                 {
                     var idx = r * 4 + k;
                     if (idx >= slots.Count || slots[idx].TechniqueId == null)
                     {
                         var empty = new View(this);
-                        row.AddView(empty, new LinearLayout.LayoutParams(0, Px(54), 1f) { LeftMargin = k > 0 ? Px(6) : 0 });
+                        row.AddView(empty, new LinearLayout.LayoutParams(0, Px(58), 1f) { LeftMargin = k > 0 ? Px(6) : 0 });
                         continue;
                     }
 
                     var slot = slots[idx];
-                    var cost = slot.QiCost > 0 ? "\n" + slot.QiCost + " Qi" : string.Empty;
+                    var cost = slot.QiCost > 0 ? slot.QiCost + " Qi" : null;
                     if (slot.Kind == "movement")
                     {
                         var pair = ui.Box(row, 1f, horizontal: true, marginDp: 6);
-                        buttons.Add(ui.Btn("⬅", () => Act(slot.Slot, "retreat"), pair, secondary: true, sp: 16, heightDp: 54));
-                        buttons.Add(ui.Btn("➡", () => Act(slot.Slot, "advance"), pair, secondary: true, sp: 16, heightDp: 54));
+                        buttons.Add(ui.SkillTile(pair, TechIcon(slot), "⬅ cofnij", cost, false, () => Act(slot.Slot, "retreat")));
+                        buttons.Add(ui.SkillTile(pair, TechIcon(slot), "naprzód ➡", cost, false, () => Act(slot.Slot, "advance")));
                         continue;
                     }
 
-                    var b = ui.Btn(slot.NamePl + cost, () => Act(slot.Slot, null), row, secondary: slot.Kind != "attack", sp: 10, heightDp: 54, icon: TechIcon(slot));
+                    var b = ui.SkillTile(row, TechIcon(slot), slot.NamePl, cost, slot.Kind == "attack", () => Act(slot.Slot, null));
                     b.Tag = slot.Slot;
                     buttons.Add(b);
                 }
             }
 
             var controls = ui.HRow(page, 42, 6);
-            buttons.Add(ui.Btn("Odpoczynek +Qi", () => Act(null, null), controls, secondary: true, sp: 12, heightDp: 42));
-            ui.Btn("Odśwież", () => Run(async () =>
+            buttons.Add(ui.Btn("Odpocznij", () => Act(null, null), controls, secondary: true, sp: 12, heightDp: 42));
+            ui.Btn("⟳", () => Run(async () =>
             {
                 await combat.RefreshAsync(Ct);
                 Render();
-            }), controls, secondary: true, sp: 12, heightDp: 42);
+            }), controls, secondary: true, sp: 16, heightDp: 42).LayoutParameters = new LinearLayout.LayoutParams(Px(48), Px(42)) { LeftMargin = Px(6) };
             var confirmForfeit = false;
             Button forfeit = null;
-            forfeit = ui.Btn("🏳 Poddaj się", () =>
+            forfeit = ui.Btn("Poddaj", () =>
             {
                 if (!combat.Battle.IsActive) return;
                 if (!confirmForfeit)
                 {
                     confirmForfeit = true;
-                    forfeit.Text = "Dotknij ponownie";
+                    forfeit.Text = "Na pewno?";
                     return;
                 }
 

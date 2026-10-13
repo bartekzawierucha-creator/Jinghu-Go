@@ -190,15 +190,13 @@ namespace JianghuGo.Android
                 var recipe = recipes[i];
                 var can = economy.CanAfford(recipe, 1);
                 var card = ui.Card(cell, 1f, 8, can ? Ui.Gold : (Color?)null, 0);
-                var row = ui.HRow(card, 46, 0);
-                ui.Icon(row, ui.ArtId("item_" + recipe.Output.Item) != 0 ? "item_" + recipe.Output.Item : "item_slot_empty", 42);
+                card.SetGravity(GravityFlags.CenterVertical);
+                var row = ui.HRow(card, 44, 0);
+                ui.Icon(row, ui.ArtId("item_" + recipe.Output.Item) != 0 ? "item_" + recipe.Output.Item : "item_slot_empty", 40);
                 var col = ui.Box(row, 1f, marginDp: 8);
-                ui.Text(N(recipe.Output.Item) + (recipe.Output.Quantity > 1 ? " ×" + recipe.Output.Quantity : string.Empty), col, 14, can ? Ui.Gold : Ui.Ink, bold: true);
+                ui.Text(N(recipe.Output.Item) + (recipe.Output.Quantity > 1 ? " ×" + recipe.Output.Quantity : string.Empty), col, 13, can ? Ui.Gold : Ui.Ink, bold: true);
                 ui.Text((recipe.Kind == "alchemy" ? "Alchemia · " + recipe.SuccessPermille / 10 + "%+" : "Kuźnia") + " · " + recipe.Stones + " KD", col, 11, Ui.Muted);
-                var inputs = string.Join("   ", recipe.Inputs.Select(x => N(x.Item) + " " + inv.Count(x.Item) + "/" + x.Quantity));
-                ui.Text(inputs, card, 11, can ? Ui.Jade : Ui.Cinnabar, maxLines: 2);
-                ui.Box(card, 1f, marginDp: 0);
-                ui.Btn(can ? "Wytwórz" : "Brakuje składników", () => Run(async () =>
+                ui.Btn(can ? "Wytwórz" : "Brak", () => Run(async () =>
                 {
                     if (!economy.CanAfford(recipe, 1))
                     {
@@ -220,7 +218,9 @@ namespace JianghuGo.Android
                     }
 
                     RefreshHud();
-                }), card, secondary: !can, sp: 13, heightDp: 38);
+                }), row, secondary: !can, sp: 12, heightDp: 38).LayoutParameters = new LinearLayout.LayoutParams(Px(86), Px(38)) { Gravity = GravityFlags.CenterVertical };
+                var inputs = string.Join("   ", recipe.Inputs.Select(x => N(x.Item) + " " + inv.Count(x.Item) + "/" + x.Quantity));
+                ui.Text(inputs, card, 11, can ? Ui.Jade : Ui.Cinnabar, maxLines: 1);
             }, empty: "Brak receptur.", startPage: startPage);
         }
 
