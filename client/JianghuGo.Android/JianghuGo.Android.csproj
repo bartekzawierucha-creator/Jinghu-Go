@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Native Android client (.NET for Android) — builds an APK without Unity.
+    Reuses the engine-independent client core (ApiClient + flows), the same code the integration tests run against
+    the real server; only the platform layer (UI, GPS, token storage, JSON) lives here.
+    Build: dotnet workload install android; dotnet publish -f net10.0-android -c Release
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <SupportedOSPlatformVersion>26</SupportedOSPlatformVersion>
+    <OutputType>Exe</OutputType>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <RootNamespace>JianghuGo.Android</RootNamespace>
+    <ApplicationId>pl.bz.jianghugo</ApplicationId>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>0.9.0</ApplicationDisplayVersion>
+    <AndroidPackageFormat>apk</AndroidPackageFormat>
+    <AndroidPackageFormats>apk</AndroidPackageFormats>
+    <!-- System.Text.Json uses reflection over the core DTOs: keep them out of the trimmer's reach. -->
+    <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
+    <TrimMode>partial</TrimMode>
+    <RuntimeIdentifiers>android-arm64;android-arm;android-x64</RuntimeIdentifiers>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../JianghuGo.Client.Core.csproj" />
+    <TrimmerRootAssembly Include="JianghuGo.Client.Core" />
+  </ItemGroup>
+</Project>

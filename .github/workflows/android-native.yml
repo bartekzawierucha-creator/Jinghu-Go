@@ -1,0 +1,57 @@
+name: android-native-apk
+
+# Builds the native Android client (.NET for Android, no Unity) into a debug-signed DEVELOPMENT APK.
+# The APK is uploaded as a workflow artifact and attached to the rolling pre-release "android-latest".
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ["client/**", ".github/workflows/android-native.yml"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-native
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Install the .NET Android workload
+        run: dotnet workload install android
+      - name: Install Android SDK dependencies (platform, build-tools)
+        run: dotnet build client/JianghuGo.Android/JianghuGo.Android.csproj -t:InstallAndroidDependencies -f net10.0-android -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT" -p:AcceptAndroidSDKLicenses=True
+      - name: Build APK
+        run: dotnet publish client/JianghuGo.Android/JianghuGo.Android.csproj -f net10.0-android -c Release -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT" -o out --nologo
+      - name: Collect APK
+        run: |
+          apk=$(find out -name '*-Signed.apk' | head -n1)
+          test -n "$apk" || { echo "no signed APK produced"; ls -R out; exit 1; }
+          mkdir -p dist && cp "$apk" dist/JianghuGo-dev.apk
+          ls -l dist
+      - uses: actions/upload-artifact@v4
+        with:
+          name: JianghuGo-dev-apk
+          path: dist/JianghuGo-dev.apk
+      - name: Publish to the android-latest pre-release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-latest
+          name: "Jianghu Go — Android (development build)"
+          prerelease: true
+          files: dist/JianghuGo-dev.apk
+          body: |
+            Debug-signed DEVELOPMENT build of the native Android client from ${{ github.sha }}.
+            Install: allow "unknown sources", open the APK. Server: `API_BIND=0.0.0.0 docker compose up --build` on a PC
+            in the same Wi-Fi, then enter http://<PC address>:8080 on the login screen.
