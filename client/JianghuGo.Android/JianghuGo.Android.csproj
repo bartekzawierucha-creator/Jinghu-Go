@@ -24,6 +24,8 @@
     <RunAOTCompilation>false</RunAOTCompilation>
     <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
     <RuntimeIdentifiers>android-arm64;android-arm;android-x64</RuntimeIdentifiers>
+    <!-- one APK per CPU type: a phone downloads only its own (arm64 for nearly all current phones) -->
+    <AndroidCreatePackagePerAbi>true</AndroidCreatePackagePerAbi>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../JianghuGo.Client.Core.csproj" />

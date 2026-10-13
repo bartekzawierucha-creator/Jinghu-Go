@@ -48,14 +48,17 @@ jobs:
           exit $status
       - name: Collect APK
         run: |
-          apk=$(find out -name '*-Signed.apk' | head -n1)
-          test -n "$apk" || { echo "no signed APK produced"; ls -R out; exit 1; }
-          mkdir -p dist && cp "$apk" dist/JianghuGo-dev.apk
+          find out -name '*-Signed.apk' | sort
+          mkdir -p dist
+          pick() { f=$(find out -name "*$1*-Signed.apk" | head -n1); test -n "$f" || { echo "no APK for $1"; exit 1; }; cp "$f" "dist/$2"; }
+          pick arm64-v8a JianghuGo-dev.apk          # phones (ARM64)
+          pick armeabi-v7a JianghuGo-dev-arm32.apk  # older 32-bit phones
+          pick x86_64 JianghuGo-dev-x86_64.apk      # emulators (smoke test)
           ls -l dist
       - uses: actions/upload-artifact@v4
         with:
           name: JianghuGo-dev-apk
-          path: dist/JianghuGo-dev.apk
+          path: dist/*.apk
 
   smoke:
     # Installs the APK on an emulator and plays through the main screens in offline mode (server inside the app).
@@ -82,7 +85,7 @@ jobs:
           profile: pixel_6
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: bash tools/android-smoke/smoke.sh dist/JianghuGo-dev.apk
+          script: bash tools/android-smoke/smoke.sh dist/JianghuGo-dev-x86_64.apk
       - name: Pack screenshots and logs
         if: always()
         run: |
@@ -108,7 +111,9 @@ jobs:
           tag_name: android-latest
           name: "Jianghu Go — Android (development build)"
           prerelease: true
-          files: dist/JianghuGo-dev.apk
+          files: |
+            dist/JianghuGo-dev.apk
+            dist/JianghuGo-dev-arm32.apk
           body: |
             Debug-signed DEVELOPMENT build of the native Android client from ${{ github.sha }}.
             Install: allow "unknown sources", open the APK. Server: `API_BIND=0.0.0.0 docker compose up --build` on a PC
