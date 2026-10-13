@@ -93,7 +93,11 @@ def tap(text, timeout=30):
 
 def field(index, value):
     """Types into the index-th text field; verifies the text landed (a half-visible field may miss the tap)."""
-    for attempt in range(6):
+    for attempt in range(12):
+        if any("isn't responding" in (n.get("text") or "") for n in nodes()):
+            find("\u0000no-such-text\u0000")  # taps "Wait" on the system dialog
+            time.sleep(3)
+            continue
         edits = []
         for _ in range(8):
             all_nodes = nodes()
