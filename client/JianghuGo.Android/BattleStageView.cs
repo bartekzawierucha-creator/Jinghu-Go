@@ -85,7 +85,19 @@ namespace JianghuGo.Android
 
             var look = NpcLooks.For(npcId);
             _look = look;
-            switch (look.Base)
+            var own = npcId == null ? 0 : ctx.Resources.GetIdentifier("anim_" + npcId + "_idle", "drawable", ctx.PackageName);
+            if (own != 0)
+            {
+                // this enemy has its own sprite sheets: idle / attack / defeat (hit = the first defeat frames)
+                int Res(string part) => ctx.Resources.GetIdentifier("anim_" + npcId + "_" + part, "drawable", ctx.PackageName);
+                _foe["idle"] = A(own, 7 * look.Speed, true);
+                _foe["attack"] = A(Res("attack"), 11 * look.Speed, false);
+                _foe["hit"] = A(Res("defeat"), 10, false, 0, 2);
+                _foe["defeat"] = A(Res("defeat"), 8, false);
+                look = look.WithOwnSprites();
+                _look = look;
+            }
+            else switch (look.Base)
             {
                 case "dummy":
                     _foe["idle"] = A(Resource.Drawable.anim_dummy_idle, 6, true);
@@ -443,6 +455,12 @@ namespace JianghuGo.Android
             public int Arena = Resource.Drawable.arena_fortress;
             public int TileArt = Resource.Drawable.tile_bandit;
             public string AttackFx = "slash";
+
+            /// <summary>With its own sprite sheets the enemy needs no colour grade; bosses stay a bit larger.</summary>
+            public Look WithOwnSprites() => new Look
+            {
+                Base = "own", Scale = Aura != null ? 1.12f : 1f, Speed = Speed, Tint = null, Aura = Aura, Arena = Arena, TileArt = TileArt, AttackFx = AttackFx,
+            };
         }
 
         private static Tint T(int r, int g, int b, int ar = 0, int ag = 0, int ab = 0) =>
@@ -456,20 +474,20 @@ namespace JianghuGo.Android
                 case "pvp": return new Look { Base = "hero", Arena = Resource.Drawable.arena_temple, AttackFx = "qi" };
                 case "training_dummy": return new Look { Base = "dummy", Arena = Resource.Drawable.arena_courtyard, TileArt = Resource.Drawable.tile_dummy };
                 case "grey_wolf": return Beast(Resource.Drawable.arena_bamboo, 1.25f, null);
-                case "wild_boar": return Beast(Resource.Drawable.arena_bamboo, 1.3f, T(200, 150, 110, 30, 10, 0), speed: 0.85f);
-                case "bamboo_viper": return Beast(Resource.Drawable.arena_bamboo, 1.0f, T(120, 220, 120), fx: "poison", speed: 1.3f);
-                case "fire_fox": return Beast(Resource.Drawable.arena_mountain, 1.1f, T(255, 150, 80, 60, 10, 0), fx: "flame", speed: 1.2f);
-                case "frost_spider": return Beast(Resource.Drawable.arena_mountain, 1.15f, T(150, 200, 255, 10, 30, 60), fx: "blue", speed: 1.2f);
-                case "thunder_eagle": return Beast(Resource.Drawable.arena_mountain, 1.2f, T(220, 220, 140, 40, 40, 70), fx: "blue", speed: 1.35f);
-                case "ancient_tortoise": return Boss(Beast(Resource.Drawable.arena_temple, 1.55f, T(130, 180, 140, 10, 30, 10), speed: 0.6f), Ui.Jade);
-                case "jiao_dragon": return Boss(Beast(Resource.Drawable.arena_mountain, 1.6f, T(120, 170, 255, 0, 20, 70), fx: "blue", speed: 1.1f), Ui.QiBlue);
+                case "wild_boar": return Tile(Resource.Drawable.tile_wild_boar, Beast(Resource.Drawable.arena_bamboo, 1.3f, T(200, 150, 110, 30, 10, 0), speed: 0.85f));
+                case "bamboo_viper": return Tile(Resource.Drawable.tile_bamboo_viper, Beast(Resource.Drawable.arena_bamboo, 1.0f, T(120, 220, 120), fx: "poison", speed: 1.3f));
+                case "fire_fox": return Tile(Resource.Drawable.tile_fire_fox, Beast(Resource.Drawable.arena_mountain, 1.1f, T(255, 150, 80, 60, 10, 0), fx: "flame", speed: 1.2f));
+                case "frost_spider": return Tile(Resource.Drawable.tile_frost_spider, Beast(Resource.Drawable.arena_mountain, 1.15f, T(150, 200, 255, 10, 30, 60), fx: "blue", speed: 1.2f));
+                case "thunder_eagle": return Tile(Resource.Drawable.tile_thunder_eagle, Beast(Resource.Drawable.arena_mountain, 1.2f, T(220, 220, 140, 40, 40, 70), fx: "blue", speed: 1.35f));
+                case "ancient_tortoise": return Tile(Resource.Drawable.tile_ancient_tortoise, Boss(Beast(Resource.Drawable.arena_tortoise_lake, 1.55f, T(130, 180, 140, 10, 30, 10), speed: 0.6f), Ui.Jade));
+                case "jiao_dragon": return Tile(Resource.Drawable.tile_jiao_dragon, Boss(Beast(Resource.Drawable.arena_dragon_abyss, 1.6f, T(120, 170, 255, 0, 20, 70), fx: "blue", speed: 1.1f), Ui.QiBlue));
                 case "mountain_bandit": return Human(Resource.Drawable.arena_mountain, 1f, null);
-                case "demonic_cultivator": return Human(Resource.Drawable.arena_fortress, 1.05f, T(190, 120, 220, 30, 0, 40), fx: "red");
-                case "sect_traitor": return Human(Resource.Drawable.arena_temple, 1f, T(170, 170, 200, 10, 10, 30), fx: "gold");
-                case "corpse_puppet": return Human(Resource.Drawable.arena_fortress, 1.1f, T(140, 170, 140, 20, 30, 20), fx: "poison", speed: 0.75f);
-                case "bandit_chief": return Boss(Human(Resource.Drawable.arena_fortress, 1.3f, T(255, 210, 160, 30, 15, 0), fx: "gold"), Ui.Gold);
-                case "blood_demon_lord": return Boss(Human(Resource.Drawable.arena_fortress, 1.45f, T(255, 110, 110, 70, 0, 0), fx: "red"), Ui.Cinnabar);
-                case "stone_golem": return new Look { Base = "dummy", Scale = 1.4f, Tint = T(150, 150, 160, 20, 20, 25), Arena = Resource.Drawable.arena_temple, TileArt = Resource.Drawable.tile_dummy, AttackFx = "slash" };
+                case "demonic_cultivator": return Tile(Resource.Drawable.tile_demonic_cultivator, Human(Resource.Drawable.arena_fortress, 1.05f, T(190, 120, 220, 30, 0, 40), fx: "red"));
+                case "sect_traitor": return Tile(Resource.Drawable.tile_sect_traitor, Human(Resource.Drawable.arena_temple, 1f, T(170, 170, 200, 10, 10, 30), fx: "gold"));
+                case "corpse_puppet": return Tile(Resource.Drawable.tile_corpse_puppet, Human(Resource.Drawable.arena_fortress, 1.1f, T(140, 170, 140, 20, 30, 20), fx: "poison", speed: 0.75f));
+                case "bandit_chief": return Tile(Resource.Drawable.tile_bandit_chief, Boss(Human(Resource.Drawable.arena_bandit_fortress, 1.3f, T(255, 210, 160, 30, 15, 0), fx: "gold"), Ui.Gold));
+                case "blood_demon_lord": return Tile(Resource.Drawable.tile_blood_demon_lord, Boss(Human(Resource.Drawable.arena_blood_gate, 1.45f, T(255, 110, 110, 70, 0, 0), fx: "red"), Ui.Cinnabar));
+                case "stone_golem": return Tile(Resource.Drawable.tile_stone_golem, new Look { Base = "dummy", Scale = 1.4f, Tint = T(150, 150, 160, 20, 20, 25), Arena = Resource.Drawable.arena_temple, TileArt = Resource.Drawable.tile_dummy, AttackFx = "slash" });
             }
 
             // unknown (newer content): guess by name
@@ -484,6 +502,12 @@ namespace JianghuGo.Android
 
         private static Look Human(int arena, float scale, Tint? tint, string fx = "slash", float speed = 1f) =>
             new Look { Base = "bandit", Scale = scale, Tint = tint, Arena = arena, TileArt = Resource.Drawable.tile_bandit, AttackFx = fx, Speed = speed };
+
+        private static Look Tile(int art, Look look)
+        {
+            look.TileArt = art;
+            return look;
+        }
 
         private static Look Boss(Look look, Color aura)
         {

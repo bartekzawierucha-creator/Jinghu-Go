@@ -62,12 +62,12 @@ namespace JianghuGo.Android
                     var r = await _api.CheckinAsync(c.Id, Ct);
                     b.Visibility = ViewStates.Gone;
                     Sfx.Play(Sfx.Coin);
-                    ShowBanner("MELDUNEK", "Seria: " + r.Streak + " " + (r.Streak == 1 ? "dzień" : "dni"), "+" + r.Stones + " kamieni duchowych", "icon_stones");
-                }), parent: card), "icon_stones", 26);
+                    ShowBanner("MELDUNEK", "Seria: " + r.Streak + " " + (r.Streak == 1 ? "dzień" : "dni"), "+" + r.Stones + " kamieni duchowych", "menu_checkin");
+                }), parent: card), "menu_checkin", 26);
             }
 
             if (done > 0)
-                _ui.WithIcon(_ui.Action("📜 Ukończone zadania do odebrania: " + done, () => Run(() => ShowQuestsAsync(c)), secondary: true, parent: card), "menu_scroll", 26);
+                _ui.WithIcon(_ui.Action("Ukończone zadania do odebrania: " + done, () => Run(() => ShowQuestsAsync(c)), secondary: true, parent: card), "menu_quests", 26);
         }
 
         // ---- popups ---------------------------------------------------------------------------------------------
@@ -180,9 +180,9 @@ namespace JianghuGo.Android
             {
                 ("Mistrz Lao", "Witaj, " + c.Name + ". Jianghu to twoje własne ulice — każdy krok, każde źródło Qi i każda bestia są prawdziwym miejscem wokół ciebie.", Resource.Drawable.portrait),
                 ("Medytacja", "Zacznij od medytacji. Naczynie Qi pokazuje, ile brakuje do pełni etapu i ile minut jeszcze potrzeba. Pełne naczynie = szansa na przełom.", Resource.Drawable.menu_meditate),
-                ("Przełom i meridiany", "Każdy zdobyty etap otwiera punkt meridianu. Wzmocnij nim wybraną cechę — premie liczą się w każdej walce.", Resource.Drawable.menu_breakthrough),
+                ("Przełom i meridiany", "Każdy zdobyty etap otwiera punkt meridianu. Wzmocnij nim wybraną cechę — premie liczą się w każdej walce.", Resource.Drawable.menu_meridians),
                 ("Wyprawa", "Eksploruj świat: zbieraj zioła i rudy, czerp Qi ze źródeł, walcz z bestiami. Bossowie czekają w legowiskach — tylko dla odważnych.", Resource.Drawable.menu_explore),
-                ("Zadania", "Codziennie trzy zadania i meldunek. Osiągnięcia dają tytuły. Zwycięż bestię z 🐾, a może zostanie twoim towarzyszem. Powodzenia, uczniu.", Resource.Drawable.menu_scroll),
+                ("Zadania", "Codziennie trzy zadania i meldunek. Osiągnięcia dają tytuły. Zwycięż bestię z 🐾, a może zostanie twoim towarzyszem. Powodzenia, uczniu.", Resource.Drawable.menu_quests),
             };
 
             void Show(int i)
@@ -214,14 +214,14 @@ namespace JianghuGo.Android
             var ui = NewScreen("Zadania", () => ShowCharacter(c), Resource.Drawable.place_altar, "DZIEŃ " + board.Day);
 
             var checkin = ui.Panel();
-            ui.WithIcon(ui.Label("Meldunek — seria " + board.Checkin.Streak + " (rekord " + board.Checkin.BestStreak + ")", 16, Ui.Gold, bold: true, parent: checkin), "icon_stones", 28);
+            ui.WithIcon(ui.Label("Meldunek — seria " + board.Checkin.Streak + " (rekord " + board.Checkin.BestStreak + ")", 16, Ui.Gold, bold: true, parent: checkin), "menu_checkin", 30);
             if (board.Checkin.CheckedInToday) ui.Label("Dziś już się zameldowałeś. Jutro: +" + board.Checkin.NextReward + " kamieni.", 13, Ui.Muted, parent: checkin);
             else ui.Action("Zamelduj się: +" + board.Checkin.NextReward + " kamieni", () => Run(async () =>
             {
                 var r = await _api.CheckinAsync(c.Id, Ct);
                 Sfx.Play(Sfx.Coin);
                 await ShowQuestsAsync(c);
-                ShowBanner("MELDUNEK", "Seria: " + r.Streak, "+" + r.Stones + " kamieni duchowych", "icon_stones");
+                ShowBanner("MELDUNEK", "Seria: " + r.Streak, "+" + r.Stones + " kamieni duchowych", "menu_checkin");
             }), parent: checkin);
 
             void QuestCard(QuestDto q, bool achievement)
@@ -268,7 +268,7 @@ namespace JianghuGo.Android
             var m = await _api.GetMeridiansAsync(c.Id, Ct);
             var ui = NewScreen("Meridiany", () => ShowCharacter(c), Resource.Drawable.place_qiarray, "DRZEWO KANAŁÓW QI");
             var head = ui.Panel();
-            ui.Label("Wolne punkty: " + m.Free + "   (zdobyte " + m.PointsEarned + ", otwarte " + m.PointsSpent + ")", 17, m.Free > 0 ? Ui.Gold : Ui.Ink, bold: true, parent: head);
+            ui.WithIcon(ui.Label("Wolne punkty: " + m.Free + "   (zdobyte " + m.PointsEarned + ", otwarte " + m.PointsSpent + ")", 17, m.Free > 0 ? Ui.Gold : Ui.Ink, bold: true, parent: head), "menu_meridians", 34);
             ui.Label("Każdy osiągnięty etap kultywacji daje 1 punkt. Królestwo dodaje +" + m.RealmBonus + " do wszystkich cech. Premie działają w walce.", 12, Ui.Muted, parent: head);
 
             foreach (var stat in Stats)
@@ -329,7 +329,7 @@ namespace JianghuGo.Android
             if (metric == null)
             {
                 var r = await _api.GetRankingAsync(c.Id, Ct);
-                if (r.Me != null) ui.Label("Twoje miejsce: #" + r.Me.Rank + " — " + r.Me.RealmNamePl + ", etap " + r.Me.Stage, 15, Ui.Gold, bold: true);
+                if (r.Me != null) ui.WithIcon(ui.Label("Twoje miejsce: #" + r.Me.Rank + " — " + r.Me.RealmNamePl + ", etap " + r.Me.Stage, 15, Ui.Gold, bold: true), "menu_ranking", 34);
                 foreach (var e in r.Top) Row(e.Rank, e.Name, e.Path, e.RealmNamePl + " · etap " + e.Stage, e.CharacterId == c.Id);
                 if (r.Top.Count == 0) ui.Label("Nikt jeszcze nie zaczął kultywacji.", 14, Ui.Muted);
             }
@@ -350,7 +350,7 @@ namespace JianghuGo.Android
             var pet = env.Pet;
             if (pet == null)
             {
-                ui.Label("Nie masz jeszcze towarzysza.", 16, Ui.Gold, bold: true);
+                ui.WithIcon(ui.Label("Nie masz jeszcze towarzysza.", 16, Ui.Gold, bold: true), "menu_pet", 34);
                 ui.Label("Pokonaj bestię oznaczoną 🐾 (w treningu lub w świecie). Po zwycięstwie jest szansa (wyższa z Losem), że bestia pójdzie za tobą. Towarzysz rośnie z każdą wygraną i dodaje część swoich cech do twoich w walce.", 14, Ui.Muted);
                 return;
             }
@@ -426,7 +426,7 @@ namespace JianghuGo.Android
             };
 
             // total combat stats: base + equipment + meridians/realm + pet
-            ui.Heading("Cechy w walce");
+            ui.WithIcon(ui.Heading("Cechy w walce"), "menu_hero", 26);
             var table = ui.Panel(padDp: 10);
             foreach (var st in c.Stats)
             {

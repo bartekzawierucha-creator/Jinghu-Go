@@ -126,11 +126,15 @@ namespace JianghuGo.Android
 
         private (Bitmap Art, Color Glow) Look(string kind) => kind switch
         {
-            "qi_spring" or "shrine" or "lotus_pond" => (Icon("qi", Resource.Drawable.map_qi), Ui.QiBlue),
-            "spirit_herb" or "bamboo_grove" => (Icon("herb", Resource.Drawable.map_herb), Ui.Jade),
-            _ when IsBossLair(kind) => (Icon("boss", Resource.Drawable.map_beast, 66), Color.Rgb(255, 60, 40)),
+            "qi_spring" => (Icon("qi", Resource.Drawable.map_qi), Ui.QiBlue),
+            "spirit_herb" => (Icon("herb", Resource.Drawable.map_herb), Ui.Jade),
+            "lotus_pond" => (Icon("lotus", Resource.Drawable.map_lotus), Color.Rgb(240, 150, 200)),
+            "bamboo_grove" => (Icon("bamboo", Resource.Drawable.map_bamboo), Ui.Jade),
+            "shrine" => (Icon("shrine", Resource.Drawable.map_shrine), Ui.Gold),
+            "ore_vein" or "jade_outcrop" => (Icon("ore", Resource.Drawable.map_ore), Color.Rgb(230, 150, 70)),
+            "ancient_ruins" => (Icon("ruins", Resource.Drawable.map_ruins), Color.Rgb(200, 190, 160)),
+            _ when IsBossLair(kind) => (Icon("boss", Resource.Drawable.map_boss, 66), Color.Rgb(255, 60, 40)),
             _ when IsBeastLair(kind) => (Icon("beast", Resource.Drawable.map_beast), Ui.Cinnabar),
-            "ore_vein" or "jade_outcrop" or "ancient_ruins" => (Icon("other2", Resource.Drawable.map_other), Color.Rgb(200, 190, 160)),
             _ => (Icon("other", Resource.Drawable.map_event), Ui.Gold),
         };
 
@@ -358,10 +362,12 @@ namespace JianghuGo.Android
             DrawAvatar(canvas, cx, cy, pulse);
             if (CultivatorsNearby > 0)
             {
+                var mark = Icon("cultivator", Resource.Drawable.map_cultivator, 30);
+                canvas.DrawBitmap(mark, 6 * _d, Height - 12 * _d - mark.Height + 4 * _d, _art);
                 _text.TextAlign = Paint.Align.Left;
                 _text.Color = Ui.Gold;
                 _text.TextSize = 12 * _d;
-                canvas.DrawText("☯ " + CultivatorsNearby + " kultywator(ów) w pobliżu", 10 * _d, Height - 12 * _d, _text);
+                canvas.DrawText(CultivatorsNearby + " kultywator(ów) w pobliżu", 40 * _d, Height - 12 * _d, _text);
                 _text.TextSize = 11 * _d;
                 _text.TextAlign = Paint.Align.Center;
             }
