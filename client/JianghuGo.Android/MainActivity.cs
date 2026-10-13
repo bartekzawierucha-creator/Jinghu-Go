@@ -474,7 +474,7 @@ namespace JianghuGo.Android
                 {
                     var p = paths[j];
                     ui.Tile(p.Item2, string.Empty, p.Item3, () => Run(async () => ShowCharacter(await flow.FinalizeAsync(name.Text.Trim(), p.Item1, Ct))),
-                        parent: row, heightDp: 118, accent: p.Item4);
+                        parent: row, heightDp: 118, accent: p.Item4, titleSp: 15);
                 }
             }
 
@@ -567,7 +567,7 @@ namespace JianghuGo.Android
                     var combat = new CombatFlow(_api);
                     await combat.StartPveAsync(c.Id, n.Item1, Ct);
                     ShowBattle(combat, c);
-                }), parent: fights, heightDp: 140, pixelArt: true, accent: Ui.Cinnabar);
+                }), parent: fights, heightDp: 140, pixelArt: true, accent: Ui.Cinnabar, titleSp: 13);
             }
 
             ui.Heading("Ścieżka mistrza");
@@ -845,7 +845,7 @@ namespace JianghuGo.Android
         private void ShowBag(EconomyFlow economy, CharacterDto c)
         {
             var ui = NewScreen("Sakwa", () => ShowCharacter(c), Resource.Drawable.loc_village, "EKWIPUNEK");
-            var summary = ui.Label("…", 15, Ui.Ink, bold: true);
+            var summary = ui.Label("…", 15, Ui.Gold, bold: true, parent: ui.Panel());
             var list = ui.Column();
 
             void Render()
@@ -913,7 +913,7 @@ namespace JianghuGo.Android
         private void ShowCrafting(EconomyFlow economy, CharacterDto c)
         {
             var ui = NewScreen("Kuźnia i alchemia", () => ShowBag(economy, c), Resource.Drawable.loc_fortress, "RZEMIOSŁO");
-            var balance = ui.Label(string.Empty, 15, Ui.Ink, bold: true);
+            var balance = ui.Label(string.Empty, 15, Ui.Gold, bold: true, parent: ui.Panel());
             void Render() => balance.Text = "💎 Kamienie Duchowe: " + economy.Inventory.Balance;
             Render();
             foreach (var r in economy.Recipes.Items)

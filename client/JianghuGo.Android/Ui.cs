@@ -244,7 +244,7 @@ namespace JianghuGo.Android
         /// A picture card: illustration (cropped to fill) under a dark gradient, title and subtitle at the bottom.
         /// The whole card is the button.
         /// </summary>
-        public FrameLayout Tile(string title, string subtitle, int artRes, System.Action onClick, ViewGroup parent = null, int heightDp = 120, bool pixelArt = false, Color? accent = null)
+        public FrameLayout Tile(string title, string subtitle, int artRes, System.Action onClick, ViewGroup parent = null, int heightDp = 120, bool pixelArt = false, Color? accent = null, float titleSp = 17)
         {
             var tile = new FrameLayout(_ctx) { Clickable = true, Focusable = true, ClipToOutline = true };
             tile.Background = new FrameDrawable(_density, Color.Argb(255, 14, 18, 22), accent ?? GoldDim, accent ?? Gold);
@@ -266,10 +266,12 @@ namespace JianghuGo.Android
             var text = new LinearLayout(_ctx) { Orientation = Orientation.Vertical };
             text.SetPadding(Dp(12), Dp(8), Dp(12), Dp(10));
             var t = new TextView(_ctx) { Text = title };
-            t.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 17);
+            t.SetTextSize(global::Android.Util.ComplexUnitType.Sp, titleSp);
             t.SetTypeface(Display, TypefaceStyle.Bold);
             t.SetTextColor(Ink);
             t.SetShadowLayer(4, 0, 1, Color.Black);
+            t.BreakStrategy = global::Android.Text.BreakStrategy.Simple;
+            t.HyphenationFrequency = global::Android.Text.HyphenationFrequency.None;
             text.AddView(t);
             if (!string.IsNullOrEmpty(subtitle))
             {
