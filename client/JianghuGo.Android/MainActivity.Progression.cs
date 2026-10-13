@@ -309,11 +309,13 @@ namespace JianghuGo.Android
         private async Task ShowRankingAsync(CharacterDto c, string metric)
         {
             var ui = NewScreen("Rankingi", () => ShowCharacter(c), Resource.Drawable.loc_temple, "SŁAWA W JIANGHU");
-            var tabs = ui.Columns();
+            LinearLayout tabs = null;
+            var tab = 0;
             foreach (var (m, label) in new[] { ((string)null, "Kultywacja"), ("pvp_won", "Pojedynki"), ("bosses_won", "Bossowie"), ("battles_won", "Zwycięstwa") })
             {
                 var mm = m;
-                ui.Action(label, () => Run(() => ShowRankingAsync(c, mm)), secondary: mm != metric, parent: Cell(tabs)).SetTextSize(global::Android.Util.ComplexUnitType.Sp, 12);
+                if (tab++ % 2 == 0) tabs = ui.Columns();
+                ui.Action(label, () => Run(() => ShowRankingAsync(c, mm)), secondary: mm != metric, parent: Cell(tabs)).SetTextSize(global::Android.Util.ComplexUnitType.Sp, 14);
             }
 
             void Row(int rank, string name, string path, string value, bool me)
@@ -436,7 +438,7 @@ namespace JianghuGo.Android
                 if (eq > 0) parts.Add("ekw. +" + eq);
                 if (mer > 0) parts.Add("meridiany +" + mer);
                 if (pb > 0) parts.Add("towarzysz +" + pb);
-                ui.WithIcon(ui.Label(StatName(st.Id) + ":  " + total + "   (" + string.Join(", ", parts) + ")", 14, total > st.Value ? Ui.Gold : Ui.Ink, parent: table), "icon_" + st.Id, 20);
+                ui.WithIcon(ui.Label(StatName(st.Id) + ":  " + total + (parts.Count > 1 ? "   (" + string.Join(", ", parts) + ")" : string.Empty), 14, total > st.Value ? Ui.Gold : Ui.Ink, parent: table), "icon_" + st.Id, 20);
             }
 
             ui.Action("🎒 Otwórz sakwę", () => ShowBag(economy, c), secondary: true);
