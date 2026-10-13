@@ -38,22 +38,20 @@ jobs:
           echo "ASP.NET Core: $aspnet"
       - name: Install Android SDK dependencies (platform, build-tools)
         run: dotnet build client/JianghuGo.Android/JianghuGo.Android.csproj -t:InstallAndroidDependencies -f net10.0-android -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT" -p:AcceptAndroidSDKLicenses=True $SERVER_PROPS
-      - name: Build APK
+      - name: Build APKs (one per CPU type, so each download stays small)
         run: |
           set +e
-          dotnet publish client/JianghuGo.Android/JianghuGo.Android.csproj -f net10.0-android -c Release -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT" $SERVER_PROPS -o out --nologo 2>&1 | tee build.log
-          status=${PIPESTATUS[0]}
-          # surface build errors as annotations (readable without the raw log)
-          grep -E ": error |error [A-Z]+[0-9]+" build.log | sort -u | head -20 | sed 's/^/::error::/'
-          exit $status
-      - name: Collect APK
-        run: |
-          find out -name '*-Signed.apk' | sort
           mkdir -p dist
-          pick() { f=$(find out -name "*$1*-Signed.apk" | head -n1); test -n "$f" || { echo "::error::no APK for $1; produced: $(find out -name '*.apk' | tr '\n' ' ')"; exit 1; }; cp "$f" "dist/$2"; }
-          pick arm64-v8a JianghuGo-dev.apk          # phones (ARM64)
-          pick armeabi-v7a JianghuGo-dev-arm32.apk  # older 32-bit phones
-          pick x86_64 JianghuGo-dev-x86_64.apk      # emulators (smoke test)
+          for pair in android-arm64:JianghuGo-dev.apk android-arm:JianghuGo-dev-arm32.apk android-x64:JianghuGo-dev-x86_64.apk; do
+            rid=${pair%%:*}; name=${pair#*:}
+            dotnet publish client/JianghuGo.Android/JianghuGo.Android.csproj -f net10.0-android -c Release -r $rid -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT" $SERVER_PROPS -o out/$rid --nologo 2>&1 | tee build-$rid.log
+            status=${PIPESTATUS[0]}
+            if [ $status -ne 0 ]; then
+              grep -E ": error |error [A-Z]+[0-9]+" build-$rid.log | sort -u | head -20 | sed 's/^/::error::/'
+              exit $status
+            fi
+            cp "$(find out/$rid -name '*-Signed.apk' | head -n1)" "dist/$name"
+          done
           ls -l dist
       - uses: actions/upload-artifact@v4
         with:
