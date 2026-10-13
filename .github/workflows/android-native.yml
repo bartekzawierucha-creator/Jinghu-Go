@@ -33,7 +33,13 @@ jobs:
       - name: Install Android SDK dependencies (platform, build-tools)
         run: dotnet build client/JianghuGo.Android/JianghuGo.Android.csproj -t:InstallAndroidDependencies -f net10.0-android -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT" -p:AcceptAndroidSDKLicenses=True
       - name: Build APK
-        run: dotnet publish client/JianghuGo.Android/JianghuGo.Android.csproj -f net10.0-android -c Release -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT" -o out --nologo
+        run: |
+          set +e
+          dotnet publish client/JianghuGo.Android/JianghuGo.Android.csproj -f net10.0-android -c Release -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT" -o out --nologo 2>&1 | tee build.log
+          status=${PIPESTATUS[0]}
+          # surface build errors as annotations (readable without the raw log)
+          grep -E ": error |error [A-Z]+[0-9]+" build.log | sort -u | head -20 | sed 's/^/::error::/'
+          exit $status
       - name: Collect APK
         run: |
           apk=$(find out -name '*-Signed.apk' | head -n1)
