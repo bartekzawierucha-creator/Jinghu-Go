@@ -38,8 +38,10 @@ def find(text):
     # a slow emulator sometimes shows "<app> isn't responding" for the launcher: keep waiting
     for n in all_nodes:
         if "isn't responding" in (n.get("text") or ""):
+            # close a hung launcher (it restarts by itself); never close the game — wait for it instead
+            choice = "Close app" if "Launcher" in (n.get("text") or "") else "Wait"
             for w in all_nodes:
-                if (w.get("text") or "") == "Wait":
+                if (w.get("text") or "") == choice:
                     x, y = center(w)
                     subprocess.run(["adb", "shell", "input", "tap", str(x), str(y)])
                     time.sleep(1)
