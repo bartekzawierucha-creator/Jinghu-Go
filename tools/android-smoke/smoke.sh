@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# End-to-end smoke test of the native Android client on an emulator against a real API (http://10.0.2.2:8080 = host).
-# Registers an account, creates a character, explores with an emulated GPS position and fights a training battle.
+# End-to-end smoke test of the native Android client on an emulator in OFFLINE mode (the game server runs inside
+# the app). Creates a character, meditates, explores with an emulated GPS position, fights a training battle, opens
+# the bag, then kills and restarts the app and checks that the character is still there.
 # Screenshots go to ./shots; the test fails on any missing screen or an app crash.
 set -euo pipefail
 APK="$1"
@@ -24,10 +25,7 @@ adb shell monkey -p $PKG -c android.intent.category.LAUNCHER 1 >/dev/null
 step "login screen"
 $UI wait "Zaloguj" 90
 $UI shot shots/01-login.png
-$UI field 0 "http://10.0.2.2:8080"
-$UI field 1 "smoke@test.dev"
-$UI field 2 "smoke-password-123"
-$UI tap "Załóż konto"
+$UI tap "Graj offline"
 
 step "character creation"
 $UI wait "Narodziny wojownika" 60
@@ -71,6 +69,16 @@ step "bag"
 $UI tap "Sakwa, kuźnia"
 $UI wait "Kamienie Duchowe" 60
 $UI shot shots/07-bag.png
+
+step "restart: progress must survive"
+sleep 2
+adb shell input keyevent KEYCODE_HOME
+sleep 2
+adb shell am force-stop $PKG
+adb shell monkey -p $PKG -c android.intent.category.LAUNCHER 1 >/dev/null
+$UI wait "Szansa przełomu" 90
+$UI wait "Lin" 10
+$UI shot shots/08-after-restart.png
 
 step "crash check"
 adb logcat -d > shots/logcat.txt

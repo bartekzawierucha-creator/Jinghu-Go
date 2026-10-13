@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ["client/**", ".github/workflows/android-native.yml"]
+    paths: ["client/**", "server/src/**", "content/**", "tools/android-smoke/**", ".github/workflows/android-native.yml"]
 
 permissions:
   contents: write
@@ -30,12 +30,18 @@ jobs:
           dotnet-version: "10.0.x"
       - name: Install the .NET Android workload
         run: dotnet workload install android
+      - name: Publish the game server (embedded in the app for offline play)
+        run: |
+          dotnet publish server/src/Api -c Release -o "$RUNNER_TEMP/server-bin" --nologo -v q
+          aspnet=$(ls -d "$DOTNET_ROOT"/shared/Microsoft.AspNetCore.App/10.* | sort -V | tail -n1)
+          echo "SERVER_PROPS=-p:ServerBin=$RUNNER_TEMP/server-bin -p:AspNetDir=$aspnet" >> "$GITHUB_ENV"
+          echo "ASP.NET Core: $aspnet"
       - name: Install Android SDK dependencies (platform, build-tools)
-        run: dotnet build client/JianghuGo.Android/JianghuGo.Android.csproj -t:InstallAndroidDependencies -f net10.0-android -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT" -p:AcceptAndroidSDKLicenses=True
+        run: dotnet build client/JianghuGo.Android/JianghuGo.Android.csproj -t:InstallAndroidDependencies -f net10.0-android -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT" -p:AcceptAndroidSDKLicenses=True $SERVER_PROPS
       - name: Build APK
         run: |
           set +e
-          dotnet publish client/JianghuGo.Android/JianghuGo.Android.csproj -f net10.0-android -c Release -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT" -o out --nologo 2>&1 | tee build.log
+          dotnet publish client/JianghuGo.Android/JianghuGo.Android.csproj -f net10.0-android -c Release -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT" $SERVER_PROPS -o out --nologo 2>&1 | tee build.log
           status=${PIPESTATUS[0]}
           # surface build errors as annotations (readable without the raw log)
           grep -E ": error |error [A-Z]+[0-9]+" build.log | sort -u | head -20 | sed 's/^/::error::/'
@@ -52,7 +58,7 @@ jobs:
           path: dist/JianghuGo-dev.apk
 
   smoke:
-    # Installs the APK on an emulator and plays through the main screens against a real API (in-memory storage).
+    # Installs the APK on an emulator and plays through the main screens in offline mode (server inside the app).
     needs: apk
     runs-on: ubuntu-24.04
     timeout-minutes: 45
@@ -62,15 +68,6 @@ jobs:
         with:
           name: JianghuGo-dev-apk
           path: dist
-      - uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "10.0.x"
-      - name: Start the API (Development, in-memory storage)
-        run: |
-          dotnet build server/src/Api -c Release --nologo -v q
-          (cd server/src/Api/bin/Release/net10.0 && ASPNETCORE_ENVIRONMENT=Development nohup dotnet JianghuGo.Api.dll --urls http://0.0.0.0:8080 > "$GITHUB_WORKSPACE/api.log" 2>&1 &)
-          for i in $(seq 1 60); do curl -fs http://127.0.0.1:8080/health/ready >/dev/null && break; sleep 1; done
-          curl -fs http://127.0.0.1:8080/health/ready
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -89,7 +86,6 @@ jobs:
       - name: Pack screenshots and logs
         if: always()
         run: |
-          cp api.log shots/ 2>/dev/null || true
           (cd shots && zip -qr ../android-smoke.zip .) || true
       - name: Publish screenshots and logs (android-smoke pre-release)
         if: always()
@@ -105,9 +101,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: android-smoke
-          path: |
-            shots/
-            api.log
+          path: shots/
       - name: Publish to the android-latest pre-release
         uses: softprops/action-gh-release@v2
         with:

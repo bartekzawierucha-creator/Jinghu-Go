@@ -17,13 +17,27 @@
     <ApplicationDisplayVersion>0.9.0</ApplicationDisplayVersion>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
     <AndroidPackageFormats>apk</AndroidPackageFormats>
-    <!-- System.Text.Json uses reflection over the core DTOs: keep them out of the trimmer's reach. -->
+    <!-- System.Text.Json, minimal APIs and DI use reflection over the client and the embedded server: no trimming. -->
     <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
-    <TrimMode>partial</TrimMode>
+    <AndroidLinkMode>None</AndroidLinkMode>
+    <PublishTrimmed>false</PublishTrimmed>
     <RuntimeIdentifiers>android-arm64;android-arm;android-x64</RuntimeIdentifiers>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../JianghuGo.Client.Core.csproj" />
-    <TrimmerRootAssembly Include="JianghuGo.Client.Core" RootMode="All" />
   </ItemGroup>
+  <!--
+    Offline mode embeds the game server. Its assemblies (and ASP.NET Core's, which has no Android runtime pack) are
+    plain IL and are referenced as files: ServerBin = `dotnet publish server/src/Api -o …`,
+    AspNetDir = the Microsoft.AspNetCore.App shared framework folder of the SDK that built it.
+  -->
+  <ItemGroup Condition="'$(ServerBin)' != '' And '$(AspNetDir)' != ''">
+    <Reference Include="$(AspNetDir)/*.dll" Private="true" />
+    <Reference Include="$(ServerBin)/*.dll" Exclude="$(ServerBin)/JianghuGo.*Tests*.dll" Private="true" />
+    <AndroidAsset Include="../../content/game-config/*.json" Link="Assets/game-config/%(Filename)%(Extension)" />
+    <AndroidAsset Include="../../server/src/Api/appsettings.json" Link="Assets/appsettings.json" />
+  </ItemGroup>
+  <Target Name="RequireServer" BeforeTargets="Build" Condition="'$(ServerBin)' == '' Or '$(AspNetDir)' == ''">
+    <Error Text="Set ServerBin and AspNetDir (see the comment in JianghuGo.Android.csproj)." />
+  </Target>
 </Project>

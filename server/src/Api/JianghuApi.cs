@@ -31,9 +31,11 @@ public static class JianghuApi
     public const string CorrelationHeader = "X-Correlation-Id";
     public const long MaxRequestBodyBytes = 64 * 1024;
 
-    public static WebApplication Create(string[] args, Action<WebApplicationBuilder>? configure = null)
+    /// <param name="contentRoot">Where appsettings.json lives; defaults to the application directory (the offline
+    /// Android build passes the folder it extracted its configuration to).</param>
+    public static WebApplication Create(string[] args, Action<WebApplicationBuilder>? configure = null, string? contentRoot = null)
     {
-        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = args, ContentRootPath = AppContext.BaseDirectory });
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions { Args = args, ContentRootPath = contentRoot ?? AppContext.BaseDirectory });
         configure?.Invoke(builder);
 
         builder.Logging.ClearProviders();

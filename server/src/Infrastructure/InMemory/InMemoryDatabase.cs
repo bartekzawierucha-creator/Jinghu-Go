@@ -7,12 +7,33 @@ namespace JianghuGo.Infrastructure.InMemory;
 /// Process-local transactional store used for development and automated tests while the PostgreSQL
 /// adapter is pending (docs/decisions/0002). Guarantees: every unit of work is SERIALIZABLE (one at a
 /// time, via an async lock) and atomic (copy-on-write immutable tables swapped in on commit).
-/// Not durable: data is lost on restart. Never use outside development/tests.
+/// Not durable by default: data is lost on restart. With a snapshot file (offline single-player mode on a phone,
+/// Storage:InMemorySnapshotPath) every committed state is written to disk shortly after the commit and loaded on start.
+/// Never use outside development, tests and the single-player offline build.
 /// </summary>
 public sealed class InMemoryDatabase : IUnitOfWorkFactory, IDisposable
 {
     private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly InMemorySnapshotWriter? _snapshots;
     private ImmutableDictionary<string, object> _tables = ImmutableDictionary<string, object>.Empty;
+
+    public InMemoryDatabase()
+    {
+    }
+
+    /// <summary>Loads <paramref name="snapshotPath"/> if it exists and keeps it up to date after every commit.</summary>
+    public InMemoryDatabase(string snapshotPath)
+    {
+        if (File.Exists(snapshotPath))
+        {
+            _tables = InMemorySnapshot.Deserialize(File.ReadAllText(snapshotPath));
+        }
+
+        _snapshots = new InMemorySnapshotWriter(snapshotPath);
+    }
+
+    /// <summary>The committed state (immutable, safe to read from any thread).</summary>
+    public ImmutableDictionary<string, object> Tables => _tables;
 
     public async Task<IUnitOfWork> BeginAsync(CancellationToken cancellationToken)
     {
@@ -20,11 +41,22 @@ public sealed class InMemoryDatabase : IUnitOfWorkFactory, IDisposable
         return new InMemoryUnitOfWork(this, _tables);
     }
 
-    internal void Commit(ImmutableDictionary<string, object> tables) => _tables = tables;
+    internal void Commit(ImmutableDictionary<string, object> tables)
+    {
+        _tables = tables;
+        _snapshots?.Schedule(tables);
+    }
 
     internal void Release() => _gate.Release();
 
-    public void Dispose() => _gate.Dispose();
+    /// <summary>Writes the latest committed state now (e.g. when the app goes to the background).</summary>
+    public void Flush() => _snapshots?.Flush();
+
+    public void Dispose()
+    {
+        _snapshots?.Dispose();
+        _gate.Dispose();
+    }
 }
 
 public sealed class InMemoryUnitOfWork : IUnitOfWork

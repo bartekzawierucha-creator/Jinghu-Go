@@ -86,7 +86,8 @@ public static class JianghuCore
                     throw new InvalidOperationException("Storage:Provider=InMemory is not durable and is refused in Production.");
                 }
 
-                services.AddSingleton<InMemoryDatabase>();
+                var snapshot = configuration["Storage:InMemorySnapshotPath"];
+                services.AddSingleton(_ => string.IsNullOrEmpty(snapshot) ? new InMemoryDatabase() : new InMemoryDatabase(snapshot));
                 services.AddSingleton<IUnitOfWorkFactory>(sp => sp.GetRequiredService<InMemoryDatabase>());
                 services.AddSingleton<IIdempotencyStore, InMemoryIdempotencyStore>();
                 services.AddSingleton<IAuditLog, InMemoryAuditLog>();

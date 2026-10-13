@@ -76,6 +76,15 @@ public sealed class ApiHost : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (Database is null && Environment.GetEnvironmentVariable("JIANGHU_TEST_SNAPSHOT") == "1")
+        {
+            // every table shape the suite produced must survive the offline-mode snapshot unchanged
+            var tables = Service<JianghuGo.Infrastructure.InMemory.InMemoryDatabase>().Tables;
+            var first = JianghuGo.Infrastructure.InMemory.InMemorySnapshot.Serialize(tables);
+            var second = JianghuGo.Infrastructure.InMemory.InMemorySnapshot.Serialize(JianghuGo.Infrastructure.InMemory.InMemorySnapshot.Deserialize(first));
+            Assert.Equal(first, second, "in-memory snapshot round trip");
+        }
+
         Client.Dispose();
         await App.StopAsync();
         await App.DisposeAsync();

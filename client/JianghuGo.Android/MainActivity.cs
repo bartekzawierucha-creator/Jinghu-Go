@@ -29,6 +29,11 @@ namespace JianghuGo.Android
         private const string Prefs = "jianghu";
         private const string ServerUrlKey = "jianghu.server_url";
         private const string DefaultServer = "http://192.168.1.10:8080";
+        private const string ModeKey = "jianghu.mode";
+        private const string OfflineMode = "offline";
+        private const string OnlineMode = "online";
+        private const string OnlineTokenKey = "jianghu.refresh_token";
+        private const string OfflineTokenKey = "jianghu.refresh_token.offline";
 
         private readonly CancellationTokenSource _lifetime = new CancellationTokenSource();
         private ISharedPreferences _prefs;
@@ -83,7 +88,13 @@ namespace JianghuGo.Android
 
             Run(async () =>
             {
-                if (!ConnectTo(_prefs.GetString(ServerUrlKey, DefaultServer)) || _prefs.GetString("jianghu.refresh_token", null) == null)
+                if (_prefs.GetString(ModeKey, OfflineMode) == OfflineMode)
+                {
+                    await PlayOfflineAsync();
+                    return;
+                }
+
+                if (!ConnectTo(_prefs.GetString(ServerUrlKey, DefaultServer)) || _prefs.GetString(OnlineTokenKey, null) == null)
                 {
                     ShowLogin();
                     return;
@@ -109,6 +120,7 @@ namespace JianghuGo.Android
             base.OnPause();
             _paused = true;
             _location.Stop(); // battery: no GPS in the background
+            EmbeddedServer.Flush(); // offline mode: the app may be killed in the background
         }
 
         protected override void OnResume()
@@ -144,20 +156,22 @@ namespace JianghuGo.Android
         // ---- plumbing -----------------------------------------------------------------------------------------
 
         /// <summary>(Re)creates the API client for a server address; the address is chosen on the login screen and remembered.</summary>
-        private bool ConnectTo(string url)
+        private bool ConnectTo(string url, bool offline = false)
         {
             url = (url ?? string.Empty).Trim().TrimEnd('/');
             if (!Uri.TryCreate(url + "/", UriKind.Absolute, out var baseUri) || (baseUri.Scheme != "http" && baseUri.Scheme != "https")) return false;
             if (_api != null && url == _serverUrl) return true;
+            var tokenKey = offline ? OfflineTokenKey : OnlineTokenKey;
             _http?.Dispose();
             _http = new HttpClient { BaseAddress = baseUri, Timeout = TimeSpan.FromSeconds(20) };
             if (_api != null) _api.SessionExpired -= OnSessionExpired;
-            _api = new ApiClient(new HttpClientTransport(_http), new StjSerializer(), new PrefsTokenStore(_prefs));
+            _api = new ApiClient(new HttpClientTransport(_http), new StjSerializer(), new PrefsTokenStore(_prefs, tokenKey));
             _api.SessionExpired += OnSessionExpired;
             _serverUrl = url;
             using (var e = _prefs.Edit())
             {
-                e.PutString(ServerUrlKey, url);
+                if (!offline) e.PutString(ServerUrlKey, url);
+                e.PutString(ModeKey, offline ? OfflineMode : OnlineMode);
                 e.Apply();
             }
 
@@ -215,8 +229,12 @@ namespace JianghuGo.Android
         {
             var ui = NewScreen("Jianghu Go");
             ui.Label("Świat wuxia na ulicach twojego miasta. Kultywuj Qi, zbieraj zioła, walcz i zakładaj sekty.", 15);
+            ui.Action("☯ Graj offline (bez serwera)", () => Run(PlayOfflineAsync));
+            ui.Label("Świat działa w telefonie, postęp zapisuje się w pamięci aplikacji.", 12, global::Android.Graphics.Color.Gray);
+            ui.Divider();
+            ui.Heading("Gra z serwerem");
             ui.Label("Adres serwera", 13);
-            var server = ui.Field("http://192.168.1.10:8080", value: _serverUrl ?? _prefs.GetString(ServerUrlKey, DefaultServer));
+            var server = ui.Field("http://192.168.1.10:8080", value: _prefs.GetString(ServerUrlKey, DefaultServer));
             var email = ui.Field("E-mail");
             var password = ui.Field("Hasło", password: true);
 
@@ -241,6 +259,38 @@ namespace JianghuGo.Android
                 await ShowHomeAsync();
             }), secondary: true);
             ui.Label("Hasło: co najmniej 10 znaków. Serwer uruchomisz na komputerze: API_BIND=0.0.0.0 docker compose up --build", 12, global::Android.Graphics.Color.Gray);
+        }
+
+        /// <summary>Starts the in-app server and signs in with the local account (created on first use).</summary>
+        private async Task PlayOfflineAsync()
+        {
+            NewScreen("Jianghu Go");
+            _ui.Label("Budzę świat Jianghu…", 16);
+            var url = await EmbeddedServer.StartAsync(this);
+            ConnectTo(url, offline: true);
+            if (await _api.TryResumeAsync(Ct))
+            {
+                await ShowHomeAsync();
+                return;
+            }
+
+            var email = _prefs.GetString("jianghu.offline_email", null);
+            var password = _prefs.GetString("jianghu.offline_password", null);
+            if (email == null || password == null)
+            {
+                email = "gracz-" + Guid.NewGuid().ToString("N").Substring(0, 12) + "@offline.jianghu.pl";
+                password = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(24));
+                await _api.RegisterAsync(email, password, Ct);
+                using (var e = _prefs.Edit())
+                {
+                    e.PutString("jianghu.offline_email", email);
+                    e.PutString("jianghu.offline_password", password);
+                    e.Commit();
+                }
+            }
+
+            await _api.LoginAsync(email, password, Ct);
+            await ShowHomeAsync();
         }
 
         private async Task ShowHomeAsync()
@@ -396,6 +446,12 @@ namespace JianghuGo.Android
             ui.Action("Wyloguj", () => Run(async () =>
             {
                 await _api.LogoutAsync(Ct);
+                using (var e = _prefs.Edit())
+                {
+                    e.PutString(ModeKey, "login"); // next start shows the menu instead of resuming
+                    e.Apply();
+                }
+
                 ShowLogin();
             }), secondary: true);
             Run(async () =>

@@ -28,10 +28,14 @@ namespace JianghuGo.Android
     /// </summary>
     public sealed class PrefsTokenStore : ITokenStore
     {
-        private const string Key = "jianghu.refresh_token";
         private readonly ISharedPreferences _prefs;
+        private readonly string Key;
 
-        public PrefsTokenStore(ISharedPreferences prefs) => _prefs = prefs;
+        public PrefsTokenStore(ISharedPreferences prefs, string key)
+        {
+            _prefs = prefs;
+            Key = key;
+        }
 
         public string LoadRefreshToken()
         {
