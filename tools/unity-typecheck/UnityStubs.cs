@@ -8,9 +8,18 @@ namespace UnityEngine
 {
     [AttributeUsage(AttributeTargets.Field)] public sealed class SerializeField : Attribute { }
 
+    public enum RuntimeInitializeLoadType { AfterSceneLoad, BeforeSceneLoad, AfterAssembliesLoaded, BeforeSplashScreen, SubsystemRegistration }
+
+    [AttributeUsage(AttributeTargets.Method)]
+    public sealed class RuntimeInitializeOnLoadMethodAttribute : Attribute
+    {
+        public RuntimeInitializeOnLoadMethodAttribute(RuntimeInitializeLoadType loadType) { }
+    }
+
     public class Object
     {
         public static void Destroy(Object obj) => throw new NotSupportedException();
+        public static void DontDestroyOnLoad(Object target) => throw new NotSupportedException();
         public static T FindFirstObjectByType<T>() where T : Object => throw new NotSupportedException();
         public static implicit operator bool(Object o) => o is not null;
     }

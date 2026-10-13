@@ -1,0 +1,8 @@
+{
+    "name": "JianghuGo.Editor",
+    "rootNamespace": "JianghuGo.Editor",
+    "references": [],
+    "includePlatforms": ["Editor"],
+    "excludePlatforms": [],
+    "autoReferenced": false
+}

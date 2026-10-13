@@ -24,12 +24,17 @@ namespace JianghuGo.Unity.Presentation
         private RectTransform _screen;
         private Text _status;
 
+        private const string ServerUrlKey = "jianghu.server_url";
+
         private async void Start()
         {
             UnityEngine.Application.targetFrameRate = 60;
-            _api = new ApiClient(new UnityWebRequestTransport(serverUrl), new NewtonsoftJsonSerializer(), new PlayerPrefsTokenStore());
-            _api.SessionExpired += ShowLogin;
             _canvas = UiKit.CreateCanvas();
+            if (!ConnectTo(PlayerPrefs.GetString(ServerUrlKey, serverUrl)))
+            {
+                ShowLogin();
+                return;
+            }
 
             try
             {
@@ -40,6 +45,29 @@ namespace JianghuGo.Unity.Presentation
             {
                 ShowLogin();
                 SetStatus(Describe(e));
+            }
+        }
+
+        /// <summary>
+        /// (Re)creates the API client for a server address. The address is chosen on the login screen and remembered,
+        /// so one APK works with a local test server (LAN, development build) and a deployed HTTPS server.
+        /// </summary>
+        private bool ConnectTo(string url)
+        {
+            try
+            {
+                var transport = new UnityWebRequestTransport(url.Trim());
+                if (_api != null) _api.SessionExpired -= ShowLogin;
+                _api = new ApiClient(transport, new NewtonsoftJsonSerializer(), new PlayerPrefsTokenStore());
+                _api.SessionExpired += ShowLogin;
+                serverUrl = url.Trim();
+                PlayerPrefs.SetString(ServerUrlKey, serverUrl);
+                PlayerPrefs.Save();
+                return true;
+            }
+            catch (ArgumentException)
+            {
+                return false; // e.g. http:// in a release build
             }
         }
 
@@ -66,15 +94,28 @@ namespace JianghuGo.Unity.Presentation
         private void ShowLogin()
         {
             var s = NewScreen("Jianghu Go");
+            var server = UiKit.TextField(s, "Adres serwera, np. http://192.168.1.10:8080");
+            server.text = serverUrl;
             var email = UiKit.TextField(s, "E-mail");
             var password = UiKit.TextField(s, "Hasło", password: true);
+
+            bool Connect()
+            {
+                if (server.text.Trim() == serverUrl && _api != null) return true;
+                if (ConnectTo(server.text)) return true;
+                SetStatus("Ta wersja aplikacji wymaga adresu https://");
+                return false;
+            }
+
             UiKit.ActionButton(s, "Zaloguj", () => Run(async () =>
             {
+                if (!Connect()) return;
                 await _api.LoginAsync(email.text, password.text, _lifetime.Token);
                 await ShowHomeAsync();
             }));
             UiKit.ActionButton(s, "Załóż konto", () => Run(async () =>
             {
+                if (!Connect()) return;
                 await _api.RegisterAsync(email.text, password.text, _lifetime.Token);
                 await _api.LoginAsync(email.text, password.text, _lifetime.Token);
                 await ShowHomeAsync();
