@@ -93,8 +93,11 @@ def tap(text, timeout=30):
 
 def field(index, value):
     edits = []
-    for attempt in range(5):
-        edits = [n for n in nodes() if n.get("class") == "android.widget.EditText"]
+    for attempt in range(8):
+        all_nodes = nodes()
+        if find("\u0000no-such-text\u0000") is None and any("isn't responding" in (n.get("text") or "") for n in all_nodes):
+            continue  # find() tapped "Wait" on a system dialog; look again
+        edits = [n for n in all_nodes if n.get("class") == "android.widget.EditText"]
         if len(edits) > index:
             break
         swipe_up()
