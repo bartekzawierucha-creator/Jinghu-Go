@@ -107,7 +107,7 @@ $UI wait "Szansa przełomu" 60
 
 step "MVP 1.1: quests, meridians, rankings, spirit pet, hero"
 $UI tap "Zadania i osiągnięcia"
-$UI wait "Dzisiejsze zadania" 60
+$UI wait "Nowe zadania o północy" 60
 $UI shot shots/13-quests.png
 adb shell input keyevent KEYCODE_BACK; sleep 2
 $UI tap "Meridiany"
@@ -123,7 +123,7 @@ $UI wait "Nie masz jeszcze towarzysza" 60
 $UI shot shots/16-pet.png
 adb shell input keyevent KEYCODE_BACK; sleep 2
 $UI tap "Postać i ekwipunek"
-$UI wait "Cechy w walce" 60
+$UI wait "Dotknij slotu" 60
 $UI shot shots/17-hero.png
 adb shell input keyevent KEYCODE_BACK; sleep 2
 $UI wait "Szansa przełomu" 60
