@@ -203,6 +203,7 @@ namespace JianghuGo.Client.Application
         public string SeedHash { get; set; }
         public string Seed { get; set; }
         public long RewardQi { get; set; }
+        public string TamedPetNpcId { get; set; }
 
         public bool IsActive => Status == "active";
         public bool IsMine(TurnEventDto e) => e.Actor == MySide;

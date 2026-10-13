@@ -24,7 +24,7 @@ namespace JianghuGo.Android
     /// </summary>
     [Activity(Label = "Jianghu Go", MainLauncher = true, Theme = "@android:style/Theme.Material.NoActionBar",
         ScreenOrientation = ScreenOrientation.Portrait, ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.KeyboardHidden)]
-    public sealed class MainActivity : Activity
+    public sealed partial class MainActivity : Activity
     {
         private const string Prefs = "jianghu";
         private const string ServerUrlKey = "jianghu.server_url";
@@ -55,6 +55,7 @@ namespace JianghuGo.Android
         private System.Action _onLocation;
         private FrameLayout _frame;
         private StepCounter _steps;
+        private Compass _compass;
 
         private CancellationToken Ct => _lifetime.Token;
 
@@ -65,6 +66,8 @@ namespace JianghuGo.Android
             _location = new AndroidLocationSource(this);
             _location.Updated += () => RunOnUiThread(() => _onLocation?.Invoke());
             _steps = new StepCounter(this);
+            _compass = new Compass(this);
+            Sfx.Init(this, _prefs);
 
             Window.SetStatusBarColor(Ui.Night);
             Window.SetNavigationBarColor(Ui.Night);
@@ -184,6 +187,7 @@ namespace JianghuGo.Android
             base.OnPause();
             _paused = true;
             _location.Stop(); // battery: no GPS in the background
+            _compass.Stop();
             _steps.Stop();
             EmbeddedServer.Flush(); // offline mode: the app may be killed in the background
         }
@@ -192,7 +196,11 @@ namespace JianghuGo.Android
         {
             base.OnResume();
             _paused = false;
-            if (_worldOpen) _location.Start();
+            if (_worldOpen)
+            {
+                _location.Start();
+                _compass.Start();
+            }
         }
 
         protected override void OnDestroy()
@@ -257,6 +265,7 @@ namespace JianghuGo.Android
             _worldOpen = false;
             _onLocation = null;
             _location.Stop();
+            _compass?.Stop();
             _back = back;
             _title.Text = title;
             _subtitle.Text = subtitle ?? string.Empty;
@@ -569,7 +578,12 @@ namespace JianghuGo.Android
             breakthrough.Click += (_, __) => Run(async () =>
             {
                 var r = await flow.BreakthroughAsync(Ct);
-                if (r != null && r.Success) PlayOverlay(Resource.Drawable.fx_breakthrough, 256, 9);
+                if (r != null && r.Success)
+                {
+                    PlayOverlay(Resource.Drawable.fx_breakthrough, 256, 9);
+                    Sfx.Play(Sfx.Breakthrough);
+                    ShowBanner("PRZEŁOM!", flow.State.RealmNamePl + " · etap " + flow.State.Stage, "+1 punkt meridianu do otwarcia", "emblem_" + flow.State.RealmId);
+                }
                 Render();
                 SetStatus(r == null ? "Stan zmienił się na innym urządzeniu — odświeżono." : r.Success ? "Przełom udany! " + flow.State.RealmNamePl + " · etap " + flow.State.Stage : "Przełom nieudany — odchylenie Qi.");
             });
@@ -583,17 +597,15 @@ namespace JianghuGo.Android
             }), heightDp: 130);
 
             ui.Heading("Trening walki");
-            var fights = ui.Columns();
-            foreach (var npc in new[] { ("training_dummy", "Manekin treningowy", Resource.Drawable.tile_dummy), ("grey_wolf", "Szary Wilk", Resource.Drawable.tile_wolf), ("mountain_bandit", "Górski Bandyta", Resource.Drawable.tile_bandit) })
-            {
-                var n = npc;
-                ui.Tile(n.Item2, string.Empty, n.Item3, () => Run(async () =>
-                {
-                    var combat = new CombatFlow(_api);
-                    await combat.StartPveAsync(c.Id, n.Item1, Ct);
-                    ShowBattle(combat, c);
-                }), parent: fights, heightDp: 140, pixelArt: true, accent: Ui.Cinnabar, titleSp: 13);
-            }
+            var fights = ui.Column();
+            ui.Heading("Droga kultywatora");
+            var dao1 = ui.Columns();
+            ui.Tile("📜 Zadania i osiągnięcia", "Dzienne zadania, tytuły, meldunek", Resource.Drawable.place_altar, () => Run(() => ShowQuestsAsync(c)), parent: dao1, heightDp: 120);
+            ui.Tile("☯ Meridiany", "Punkty z każdego etapu", Resource.Drawable.place_qiarray, () => Run(() => ShowMeridiansAsync(c)), parent: dao1, heightDp: 120);
+            var dao2 = ui.Columns();
+            ui.Tile("🏆 Rankingi", "Najwięksi kultywatorzy", Resource.Drawable.loc_temple, () => Run(() => ShowRankingAsync(c, null)), parent: dao2, heightDp: 120);
+            ui.Tile("🐾 Duchowy towarzysz", "Oswojona bestia", Resource.Drawable.loc_bamboo, () => Run(() => ShowPetAsync(c)), parent: dao2, heightDp: 120);
+            ui.Tile("🥋 Postać i ekwipunek", "Sylwetka, sloty i premie", Resource.Drawable.bg_hero, () => Run(() => ShowHeroAsync(c)), heightDp: 110);
 
             ui.Heading("Ścieżka mistrza");
             var row1 = ui.Columns();
@@ -638,6 +650,9 @@ namespace JianghuGo.Android
             {
                 await flow.LoadAsync(Ct);
                 Render();
+                await RenderTrainingAsync(c, fights);
+                await RenderDailyAsync(c, card, traitsText);
+                MaybeShowTutorial(c);
             });
         }
 
@@ -825,7 +840,11 @@ namespace JianghuGo.Android
             var ui = NewScreen("Jianghu", () => Run(Leave), subtitle: "EKSPLORACJA");
             var gen = _screen;
             _worldOpen = true;
-            if (!_paused) _location.Start();
+            if (!_paused)
+            {
+                _location.Start();
+                _compass.Start();
+            }
 
             var info = ui.Label("…", 13, Ui.Ink);
             var map = new WorldMapView(this);
@@ -833,6 +852,41 @@ namespace JianghuGo.Android
             ui.Label("Dotknij miejsca w czerwonym kręgu (~40 m), by je zebrać lub stoczyć walkę.", 12, Ui.Muted);
             ui.Heading("W pobliżu");
             var list = ui.Column();
+            ui.Heading("Kultywatorzy w okolicy");
+            var people = ui.Column();
+            ui.Label("Widać tylko imię i przybliżoną odległość — nigdy dokładne położenie.", 11, Ui.Muted);
+            var lastPeople = DateTime.MinValue;
+            async Task RefreshPeopleAsync()
+            {
+                if (DateTime.UtcNow - lastPeople < TimeSpan.FromSeconds(30)) return;
+                lastPeople = DateTime.UtcNow;
+                NearbyCultivatorsDto found;
+                try
+                {
+                    found = await _api.GetNearbyCultivatorsAsync(c.Id, Ct);
+                }
+                catch (ApiException)
+                {
+                    return; // no verified position yet
+                }
+
+                if (gen != _screen) return;
+                map.CultivatorsNearby = found.Items.Count;
+                people.RemoveAllViews();
+                if (found.Items.Count == 0) ui.Label("Nikogo w promieniu 2 km.", 13, Ui.Muted, parent: people);
+                foreach (var other in found.Items)
+                {
+                    var o = other;
+                    ui.WithIcon(ui.Action("⚔ Wyzwij: " + o.Name + " · " + PathName(o.Path) + " · " + o.DistanceBand, () => Run(async () =>
+                    {
+                        var combat = new CombatFlow(_api);
+                        var battle = await _api.ChallengeAsync(c.Id, o.CharacterId, Ct);
+                        await combat.OpenAsync(battle.Id, Ct);
+                        await exploration.StopAsync(Ct);
+                        ShowBattle(combat, c);
+                    }), secondary: true, parent: people), "portrait_" + o.Path, 30);
+                }
+            }
 
             void Interact(NodeDto node) => Run(async () =>
             {
@@ -853,7 +907,8 @@ namespace JianghuGo.Android
                 }
 
                 Render();
-                SetStatus("+" + r.RewardQi + " Qi" + (r.Items.Count > 0 ? "  · " + string.Join(", ", r.Items.Select(i => i.ItemId + " ×" + i.Quantity)) : string.Empty));
+                Sfx.Play(Sfx.Coin);
+                ShowLoot("Zebrano: " + node.NamePl, r.RewardQi, r.Items.Select(i => (i.ItemId, (long)i.Quantity)).ToList(), null);
             });
 
             void Render()
@@ -865,6 +920,7 @@ namespace JianghuGo.Android
                             (n?.Event != null ? "\n✨ Wydarzenie: " + n.Event.NamePl : string.Empty) +
                             (n?.NearestFlameSite != null ? "\n🔥 Płomień: " + n.NearestFlameSite.NamePl + " (" + (n.NearestFlameSite.DistanceM < 1000 ? n.NearestFlameSite.DistanceM + " m" : n.NearestFlameSite.DistanceM / 1000 + " km") + ")" : string.Empty);
                 map.Player = _location.Last;
+                map.Heading = _compass.Heading;
                 map.Nearby = n;
                 map.Invalidate();
                 list.RemoveAllViews();
@@ -882,8 +938,28 @@ namespace JianghuGo.Android
             _onLocation = () =>
             {
                 map.Player = _location.Last;
+                map.Heading = _compass.Heading;
                 map.Invalidate();
             };
+            async void Spin()
+            {
+                // the compass changes faster than GPS: keep the avatar facing the right way
+                while (gen == _screen && !_lifetime.IsCancellationRequested)
+                {
+                    try
+                    {
+                        await Task.Delay(120, Ct);
+                    }
+                    catch (System.OperationCanceledException)
+                    {
+                        return;
+                    }
+
+                    if (gen == _screen && _compass.Heading != map.Heading) map.Heading = _compass.Heading;
+                }
+            }
+
+            Spin();
 
             var buttons = ui.Columns();
             ui.Action("🔥 Dostrój się", () => Run(async () =>
@@ -910,6 +986,7 @@ namespace JianghuGo.Android
                         {
                             await exploration.TickAsync(Ct);
                             Render();
+                            await RefreshPeopleAsync();
                         }
                         catch (ApiException e)
                         {
@@ -938,9 +1015,13 @@ namespace JianghuGo.Android
 
         private static string NodeGlyph(string kind) => kind switch
         {
-            "qi_spring" => "💧",
-            "spirit_herb" => "🌿",
-            "spirit_beast" => "🐺",
+            "qi_spring" or "lotus_pond" => "💧",
+            "spirit_herb" or "bamboo_grove" => "🌿",
+            "ore_vein" or "jade_outcrop" => "⛏",
+            "ancient_ruins" => "🏛",
+            "shrine" => "⛩",
+            _ when WorldMapView.IsBossLair(kind) => "👹",
+            _ when WorldMapView.IsBeastLair(kind) => "🐺",
             _ => "✦",
         };
 
@@ -957,10 +1038,23 @@ namespace JianghuGo.Android
             var buttons = new List<Button>();
             var gen = _screen;
 
+            var rewardShown = combat.Battle.Status == "finished";
             void Render()
             {
                 var b = combat.Battle;
                 stage.Show(b);
+                if (!rewardShown && !b.IsActive && b.Status == "finished")
+                {
+                    rewardShown = true;
+                    var won = b.Result == b.MySide + "_won";
+                    var shownGen = _screen;
+                    _frame.PostDelayed(() =>
+                    {
+                        if (shownGen != _screen) return;
+                        if (won) ShowLoot("Zwycięstwo!", b.RewardQi, new List<(string, long)>(), b.TamedPetNpcId);
+                        else ShowBanner(b.Result == "draw" ? "REMIS" : "PORAŻKA", "Przeciwnik: " + b.Opponent.Name, "Trenuj meridiany i techniki, wróć silniejszy.", "menu_battle");
+                    }, b.LastTurnEvents.Count * 760 + 1500);
+                }
                 header.Text = "Tura " + b.Turn + "   ·   dystans " + b.Distance + "   ·   Qi " + b.Me.Qi + "/" + b.Me.MaxQi +
                               (b.Status == "pending_acceptance" ? "\nCzekasz, aż przeciwnik przyjmie wyzwanie…"
                                   : b.Status == "declined" ? "\nPrzeciwnik odrzucił wyzwanie." : b.Status == "expired" ? "\nWyzwanie wygasło."

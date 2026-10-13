@@ -34,9 +34,19 @@ $UI wait "Żetony Losu" 30
 $UI field 0 "Lin"
 $UI tap "Qi — równowaga"
 
-step "character sheet"
+step "character sheet + mentor tutorial (first run)"
+$UI wait "Mistrz Lao" 60
+$UI shot shots/03a-tutorial.png
+for i in 1 2 3 4; do $UI tap "Dalej" 20; sleep 1; done
+$UI tap "Ruszam w drogę" 20
+sleep 1
 $UI wait "Szansa przełomu" 60
 $UI shot shots/03-character.png
+$UI tap "Dzienny meldunek" 30
+$UI wait "MELDUNEK" 30
+$UI shot shots/03c-checkin.png
+$UI tap "Dalej" 20
+sleep 1
 $UI tap "Medytuj"
 $UI wait "Medytujesz od" 30
 sleep 2
@@ -56,7 +66,7 @@ $UI tap "Zakończ eksplorację"
 
 step "training battle"
 $UI wait "Szansa przełomu" 60
-$UI tap "Manekin treningowy"
+$UI tap "Drewniany Manekin"
 $UI wait "Tura" 60
 $UI shot shots/05-battle.png
 $UI tap "Odpoczynek" 20
@@ -89,6 +99,29 @@ adb shell input keyevent KEYCODE_BACK; sleep 2
 $UI tap "Powiadomienia"
 $UI wait "Witaj w Jianghu" 60
 $UI shot shots/12-inbox.png
+adb shell input keyevent KEYCODE_BACK; sleep 2
+$UI wait "Szansa przełomu" 60
+
+step "MVP 1.1: quests, meridians, rankings, spirit pet, hero"
+$UI tap "Zadania i osiągnięcia"
+$UI wait "Dzisiejsze zadania" 60
+$UI shot shots/13-quests.png
+adb shell input keyevent KEYCODE_BACK; sleep 2
+$UI tap "Meridiany"
+$UI wait "Wolne punkty" 60
+$UI shot shots/14-meridians.png
+adb shell input keyevent KEYCODE_BACK; sleep 2
+$UI tap "Rankingi"
+$UI wait "Twoje miejsce" 60
+$UI shot shots/15-ranking.png
+adb shell input keyevent KEYCODE_BACK; sleep 2
+$UI tap "Duchowy towarzysz"
+$UI wait "Nie masz jeszcze towarzysza" 60
+$UI shot shots/16-pet.png
+adb shell input keyevent KEYCODE_BACK; sleep 2
+$UI tap "Postać i ekwipunek"
+$UI wait "Cechy w walce" 60
+$UI shot shots/17-hero.png
 adb shell input keyevent KEYCODE_BACK; sleep 2
 $UI wait "Szansa przełomu" 60
 

@@ -82,7 +82,7 @@ def tap(text, timeout=30):
             subprocess.run(["adb", "shell", "input", "tap", str(x), str(y)])
             time.sleep(1)
             return True
-        if swipes < 4:
+        if swipes < 8:
             swipe_up()
             swipes += 1
         else:

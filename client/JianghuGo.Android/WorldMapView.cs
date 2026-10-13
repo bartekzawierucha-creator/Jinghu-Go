@@ -118,13 +118,106 @@ namespace JianghuGo.Android
             return m;
         }
 
+        /// <summary>World bosses' lairs (the server marks them; the map only needs to make them stand out).</summary>
+        public static bool IsBossLair(string kind) => kind is "bandit_fortress" or "tortoise_lake" or "dragon_abyss" or "blood_gate";
+
+        public static bool IsBeastLair(string kind) => kind is "spirit_beast" or "boar_den" or "viper_nest" or "fox_den" or "golem_ruin" or "spider_cave"
+            or "demon_altar" or "traitor_camp" or "eagle_peak" or "cursed_grave" || IsBossLair(kind);
+
         private (Bitmap Art, Color Glow) Look(string kind) => kind switch
         {
-            "qi_spring" => (Icon("qi", Resource.Drawable.map_qi), Ui.QiBlue),
-            "spirit_herb" => (Icon("herb", Resource.Drawable.map_herb), Ui.Jade),
-            "spirit_beast" => (Icon("beast", Resource.Drawable.map_beast), Ui.Cinnabar),
+            "qi_spring" or "shrine" or "lotus_pond" => (Icon("qi", Resource.Drawable.map_qi), Ui.QiBlue),
+            "spirit_herb" or "bamboo_grove" => (Icon("herb", Resource.Drawable.map_herb), Ui.Jade),
+            _ when IsBossLair(kind) => (Icon("boss", Resource.Drawable.map_beast, 66), Color.Rgb(255, 60, 40)),
+            _ when IsBeastLair(kind) => (Icon("beast", Resource.Drawable.map_beast), Ui.Cinnabar),
+            "ore_vein" or "jade_outcrop" or "ancient_ruins" => (Icon("other2", Resource.Drawable.map_other), Color.Rgb(200, 190, 160)),
             _ => (Icon("other", Resource.Drawable.map_event), Ui.Gold),
         };
+
+        // ---- compass heading and fog of war ------------------------------------------------------------
+
+        /// <summary>Device heading in degrees from north (null when the phone has no compass).</summary>
+        public float? Heading { get; set; }
+
+        /// <summary>How many other cultivators are exploring nearby (no positions are ever shown).</summary>
+        public int CultivatorsNearby { get; set; }
+
+        /// <summary>Places walked this run (kept for the app's lifetime): the fog clears around them.</summary>
+        private static readonly List<(double Lat, double Lon)> Explored = new List<(double, double)>();
+        private Bitmap _fog;
+        private readonly Paint _clear = new Paint(PaintFlags.AntiAlias);
+
+        private void Remember(LocationFix p)
+        {
+            foreach (var e in Explored)
+            {
+                var dx = (e.Lon - p.Lon) * Math.Cos(p.Lat * Math.PI / 180) * 111320;
+                var dy = (e.Lat - p.Lat) * 110540;
+                if (dx * dx + dy * dy < 25 * 25) return;
+            }
+
+            Explored.Add((p.Lat, p.Lon));
+            if (Explored.Count > 600) Explored.RemoveAt(0);
+        }
+
+        /// <summary>Night mist over the map with clear holes where the player has been (and around them now).</summary>
+        private void DrawFog(Canvas canvas, float scale)
+        {
+            if (_fog == null || _fog.Width != Width || _fog.Height != Height) _fog = Bitmap.CreateBitmap(Width, Height, Bitmap.Config.Argb8888);
+            _fog.EraseColor(Color.Argb(165, 4, 6, 9).ToArgb());
+            var c = new Canvas(_fog);
+            _clear.SetXfermode(new PorterDuffXfermode(PorterDuff.Mode.DstOut));
+            void Hole(float x, float y, float r)
+            {
+                _clear.SetShader(new RadialGradient(x, y, Math.Max(r, 1), new int[] { Color.Argb(255, 0, 0, 0).ToArgb(), Color.Argb(255, 0, 0, 0).ToArgb(), Color.Argb(0, 0, 0, 0).ToArgb() },
+                    new float[] { 0f, 0.55f, 1f }, Shader.TileMode.Clamp));
+                c.DrawCircle(x, y, r, _clear);
+            }
+
+            foreach (var e in Explored)
+            {
+                var (x, y) = Project(e.Lat, e.Lon);
+                Hole(x, y, 110 * scale);
+            }
+
+            Hole(Width / 2f, Height / 2f, Math.Max(160 * scale, 70 * _d)); // sight around the player
+            _clear.SetShader(null);
+            canvas.DrawBitmap(_fog, 0, 0, null);
+        }
+
+        private void DrawAvatar(Canvas canvas, float cx, float cy, float pulse)
+        {
+            if (Heading is { } heading)
+            {
+                // the way the cultivator is facing: a soft cone of light
+                var save = canvas.Save();
+                canvas.Rotate(heading, cx, cy);
+                var cone = new Path();
+                var len = 70 * _d;
+                cone.MoveTo(cx, cy);
+                cone.LineTo(cx - len * 0.42f, cy - len);
+                cone.QuadTo(cx, cy - len * 1.15f, cx + len * 0.42f, cy - len);
+                cone.Close();
+                _p.SetStyle(Paint.Style.Fill);
+                _p.SetShader(new RadialGradient(cx, cy, len, new int[] { Color.Argb(140, 255, 220, 140).ToArgb(), Color.Argb(0, 255, 220, 140).ToArgb() }, null, Shader.TileMode.Clamp));
+                canvas.DrawPath(cone, _p);
+                _p.SetShader(null);
+                // arrow tip
+                var tip = new Path();
+                tip.MoveTo(cx, cy - 34 * _d);
+                tip.LineTo(cx - 7 * _d, cy - 22 * _d);
+                tip.LineTo(cx + 7 * _d, cy - 22 * _d);
+                tip.Close();
+                _p.Color = Ui.Gold;
+                canvas.DrawPath(tip, _p);
+                canvas.RestoreToCount(save);
+            }
+
+            Glow(canvas, cx, cy, (22 + 10 * pulse) * _d, Ui.Gold, 0.7f);
+            // walking bob
+            var bob = (float)Math.Sin(SystemClock.UptimeMillis() / 180.0) * 1.5f * _d;
+            canvas.DrawBitmap(_playerToken, cx - _playerToken.Width / 2f, cy - _playerToken.Height * 0.6f + bob, _art);
+        }
 
         /// <summary>Night parchment with faint survey lines, drawn once per size.</summary>
         private Bitmap Terrain()
@@ -209,6 +302,9 @@ namespace JianghuGo.Android
             canvas.DrawText((int)RadiusM + " m", cx + 4 * _d, cy - half - 4 * _d, _text);
             _text.TextAlign = Paint.Align.Center;
 
+            Remember(Player);
+            DrawFog(canvas, scale);
+
             // reach: what is inside this glowing ring can be gathered or fought
             var reach = InteractionRadiusM * scale;
             _p.SetStyle(Paint.Style.Fill);
@@ -259,9 +355,17 @@ namespace JianghuGo.Android
                 }
             }
 
-            // the player: a gold seal with a breathing ring
-            Glow(canvas, cx, cy, (22 + 10 * pulse) * _d, Ui.Gold, 0.7f);
-            canvas.DrawBitmap(_playerToken, cx - _playerToken.Width / 2f, cy - _playerToken.Height * 0.6f, _art);
+            DrawAvatar(canvas, cx, cy, pulse);
+            if (CultivatorsNearby > 0)
+            {
+                _text.TextAlign = Paint.Align.Left;
+                _text.Color = Ui.Gold;
+                _text.TextSize = 12 * _d;
+                canvas.DrawText("☯ " + CultivatorsNearby + " kultywator(ów) w pobliżu", 10 * _d, Height - 12 * _d, _text);
+                _text.TextSize = 11 * _d;
+                _text.TextAlign = Paint.Align.Center;
+            }
+
             PostInvalidateDelayed(40); // ~25 fps while the map is on screen
         }
 

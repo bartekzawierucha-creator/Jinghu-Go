@@ -236,4 +236,57 @@ namespace JianghuGo.Android
         {
         }
     }
+
+    /// <summary>Device heading (degrees from north) from the rotation-vector sensor, smoothed. Null without a compass.</summary>
+    public sealed class Compass : Java.Lang.Object, global::Android.Hardware.ISensorEventListener
+    {
+        private readonly Activity _activity;
+        private global::Android.Hardware.SensorManager _manager;
+        private bool _listening;
+        private readonly float[] _rotation = new float[9];
+        private readonly float[] _orientation = new float[3];
+
+        public Compass(Activity activity) => _activity = activity;
+
+        public float? Heading { get; private set; }
+
+        public void Start()
+        {
+            if (_listening) return;
+            _manager ??= (global::Android.Hardware.SensorManager)_activity.GetSystemService(Context.SensorService);
+            var sensor = _manager?.GetDefaultSensor(global::Android.Hardware.SensorType.RotationVector);
+            if (sensor == null) return;
+            _manager.RegisterListener(this, sensor, global::Android.Hardware.SensorDelay.Ui);
+            _listening = true;
+        }
+
+        public void Stop()
+        {
+            if (!_listening) return;
+            _manager.UnregisterListener(this);
+            _listening = false;
+        }
+
+        public void OnSensorChanged(global::Android.Hardware.SensorEvent e)
+        {
+            if (e?.Values == null || e.Values.Count < 3) return;
+            var v = new float[Math.Min(e.Values.Count, 5)];
+            for (var i = 0; i < v.Length; i++) v[i] = e.Values[i];
+            global::Android.Hardware.SensorManager.GetRotationMatrixFromVector(_rotation, v);
+            global::Android.Hardware.SensorManager.GetOrientation(_rotation, _orientation);
+            var deg = (float)(_orientation[0] * 180 / Math.PI);
+            if (deg < 0) deg += 360;
+            if (Heading is { } h)
+            {
+                var diff = ((deg - h + 540) % 360) - 180; // shortest way round
+                deg = (h + diff * 0.2f + 360) % 360;
+            }
+
+            Heading = deg;
+        }
+
+        public void OnAccuracyChanged(global::Android.Hardware.Sensor sensor, global::Android.Hardware.SensorStatus accuracy)
+        {
+        }
+    }
 }

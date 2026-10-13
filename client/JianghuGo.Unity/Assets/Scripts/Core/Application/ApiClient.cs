@@ -178,6 +178,47 @@ namespace JianghuGo.Client.Application
         public Task<WorldInteractionDto> AttuneAsync(Guid characterId, string siteId, CancellationToken ct) =>
             SendAsync<WorldInteractionDto>("POST", "/api/v1/world/flame-attunements", new { characterId, siteId }, true, NewIdempotencyKey(), ct);
 
+        /// <summary>Cultivators exploring within 2 km (names and distance bands only).</summary>
+        public Task<NearbyCultivatorsDto> GetNearbyCultivatorsAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<NearbyCultivatorsDto>("GET", "/api/v1/characters/" + characterId + "/nearby", null, true, null, ct);
+
+        // ---- progression: quests, meridians, rankings, spirit pet ---------------------------------
+
+        private static string Quests(Guid characterId) => "/api/v1/characters/" + characterId + "/quests";
+
+        public Task<QuestBoardDto> GetQuestsAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<QuestBoardDto>("GET", Quests(characterId), null, true, null, ct);
+
+        public Task<ClaimResultDto> ClaimQuestAsync(Guid characterId, string questId, CancellationToken ct) =>
+            SendAsync<ClaimResultDto>("POST", Quests(characterId) + "/" + Uri.EscapeDataString(questId) + "/claim", null, true, null, ct);
+
+        public Task<CheckinResultDto> CheckinAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<CheckinResultDto>("POST", Quests(characterId) + "/checkin", null, true, null, ct);
+
+        public Task<LeaderPageDto> GetLeadersAsync(Guid characterId, string metric, CancellationToken ct) =>
+            SendAsync<LeaderPageDto>("GET", Quests(characterId) + "/leaders/" + Uri.EscapeDataString(metric), null, true, null, ct);
+
+        public Task<MeridiansDto> GetMeridiansAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<MeridiansDto>("GET", Cultivation(characterId) + "/meridians", null, true, null, ct);
+
+        public Task<MeridiansDto> OpenMeridianAsync(Guid characterId, string stat, int expectedSpent, CancellationToken ct) =>
+            SendAsync<MeridiansDto>("POST", Cultivation(characterId) + "/meridians", new { stat, expectedSpent }, true, null, ct);
+
+        public Task<MeridiansDto> ResetMeridiansAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<MeridiansDto>("POST", Cultivation(characterId) + "/meridians/reset", null, true, null, ct);
+
+        public Task<RankingDto> GetRankingAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<RankingDto>("GET", Cultivation(characterId) + "/ranking?limit=50", null, true, null, ct);
+
+        public Task<PetEnvelopeDto> GetPetAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<PetEnvelopeDto>("GET", "/api/v1/characters/" + characterId + "/combat/pet", null, true, null, ct);
+
+        public Task<PetEnvelopeDto> ReleasePetAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<PetEnvelopeDto>("POST", "/api/v1/characters/" + characterId + "/combat/pet/release", null, true, null, ct);
+
+        public Task<CombatCatalogDto> GetCombatCatalogAsync(CancellationToken ct) =>
+            SendAsync<CombatCatalogDto>("GET", "/api/v1/combat/catalog", null, true, null, ct);
+
         // ---- notifications ----------------------------------------------------------------------
 
         public Task<NotificationPageDto> GetNotificationsAsync(bool unreadOnly, int limit, Guid? before, CancellationToken ct) =>

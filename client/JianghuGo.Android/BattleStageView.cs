@@ -59,8 +59,11 @@ namespace JianghuGo.Android
         private readonly List<Floater> _floaters = new List<Floater>();
         private readonly float _foeScale;
         private readonly bool _foeFlip;
+        private readonly Paint _foePaint = new Paint(PaintFlags.FilterBitmap);
+        private readonly NpcLooks.Look _look;
         private float _distanceShown = -1;
         private long _endAt = -1;
+        private bool _endSoundPlayed;
 
         public BattleStageView(Context ctx, string npcId) : base(ctx)
         {
@@ -68,14 +71,7 @@ namespace JianghuGo.Android
             _text.SetTypeface(Ui.Display);
             _text.TextAlign = Paint.Align.Center;
             _text.SetShadowLayer(4, 0, 2, Color.Black);
-            _backdrop = Ui.Art(ctx, npcId switch
-            {
-                "training_dummy" => Resource.Drawable.arena_courtyard,
-                "grey_wolf" => Resource.Drawable.arena_bamboo,
-                "mountain_bandit" => Resource.Drawable.arena_mountain,
-                null or "pvp" => Resource.Drawable.arena_temple,
-                _ => Resource.Drawable.arena_fortress,
-            });
+            _backdrop = Ui.Art(ctx, NpcLooks.For(npcId).Arena);
 
             Anim A(int res, float fps, bool loop, int first = 0, int count = -1) => new Anim(Ui.Art(ctx, res), 320, fps, loop, first, count);
             _hero["idle"] = A(Resource.Drawable.anim_hero_idle, 7, true);
@@ -87,36 +83,38 @@ namespace JianghuGo.Android
             _hero["defeat"] = A(Resource.Drawable.anim_hero_defeat, 9, false);
             _hero["rest"] = A(Resource.Drawable.anim_hero_meditate, 8, false);
 
-            switch (npcId)
+            var look = NpcLooks.For(npcId);
+            _look = look;
+            switch (look.Base)
             {
-                case "training_dummy":
+                case "dummy":
                     _foe["idle"] = A(Resource.Drawable.anim_dummy_idle, 6, true);
                     _foe["attack"] = A(Resource.Drawable.anim_dummy_attack, 14, false, 3, 6);
                     _foe["hit"] = A(Resource.Drawable.anim_dummy_defeat, 12, false, 0, 3);
                     _foe["defeat"] = A(Resource.Drawable.anim_dummy_defeat, 9, false);
-                    _foeScale = 1f;
                     break;
-                case "grey_wolf":
-                    _foe["idle"] = A(Resource.Drawable.anim_wolf_idle, 8, true);
-                    _foe["attack"] = A(Resource.Drawable.anim_wolf_attack, 10, false);
+                case "wolf":
+                    _foe["idle"] = A(Resource.Drawable.anim_wolf_idle, 8 * look.Speed, true);
+                    _foe["attack"] = A(Resource.Drawable.anim_wolf_attack, 10 * look.Speed, false);
                     _foe["hit"] = A(Resource.Drawable.anim_wolf_defeat, 10, false, 0, 2);
                     _foe["defeat"] = A(Resource.Drawable.anim_wolf_defeat, 8, false);
-                    _foeScale = 1.25f;
                     break;
-                case "pvp":
+                case "hero":
                     // another cultivator: the hero's own animations, mirrored to face left
                     foreach (var kv in _hero) _foe[kv.Key] = kv.Value;
                     _foeFlip = true;
-                    _foeScale = 1f;
                     break;
                 default:
-                    _foe["idle"] = A(Resource.Drawable.anim_bandit_idle, 7, true);
-                    _foe["attack"] = A(Resource.Drawable.anim_bandit_attack, 12, false);
+                    _foe["idle"] = A(Resource.Drawable.anim_bandit_idle, 7 * look.Speed, true);
+                    _foe["attack"] = A(Resource.Drawable.anim_bandit_attack, 12 * look.Speed, false);
                     _foe["hit"] = A(Resource.Drawable.anim_bandit_defeat, 12, false, 0, 4);
                     _foe["defeat"] = A(Resource.Drawable.anim_bandit_defeat, 9, false);
-                    _foeScale = 1f;
                     break;
             }
+
+            _foeScale = look.Scale;
+            if (look.Tint is { } tint)
+                _foePaint.SetColorFilter(new LightingColorFilter(tint.Mul, tint.Add));
 
             Anim F(int res, float fps) => new Anim(Ui.Art(ctx, res), 256, fps, false);
             _fx["qi"] = F(Resource.Drawable.fx_qi_hit, 14);
@@ -125,6 +123,9 @@ namespace JianghuGo.Android
             _fx["flame"] = F(Resource.Drawable.fx_flame, 13);
             _fx["poison"] = F(Resource.Drawable.fx_poison, 12);
             _fx["gather"] = F(Resource.Drawable.fx_qi_gather, 10);
+            _fx["blue"] = F(Resource.Drawable.fx_blue, 13);
+            _fx["gold"] = F(Resource.Drawable.fx_gold, 13);
+            _fx["red"] = F(Resource.Drawable.fx_red, 13);
         }
 
         public BattleDto Battle { get; private set; }
@@ -192,7 +193,8 @@ namespace JianghuGo.Android
                     {
                         var target = mine ? _foe : _hero;
                         _cues.Add(new Cue { Hero = !mine, Anim = target["hit"], At = impact });
-                        var fx = !mine ? "slash" : tech.Contains("flame") ? "flame" : tech.Contains("venom") || tech.Contains("poison") ? "poison" : "qi";
+                        var fx = mine ? TechniqueFx(tech) : _look.AttackFx;
+                        if (mine) Sfx.Play(Sfx.Hit); else Sfx.Play(Sfx.Hurt);
                         _cues.Add(new Cue { Hero = !mine, Fx = true, Anim = _fx[fx], At = impact });
                         _floaters.Add(new Floater { OnHero = !mine, Text = "-" + e.Damage, Color = mine ? Color.Rgb(255, 230, 140) : Color.Rgb(255, 110, 90), Size = 26, At = impact });
                     }
@@ -228,6 +230,17 @@ namespace JianghuGo.Android
                     _floaters.Add(new Floater { OnHero = mine, Text = "-" + e.Damage, Color = Color.Rgb(200, 60, 60), Size = 18, At = at });
                     break;
             }
+        }
+
+        /// <summary>Impact effect per technique family (fire, venom, blades, thunder, blood, plain Qi).</summary>
+        private static string TechniqueFx(string tech)
+        {
+            if (tech.Contains("flame") || tech.Contains("fire") || tech.Contains("sun") || tech.Contains("phoenix") || tech.Contains("ember")) return "flame";
+            if (tech.Contains("venom") || tech.Contains("poison") || tech.Contains("toxic") || tech.Contains("miasma") || tech.Contains("serpent")) return "poison";
+            if (tech.Contains("thunder") || tech.Contains("lightning") || tech.Contains("frost") || tech.Contains("ice") || tech.Contains("wave")) return "blue";
+            if (tech.Contains("sword") || tech.Contains("blade") || tech.Contains("dagger") || tech.Contains("thrust") || tech.Contains("golden")) return "gold";
+            if (tech.Contains("blood") || tech.Contains("demon") || tech.Contains("soul")) return "red";
+            return "qi";
         }
 
         /// <summary>The body animation a fighter shows now: the latest started cue, else idle (or the held defeat pose).</summary>
@@ -280,9 +293,19 @@ namespace JianghuGo.Android
             canvas.DrawBitmap(ha.Strip, ha.Frame(he), new RectF(heroX - cellW / 2, ground - footInCell, heroX + cellW / 2, ground - footInCell + cellH), _pixel);
             var fw = cellW * _foeScale;
             var fh = cellH * _foeScale;
+            if (_look.Aura is { } aura)
+            {
+                var pulse = (float)(0.5 + 0.5 * Math.Sin(now / 260.0));
+                var ar = fw * (0.32f + 0.04f * pulse);
+                var ay = ground - fh * 0.38f;
+                _p.SetShader(new RadialGradient(foeX, ay, ar, new int[] { Color.Argb((int)(90 + 60 * pulse), aura.R, aura.G, aura.B).ToArgb(), Color.Argb(0, aura.R, aura.G, aura.B).ToArgb() }, null, Shader.TileMode.Clamp));
+                canvas.DrawCircle(foeX, ay, ar, _p);
+                _p.SetShader(null);
+            }
+
             canvas.Save();
             if (_foeFlip) canvas.Scale(-1, 1, foeX, ground);
-            canvas.DrawBitmap(fa.Strip, fa.Frame(fe), new RectF(foeX - fw / 2, ground - footInCell * _foeScale, foeX + fw / 2, ground - footInCell * _foeScale + fh), _pixel);
+            canvas.DrawBitmap(fa.Strip, fa.Frame(fe), new RectF(foeX - fw / 2, ground - footInCell * _foeScale, foeX + fw / 2, ground - footInCell * _foeScale + fh), _foePaint);
             canvas.Restore();
 
             // effects over the fighters
@@ -321,6 +344,11 @@ namespace JianghuGo.Android
                 _text.TextSize = 34 * _d;
                 _text.Color = won ? Ui.Gold : draw ? Ui.Ink : Ui.Cinnabar;
                 canvas.DrawText(won ? "ZWYCIĘSTWO" : draw ? "REMIS" : "PORAŻKA", w / 2, h * 0.5f, _text);
+                if (!_endSoundPlayed)
+                {
+                    _endSoundPlayed = true;
+                    Sfx.Play(won ? Sfx.Victory : Sfx.Defeat);
+                }
                 if (Battle.RewardQi > 0)
                 {
                     _text.TextSize = 14 * _d;
@@ -389,6 +417,78 @@ namespace JianghuGo.Android
             _p.SetShader(new LinearGradient(0, r.Top, 0, r.Bottom, Color.Argb(255, Math.Min(255, color.R + 70), Math.Min(255, color.G + 70), Math.Min(255, color.B + 70)), color, Shader.TileMode.Clamp));
             canvas.DrawRoundRect(fill, r.Height() / 2, r.Height() / 2, _p);
             _p.SetShader(null);
+        }
+    }
+
+    /// <summary>
+    /// How each enemy looks on the stage until it gets its own sprite sheet: a base animation set (beast, humanoid,
+    /// construct), a colour grade, a size and an arena; bosses also get a pulsing aura. Unknown ids fall back by name.
+    /// </summary>
+    public static class NpcLooks
+    {
+        public readonly struct Tint
+        {
+            public Tint(int mul, int add) { Mul = mul; Add = add; }
+            public int Mul { get; }
+            public int Add { get; }
+        }
+
+        public sealed class Look
+        {
+            public string Base = "bandit";
+            public float Scale = 1f;
+            public float Speed = 1f;
+            public Tint? Tint;
+            public Color? Aura;
+            public int Arena = Resource.Drawable.arena_fortress;
+            public int TileArt = Resource.Drawable.tile_bandit;
+            public string AttackFx = "slash";
+        }
+
+        private static Tint T(int r, int g, int b, int ar = 0, int ag = 0, int ab = 0) =>
+            new Tint(Color.Rgb(r, g, b).ToArgb(), Color.Rgb(ar, ag, ab).ToArgb());
+
+        public static Look For(string npcId)
+        {
+            switch (npcId)
+            {
+                case null:
+                case "pvp": return new Look { Base = "hero", Arena = Resource.Drawable.arena_temple, AttackFx = "qi" };
+                case "training_dummy": return new Look { Base = "dummy", Arena = Resource.Drawable.arena_courtyard, TileArt = Resource.Drawable.tile_dummy };
+                case "grey_wolf": return Beast(Resource.Drawable.arena_bamboo, 1.25f, null);
+                case "wild_boar": return Beast(Resource.Drawable.arena_bamboo, 1.3f, T(200, 150, 110, 30, 10, 0), speed: 0.85f);
+                case "bamboo_viper": return Beast(Resource.Drawable.arena_bamboo, 1.0f, T(120, 220, 120), fx: "poison", speed: 1.3f);
+                case "fire_fox": return Beast(Resource.Drawable.arena_mountain, 1.1f, T(255, 150, 80, 60, 10, 0), fx: "flame", speed: 1.2f);
+                case "frost_spider": return Beast(Resource.Drawable.arena_mountain, 1.15f, T(150, 200, 255, 10, 30, 60), fx: "blue", speed: 1.2f);
+                case "thunder_eagle": return Beast(Resource.Drawable.arena_mountain, 1.2f, T(220, 220, 140, 40, 40, 70), fx: "blue", speed: 1.35f);
+                case "ancient_tortoise": return Boss(Beast(Resource.Drawable.arena_temple, 1.55f, T(130, 180, 140, 10, 30, 10), speed: 0.6f), Ui.Jade);
+                case "jiao_dragon": return Boss(Beast(Resource.Drawable.arena_mountain, 1.6f, T(120, 170, 255, 0, 20, 70), fx: "blue", speed: 1.1f), Ui.QiBlue);
+                case "mountain_bandit": return Human(Resource.Drawable.arena_mountain, 1f, null);
+                case "demonic_cultivator": return Human(Resource.Drawable.arena_fortress, 1.05f, T(190, 120, 220, 30, 0, 40), fx: "red");
+                case "sect_traitor": return Human(Resource.Drawable.arena_temple, 1f, T(170, 170, 200, 10, 10, 30), fx: "gold");
+                case "corpse_puppet": return Human(Resource.Drawable.arena_fortress, 1.1f, T(140, 170, 140, 20, 30, 20), fx: "poison", speed: 0.75f);
+                case "bandit_chief": return Boss(Human(Resource.Drawable.arena_fortress, 1.3f, T(255, 210, 160, 30, 15, 0), fx: "gold"), Ui.Gold);
+                case "blood_demon_lord": return Boss(Human(Resource.Drawable.arena_fortress, 1.45f, T(255, 110, 110, 70, 0, 0), fx: "red"), Ui.Cinnabar);
+                case "stone_golem": return new Look { Base = "dummy", Scale = 1.4f, Tint = T(150, 150, 160, 20, 20, 25), Arena = Resource.Drawable.arena_temple, TileArt = Resource.Drawable.tile_dummy, AttackFx = "slash" };
+            }
+
+            // unknown (newer content): guess by name
+            var id = npcId ?? string.Empty;
+            return id.Contains("wolf") || id.Contains("beast") || id.Contains("fox") || id.Contains("tiger") || id.Contains("serpent")
+                ? Beast(Resource.Drawable.arena_bamboo, 1.2f, T(200, 200, 200))
+                : Human(Resource.Drawable.arena_fortress, 1f, T(200, 200, 200));
+        }
+
+        private static Look Beast(int arena, float scale, Tint? tint, string fx = "slash", float speed = 1f) =>
+            new Look { Base = "wolf", Scale = scale, Tint = tint, Arena = arena, TileArt = Resource.Drawable.tile_wolf, AttackFx = fx, Speed = speed };
+
+        private static Look Human(int arena, float scale, Tint? tint, string fx = "slash", float speed = 1f) =>
+            new Look { Base = "bandit", Scale = scale, Tint = tint, Arena = arena, TileArt = Resource.Drawable.tile_bandit, AttackFx = fx, Speed = speed };
+
+        private static Look Boss(Look look, Color aura)
+        {
+            look.Aura = aura;
+            return look;
         }
     }
 }
