@@ -9,6 +9,7 @@ PKG=pl.bz.jianghugo
 UI="python3 $(dirname "$0")/ui.py"
 mkdir -p shots
 step() { echo "### $*"; }
+trap 'adb logcat -d > shots/logcat.txt 2>/dev/null || true' EXIT
 
 adb wait-for-device
 adb shell settings put global window_animation_scale 0 || true

@@ -96,6 +96,9 @@ internal sealed class InMemorySnapshotWriter : IDisposable
         _signal.Release();
     }
 
+    /// <summary>The last background write failure, if any (diagnostics).</summary>
+    public Exception? LastError { get; private set; }
+
     public void Flush()
     {
         ImmutableDictionary<string, object>? tables;
@@ -118,7 +121,16 @@ internal sealed class InMemorySnapshotWriter : IDisposable
             {
                 await _signal.WaitAsync(_stop.Token);
                 await Task.Delay(300, _stop.Token); // coalesce a burst of commits into one write
-                Flush();
+                try
+                {
+                    Flush();
+                }
+                catch (Exception e) when (e is not OperationCanceledException)
+                {
+                    // keep the writer alive (the next commit retries); the failure is visible in the process log
+                    LastError = e;
+                    Console.Error.WriteLine("jianghu: snapshot write failed: " + e);
+                }
             }
         }
         catch (OperationCanceledException)
