@@ -1,0 +1,289 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Android.Graphics;
+using Android.Graphics.Drawables;
+using Android.Views;
+using Android.Widget;
+using JianghuGo.Client.Application;
+
+namespace JianghuGo.Android
+{
+    /// <summary>Bag (paged item grid with an action sheet), forge and alchemy (recipe cards), market (paged offers).</summary>
+    public sealed partial class MainActivity
+    {
+        private sealed class BagEntry
+        {
+            public StackDto Stack;
+            public ItemInstanceDto Item;
+            public string ItemId => Stack?.ItemId ?? Item.ItemId;
+            public string Name => Stack?.NamePl ?? Item.NamePl;
+        }
+
+        private async Task ShowBagAsync(int tab)
+        {
+            var c = _me;
+            var economy = new EconomyFlow(_api, c.Id);
+            await economy.LoadAsync(Ct);
+            var page1 = tab == 2 ? await economy.BrowseAsync(null, null, Ct) : null;
+            var mine = tab == 2 ? await economy.MyListingsAsync(Ct) : null;
+            ShowBag(economy, tab, page1, mine, 0);
+        }
+
+        private void ShowBag(EconomyFlow economy, int tab, ListingPageDto offers, List<MyListingDto> mine, int startPage, bool marketMine = false)
+        {
+            var c = _me;
+            var ui = NewScreen("Sakwa", BackToTab, Resource.Drawable.loc_village, "EKWIPUNEK · KUŹNIA · TARG");
+            var page = ui.Content;
+            var inv = economy.Inventory;
+            _balance = inv.Balance;
+            RenderHud();
+            ui.Tabs(page, new[] { "Sakwa", "Kuźnia", "Targ" }, tab, i => Run(() => ShowBagAsync(i)));
+            var head = ui.HRow(page, 26, 4);
+            ui.Icon(head, "icon_stones", 22);
+            ui.Text(inv.Balance.ToString("N0") + " Kamieni Duchowych", head, 13, Ui.Gold, bold: true).LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f) { LeftMargin = Px(6), Gravity = GravityFlags.CenterVertical };
+            ui.Text("Miejsca " + inv.SlotsUsed + "/" + inv.Capacity, head, 12, Ui.Muted).Gravity = GravityFlags.End;
+
+            if (tab == 0) BagGrid(economy, ui, page, startPage);
+            else if (tab == 1) Forge(economy, ui, page, startPage);
+            else Market(economy, ui, page, offers, mine, marketMine);
+        }
+
+        // ---- Sakwa --------------------------------------------------------------------------------------------
+
+        private void BagGrid(EconomyFlow economy, Ui ui, LinearLayout page, int startPage)
+        {
+            var inv = economy.Inventory;
+            var entries = inv.Items.Where(i => i.IsEquipped).Select(i => new BagEntry { Item = i })
+                .Concat(inv.Stacks.Select(s => new BagEntry { Stack = s }))
+                .Concat(inv.Items.Where(i => !i.IsEquipped).Select(i => new BagEntry { Item = i })).ToList();
+            Pager pager = null;
+            pager = ui.Pages(page, entries.Count, 4, 4, (i, cell) =>
+            {
+                var e = entries[i];
+                var rarity = Ui.RarityOf(e.Stack?.Rarity ?? e.Item.Rarity).Color;
+                var box = new FrameLayout(this) { Clickable = true };
+                box.Background = new FrameDrawable(Resources.DisplayMetrics.Density, Color.Argb(235, 14, 18, 22), e.Item?.IsEquipped == true ? Ui.Gold : rarity, rarity);
+                var img = new ImageView(this);
+                var art = ui.ArtId("item_" + e.ItemId);
+                img.SetImageBitmap(Ui.Art(this, art != 0 ? art : Resource.Drawable.item_slot_empty));
+                img.SetScaleType(ImageView.ScaleType.FitCenter);
+                box.AddView(img, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent) { LeftMargin = Px(8), RightMargin = Px(8), TopMargin = Px(6), BottomMargin = Px(16) });
+                var label = new TextView(this) { Text = e.Name, Gravity = GravityFlags.Center };
+                label.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 9);
+                label.SetTextColor(Ui.Ink);
+                label.SetMaxLines(1);
+                label.Ellipsize = global::Android.Text.TextUtils.TruncateAt.End;
+                label.SetShadowLayer(3, 0, 1, Color.Black);
+                box.AddView(label, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent, GravityFlags.Bottom) { BottomMargin = Px(3) });
+                var tag = e.Stack != null ? "×" + e.Stack.Quantity : e.Item.IsEquipped ? "✓" : e.Item.State == "listed" ? "targ" : e.Item.UpgradeLevel > 0 ? "+" + e.Item.UpgradeLevel : null;
+                if (tag != null)
+                {
+                    var b = ui.Badge(tag);
+                    if (e.Item?.IsEquipped == true) ((GradientDrawable)b.Background).SetColor(Ui.Jade);
+                    box.AddView(b, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent, GravityFlags.Top | GravityFlags.End) { TopMargin = Px(3), RightMargin = Px(3) });
+                }
+
+                box.Click += (_, __) =>
+                {
+                    Sfx.Play(Sfx.Click, 0.5f);
+                    ItemSheet(economy, e, pager.Page);
+                };
+                cell.AddView(box, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+            }, empty: "Sakwa jest pusta — zbieraj zioła i rudę w świecie.", startPage: startPage);
+            if (inv.Bonuses.Count > 0)
+                ui.Text("Premie z ekwipunku: " + string.Join("  ", inv.Bonuses.Select(b => StatName(b.Key) + " +" + b.Value)), page, 11, Ui.Gold, maxLines: 2);
+        }
+
+        private void ItemSheet(EconomyFlow economy, BagEntry e, int returnPage)
+        {
+            var ui = _ui;
+            var art = ui.ArtId("item_" + e.ItemId) != 0 ? "item_" + e.ItemId : "item_slot_empty";
+            var body = Sheet(e.Name + (e.Item?.UpgradeLevel > 0 ? " +" + e.Item.UpgradeLevel : string.Empty), 0.56f, out var close, art);
+            var rarity = Ui.RarityOf(e.Stack?.Rarity ?? e.Item.Rarity);
+            ui.Text(rarity.Name + (e.Stack != null ? "  ·  w sakwie: " + e.Stack.Quantity : e.Item.IsEquipped ? "  ·  założony" : e.Item.State == "listed" ? "  ·  na targu" : string.Empty), body, 12, rarity.Color, bold: true);
+            if (e.Item != null && e.Item.Stats.Count > 0)
+                ui.Text(string.Join("  ·  ", e.Item.Stats.Select(x => StatName(x.Key) + " +" + x.Value)), body, 13, Ui.Ink, maxLines: 2);
+            if (e.Item?.BoundRef != null) ui.Text("Zwój techniki: " + e.Item.BoundRef + " (przeczytaj w Bohater → Dao)", body, 12, Ui.Muted, maxLines: 2);
+            ui.Box(body, 1f, marginDp: 0);
+
+            async Task Done(string message)
+            {
+                close();
+                ShowBag(economy, 0, null, null, returnPage);
+                if (message != null) SetStatus(message);
+                RefreshHud();
+            }
+
+            var r1 = ui.HRow(body, 46);
+            if (e.Stack != null)
+            {
+                if (e.Stack.Type == "consumable")
+                    ui.Btn("Użyj", () => Run(async () =>
+                    {
+                        var r = await economy.UseAsync(e.Stack.ItemId, 1, Ct);
+                        Sfx.Play(Sfx.Chime);
+                        await Done("+" + r.QiGranted + " Qi");
+                    }), r1, sp: 14, heightDp: 46);
+                ui.Btn("Wyrzuć 1", () => Run(async () =>
+                {
+                    await economy.DiscardAsync(e.Stack.ItemId, 1, Ct);
+                    await Done(null);
+                }), r1, secondary: true, sp: 13, heightDp: 46);
+            }
+            else if (e.Item.State != "listed")
+            {
+                if (e.Item.Slot != null)
+                    ui.Btn(e.Item.IsEquipped ? "Zdejmij" : "Załóż", () => Run(async () =>
+                    {
+                        var ok = await economy.ToggleEquipAsync(e.Item, Ct);
+                        Sfx.Play(Sfx.Chime, 0.6f);
+                        await Done(ok ? null : "Przedmiot zmienił się na innym urządzeniu — odświeżono.");
+                    }), r1, sp: 14, heightDp: 46);
+                var next = economy.NextUpgrade(e.Item);
+                if (next != null)
+                    ui.Btn("⚒ +" + next.Level + " · " + next.Stones + " KD · " + next.SuccessPermille / 10 + "%", () => Run(async () =>
+                    {
+                        var r = await economy.UpgradeAsync(e.Item, Ct);
+                        Sfx.Play(r != null && r.Success ? Sfx.Breakthrough : Sfx.Defeat, 0.6f);
+                        await Done(r == null ? "Odświeżono." : r.Success ? "Udane! Teraz +" + r.Level : "Nieudane — poziom +" + r.Level + " zachowany.");
+                    }), r1, secondary: true, sp: 12, heightDp: 46);
+                if (!e.Item.IsEquipped)
+                    ui.Btn("Wyrzuć", () => Run(async () =>
+                    {
+                        await economy.DiscardAsync(e.Item, Ct);
+                        await Done(null);
+                    }), r1, secondary: true, sp: 13, heightDp: 46);
+            }
+
+            // sell on the market (tradable stacks and items in the bag)
+            if (e.Stack != null || e.Item.InBag)
+            {
+                var r2 = ui.HRow(body, 56);
+                var priceBox = ui.Box(r2, 1.3f, marginDp: 0);
+                var price = ui.Field("Cena (KD)", number: true, parent: priceBox);
+                ui.Btn("Wystaw na targ", () => Run(async () =>
+                {
+                    var rules = economy.MarketRules ?? await _api.GetMarketRulesAsync(Ct);
+                    if (!TryPrice(price.Text, rules, out var p)) return;
+                    if (e.Stack != null) await economy.SellAsync(e.Stack.ItemId, e.Stack.Quantity, p, Ct);
+                    else await economy.SellAsync(e.Item, p, Ct);
+                    Sfx.Play(Sfx.Coin);
+                    await Done("Wystawiono na targu.");
+                }), r2, secondary: true, sp: 12, heightDp: 46);
+            }
+        }
+
+        // ---- Kuźnia i alchemia --------------------------------------------------------------------------------
+
+        private void Forge(EconomyFlow economy, Ui ui, LinearLayout page, int startPage)
+        {
+            var inv = economy.Inventory;
+            var names = inv.Stacks.GroupBy(s => s.ItemId).ToDictionary(g => g.Key, g => g.First().NamePl);
+            foreach (var it in inv.Items) names[it.ItemId] = it.NamePl;
+            string N(string id) => names.TryGetValue(id, out var n) ? n : Pretty(id);
+            var recipes = economy.Recipes.Items.OrderByDescending(r => economy.CanAfford(r, 1)).ThenBy(r => r.Stones).ToList();
+            Pager pager = null;
+            pager = ui.Pages(page, recipes.Count, 1, 3, (i, cell) =>
+            {
+                var recipe = recipes[i];
+                var can = economy.CanAfford(recipe, 1);
+                var card = ui.Card(cell, 1f, 8, can ? Ui.Gold : (Color?)null, 0);
+                var row = ui.HRow(card, 46, 0);
+                ui.Icon(row, ui.ArtId("item_" + recipe.Output.Item) != 0 ? "item_" + recipe.Output.Item : "item_slot_empty", 42);
+                var col = ui.Box(row, 1f, marginDp: 8);
+                ui.Text(N(recipe.Output.Item) + (recipe.Output.Quantity > 1 ? " ×" + recipe.Output.Quantity : string.Empty), col, 14, can ? Ui.Gold : Ui.Ink, bold: true);
+                ui.Text((recipe.Kind == "alchemy" ? "Alchemia · " + recipe.SuccessPermille / 10 + "%+" : "Kuźnia") + " · " + recipe.Stones + " KD", col, 11, Ui.Muted);
+                var inputs = string.Join("   ", recipe.Inputs.Select(x => N(x.Item) + " " + inv.Count(x.Item) + "/" + x.Quantity));
+                ui.Text(inputs, card, 11, can ? Ui.Jade : Ui.Cinnabar, maxLines: 2);
+                ui.Box(card, 1f, marginDp: 0);
+                ui.Btn(can ? "Wytwórz" : "Brakuje składników", () => Run(async () =>
+                {
+                    if (!economy.CanAfford(recipe, 1))
+                    {
+                        SetStatus("Brakuje składników lub kamieni.");
+                        return;
+                    }
+
+                    var result = await economy.CraftAsync(recipe.Id, 1, Ct);
+                    ShowBag(economy, 1, null, null, pager.Page);
+                    if (result.Successes > 0)
+                    {
+                        Sfx.Play(Sfx.Chime);
+                        ShowLoot("Wytworzono", 0, new List<(string, long)> { (result.OutputItem, recipe.Output.Quantity) }, null);
+                    }
+                    else
+                    {
+                        Sfx.Play(Sfx.Defeat, 0.6f);
+                        SetStatus("Alchemia nie powiodła się — składniki przepadły.");
+                    }
+
+                    RefreshHud();
+                }), card, secondary: !can, sp: 13, heightDp: 38);
+            }, empty: "Brak receptur.", startPage: startPage);
+        }
+
+        // ---- Targ ---------------------------------------------------------------------------------------------
+
+        private void Market(EconomyFlow economy, Ui ui, LinearLayout page, ListingPageDto offersPage, List<MyListingDto> mine, bool showMine)
+        {
+            var c = _me;
+            var rules = economy.MarketRules;
+            if (rules != null)
+                ui.Text("Opłata " + rules.ListingFeePermille / 10.0 + "% (min. " + rules.MinListingFee + ") · podatek " + rules.SaleTaxPermille / 10.0 + "% · " + rules.ListingHours + " h", page, 11, Ui.Muted);
+            ui.Tabs(page, new[] { "Oferty", "Moje oferty" }, showMine ? 1 : 0, i => ShowBag(economy, 2, offersPage, mine, 0, i == 1), 32);
+
+            async Task Reload(string message)
+            {
+                var o = await economy.BrowseAsync(null, null, Ct);
+                var m = await economy.MyListingsAsync(Ct);
+                await economy.ReloadAsync(Ct);
+                ShowBag(economy, 2, o, m, 0, showMine);
+                if (message != null) SetStatus(message);
+                RefreshHud();
+            }
+
+            if (!showMine)
+            {
+                var offers = (offersPage?.Items ?? new List<ListingDto>()).Where(l => l.SellerCharacterId != c.Id).ToList();
+                ui.Pages(page, offers.Count, 1, 4, (i, cell) =>
+                {
+                    var l = offers[i];
+                    var card = ui.Card(cell, 1f, 6, Ui.RarityOf(l.Rarity).Color, 0);
+                    var row = ui.HRow(card, 44, 0);
+                    ui.Icon(row, ui.ArtId("item_" + l.ItemId) != 0 ? "item_" + l.ItemId : "item_slot_empty", 38);
+                    var col = ui.Box(row, 1f, marginDp: 8);
+                    ui.Text(l.ItemNamePl + (l.UpgradeLevel > 0 ? " +" + l.UpgradeLevel : string.Empty) + " ×" + l.Quantity, col, 13, Ui.Ink, bold: true);
+                    ui.Text(l.SellerName + " · " + l.Price + " KD", col, 11, Ui.Gold);
+                    ui.Btn("Kup", () => Run(async () =>
+                    {
+                        var bought = await economy.BuyAsync(l, Ct);
+                        Sfx.Play(Sfx.Coin);
+                        await Reload(bought == null ? "Ktoś był szybszy — oferta już nieaktualna." : "Kupiono za " + bought.Paid + " KD.");
+                    }), row, sp: 12, heightDp: 38).LayoutParameters = new LinearLayout.LayoutParams(Px(70), Px(38)) { Gravity = GravityFlags.CenterVertical };
+                }, empty: "Na targu nic nie ma.");
+                ui.Text("Wystawiasz z sakwy: dotknij przedmiotu → Wystaw na targ.", page, 11, Ui.Muted, center: true);
+            }
+            else
+            {
+                var active = (mine ?? new List<MyListingDto>()).Where(x => x.Listing.Status == "active").Select(x => x.Listing).ToList();
+                ui.Pages(page, active.Count, 1, 4, (i, cell) =>
+                {
+                    var l = active[i];
+                    var card = ui.Card(cell, 1f, 6, null, 0);
+                    var row = ui.HRow(card, 44, 0);
+                    ui.Icon(row, ui.ArtId("item_" + l.ItemId) != 0 ? "item_" + l.ItemId : "item_slot_empty", 38);
+                    var col = ui.Box(row, 1f, marginDp: 8);
+                    ui.Text(l.ItemNamePl + " ×" + l.Quantity + " — " + l.Price + " KD", col, 13, Ui.Ink, bold: true);
+                    ui.Text(l.Expired ? "wygasła" : "do " + l.ExpiresAt.ToLocalTime().ToString("dd.MM HH:mm"), col, 11, Ui.Muted);
+                    ui.Btn(l.Expired ? "Odbierz" : "Wycofaj", () => Run(async () =>
+                    {
+                        await economy.CancelAsync(l, Ct);
+                        await Reload(null);
+                    }), row, secondary: true, sp: 12, heightDp: 38).LayoutParameters = new LinearLayout.LayoutParams(Px(84), Px(38)) { Gravity = GravityFlags.CenterVertical };
+                }, empty: "Nie masz aktywnych ofert.");
+            }
+        }
+    }
+}

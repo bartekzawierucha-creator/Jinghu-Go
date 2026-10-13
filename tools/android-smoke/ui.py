@@ -145,6 +145,40 @@ def dump(out=sys.stdout):
             print("  " + t, file=out)
 
 
+def screen_size():
+    out = subprocess.run(["adb", "shell", "wm", "size"], capture_output=True).stdout.decode()
+    w, h = re.findall(r"(\d+)x(\d+)", out)[-1]
+    return int(w), int(h)
+
+
+def page_left(y_fraction=0.5):
+    """Turns a pager page: a horizontal swipe right-to-left."""
+    w, h = screen_size()
+    y = int(h * y_fraction)
+    subprocess.run(["adb", "shell", "input", "swipe", str(int(w * 0.85)), str(y), str(int(w * 0.15)), str(y), "250"])
+    time.sleep(1)
+    return True
+
+
+def find_paged(text, pages=6, y_fraction=0.5):
+    """Looks for a text on the current pager page, turning pages until it shows up."""
+    for _ in range(pages):
+        if find(text) is not None:
+            return True
+        page_left(y_fraction)
+    report(f"'{text}' not found on {pages} pages")
+    return False
+
+
+def no_scroll():
+    """The fixed-viewport rule: no scrolling containers on screen."""
+    bad = [n.get("class") for n in nodes() if n.get("class") in ("android.widget.ScrollView", "android.widget.HorizontalScrollView", "androidx.recyclerview.widget.RecyclerView", "android.widget.ListView")]
+    if bad:
+        report("scrolling container on screen: " + ", ".join(bad))
+        return False
+    return True
+
+
 def shot(path):
     png = subprocess.run(["adb", "exec-out", "screencap", "-p"], capture_output=True).stdout
     with open(path, "wb") as f:
@@ -162,6 +196,14 @@ if __name__ == "__main__":
         ok = field(int(args[0]), args[1])
     elif cmd == "shot":
         ok = shot(args[0])
+    elif cmd == "has":
+        ok = find(args[0]) is not None
+    elif cmd == "page":
+        ok = page_left(float(args[0]) if args else 0.5)
+    elif cmd == "paged":
+        ok = find_paged(args[0], int(args[1]) if len(args) > 1 else 6, float(args[2]) if len(args) > 2 else 0.5)
+    elif cmd == "noscroll":
+        ok = no_scroll()
     elif cmd == "dump":
         dump()
         ok = True

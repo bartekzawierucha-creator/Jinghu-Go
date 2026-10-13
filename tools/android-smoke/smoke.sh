@@ -24,39 +24,56 @@ for i in 1 2 3; do adb emu geo fix 19.9372 50.0614 220 >/dev/null || true; sleep
 adb shell pm grant $PKG android.permission.ACCESS_FINE_LOCATION
 adb shell pm grant $PKG android.permission.ACCESS_COARSE_LOCATION
 adb logcat -c
+adb logcat -G 16M || true
 adb shell monkey -p $PKG -c android.intent.category.LAUNCHER 1 >/dev/null
 
 step "first start goes straight into the offline world"
 
-step "character creation"
+step "character creation: fate, path, name"
 $UI wait "Narodziny wojownika" 120
 $UI wait "Żetony Losu" 30
+$UI noscroll
 $UI shot shots/02-creation.png
 $UI tap "Losuj ponownie"
 $UI wait "Żetony Losu" 30
+$UI tap "Dalej ›"
+$UI wait "ŚCIEŻKA" 30
+$UI shot shots/02b-path.png
+$UI tap "równowaga i technika"
+$UI wait "Rozpocznij drogę" 30
 $UI field 0 "Lin"
-$UI tap "Qi — równowaga"
+$UI tap "Rozpocznij drogę"
 
-step "character sheet + mentor tutorial (first run)"
-$UI wait "Mistrz Lao" 60
+step "cultivation hub + mentor tutorial (coach marks)"
+$UI wait "Mistrz Lao" 90
 $UI shot shots/03a-tutorial.png
-for i in 1 2 3 4; do $UI tap "Dalej" 20; sleep 1; done
+for i in 1 2 3 4 5 6 7; do $UI tap "Dalej" 20; sleep 1; done
 $UI tap "Ruszam w drogę" 20
 sleep 1
 $UI wait "Szansa przełomu" 60
-$UI shot shots/03-character.png
-$UI tap "Dzienny meldunek" 30
-$UI wait "MELDUNEK" 30
-$UI shot shots/03c-checkin.png
-$UI tap "Dalej" 20
-sleep 1
+$UI noscroll
+$UI shot shots/03-home.png
 $UI tap "Medytuj"
 $UI wait "Medytujesz od" 30
 sleep 2
 $UI shot shots/03b-meditating.png
 
-step "world exploration with emulated GPS (Krakow)"
-$UI tap "Eksploruj świat"
+step "quests: check-in"
+$UI tap "Zadania"
+$UI wait "Nowe zadania o północy" 60
+$UI tap "Zamelduj" 20
+$UI wait "MELDUNEK" 30
+$UI shot shots/04-checkin.png
+$UI tap "Dalej" 20
+$UI noscroll
+$UI shot shots/04b-quests.png
+$UI tap "Osiągnięcia"
+$UI wait "Pierwsza krew" 30
+$UI shot shots/04c-achievements.png
+adb shell input keyevent KEYCODE_BACK; sleep 2
+
+step "world: full-screen map with emulated GPS (Krakow)"
+$UI tap "Świat"
 $UI wait "Pozycja" 60
 for i in $(seq 1 12); do
   lon=$(python3 -c "print(19.9372 + $i * 0.00004)")
@@ -64,87 +81,98 @@ for i in $(seq 1 12); do
   sleep 3
 done
 $UI wait "Pozycja potwierdzona" 60 || echo "position not confirmed by the server within the time limit"
-$UI shot shots/04-world.png
-$UI tap "Zakończ eksplorację"
+$UI noscroll
+$UI shot shots/05-world.png
+$UI tap "Okolica"
+$UI wait "Miejsca w okolicy" 20
+$UI shot shots/05b-places.png
+adb shell input keyevent KEYCODE_BACK; sleep 1
+$UI tap "Płomień"
+$UI wait "Smocza Jama" 30
+$UI shot shots/05c-flame.png
+adb shell input keyevent KEYCODE_BACK; sleep 1
 
-step "training battle"
-$UI wait "Szansa przełomu" 60
+step "combat: training cards, duel, forfeit"
+$UI tap "Walka"
+$UI wait "Trening" 60
+$UI noscroll
+$UI shot shots/06-combat.png
 $UI tap "Drewniany Manekin"
-$UI wait "Tura" 60
-$UI shot shots/05-battle.png
+$UI wait "Odpoczynek" 60
+$UI noscroll
+$UI shot shots/06b-battle.png
 $UI tap "Odpoczynek" 20
 sleep 3
-$UI shot shots/06-battle-turn.png
+$UI shot shots/06c-battle-turn.png
 $UI tap "Poddaj się"
 $UI tap "Dotknij ponownie" 20
 $UI wait "PORAŻKA" 30
 $UI tap "Dalej" 20
-$UI tap "Wróć"
-$UI wait "Szansa przełomu" 60
-
-step "new enemies have their own sprites"
+$UI tap "Wyjdź"
+$UI wait "Trening" 30
 for foe in "Kamienny Golem" "Zdrajca Sekty"; do
+  $UI paged "$foe" 6 0.45
   $UI tap "$foe"
-  $UI wait "Tura" 60
-  $UI tap "Odpoczynek" 20
-  sleep 3
+  $UI wait "Odpoczynek" 60
+  sleep 2
   $UI shot "shots/06-$(echo "$foe" | tr ' ' '_').png"
   $UI tap "Poddaj się"
   $UI tap "Dotknij ponownie" 20
   $UI wait "PORAŻKA" 30
   $UI tap "Dalej" 20
-  $UI tap "Wróć"
-  $UI wait "Szansa przełomu" 60
+  $UI tap "Wyjdź"
+  $UI wait "Trening" 30
 done
+$UI tap "Bossowie"
+$UI wait "legowiskach" 30
+$UI shot shots/06d-bosses.png
 
-step "bag"
-$UI tap "Sakwa, kuźnia"
-$UI wait "Kamienie Duchowe" 60
-$UI shot shots/07-bag.png
-
-step "loadout, Flame sites, notifications"
-adb shell input keyevent KEYCODE_BACK; sleep 2
-$UI wait "Szansa przełomu" 60
-$UI tap "Zestaw technik"
-$UI wait "Slot 1" 60
-$UI shot shots/09-loadout.png
-$UI tap "Slot 2"
-$UI wait "Opróżnij slot" 30
-$UI shot shots/10-slot-picker.png
-adb shell input keyevent KEYCODE_BACK; sleep 2
-$UI wait "Slot 1" 30
-adb shell input keyevent KEYCODE_BACK; sleep 2
-$UI tap "Miejsca Płomienia"
-$UI wait "Smocza Jama" 60
-$UI shot shots/11-flame-sites.png
-adb shell input keyevent KEYCODE_BACK; sleep 2
-$UI tap "Powiadomienia"
-$UI wait "Witaj w Jianghu" 60
-$UI shot shots/12-inbox.png
-adb shell input keyevent KEYCODE_BACK; sleep 2
-$UI wait "Szansa przełomu" 60
-
-step "MVP 1.1: quests, meridians, rankings, spirit pet, hero"
-$UI tap "Zadania i osiągnięcia"
-$UI wait "Nowe zadania o północy" 60
-$UI shot shots/13-quests.png
-adb shell input keyevent KEYCODE_BACK; sleep 2
-$UI tap "Punkty z każdego etapu"
-$UI wait "Wolne punkty" 60
-$UI shot shots/14-meridians.png
-adb shell input keyevent KEYCODE_BACK; sleep 2
-$UI tap "Rankingi"
-$UI wait "Twoje miejsce" 60
-$UI shot shots/15-ranking.png
-adb shell input keyevent KEYCODE_BACK; sleep 2
-$UI tap "Duchowy towarzysz"
-$UI wait "Nie masz jeszcze towarzysza" 60
-$UI shot shots/16-pet.png
-adb shell input keyevent KEYCODE_BACK; sleep 2
-$UI tap "Postać i ekwipunek"
+step "hero: silhouette, meridians, techniques, pet, Dao"
+$UI tap "Bohater"
 $UI wait "Dotknij slotu" 60
-$UI shot shots/17-hero.png
+$UI noscroll
+$UI shot shots/07-hero.png
+$UI tap "Meridiany"
+$UI wait "Wolne punkty" 60
+$UI shot shots/07b-meridians.png
+$UI tap "Techniki"
+$UI wait "4 ataki" 60
+$UI shot shots/07c-techniques.png
+$UI tap "Towarzysz"
+$UI wait "Nie masz jeszcze towarzysza" 60
+$UI shot shots/07d-pet.png
+$UI tap "Dao"
+$UI wait "Ułóż własną" 60
+$UI shot shots/07e-dao.png
+
+step "bag, forge, market"
+$UI tap "Sakwa"
+$UI wait "Kamieni Duchowych" 60
+$UI noscroll
+$UI shot shots/08-bag.png
+$UI tap "Kuźnia"
+$UI wait "KD" 60
+$UI shot shots/08b-forge.png
+$UI tap "Targ"
+$UI wait "Moje oferty" 60
+$UI shot shots/08c-market.png
 adb shell input keyevent KEYCODE_BACK; sleep 2
+
+step "sect and rankings"
+$UI tap "Sekta"
+$UI wait "Nie należysz" 60
+$UI noscroll
+$UI shot shots/09-sect.png
+$UI tap "Ranking"
+$UI wait "Twoje miejsce" 60
+$UI shot shots/09b-ranking.png
+
+step "news"
+$UI tap "Wieści"
+$UI wait "Witaj w Jianghu" 60
+$UI shot shots/10-news.png
+adb shell input keyevent KEYCODE_BACK; sleep 2
+$UI tap "Kultywacja"
 $UI wait "Szansa przełomu" 60
 
 step "restart: progress must survive"
@@ -156,6 +184,13 @@ adb shell monkey -p $PKG -c android.intent.category.LAUNCHER 1 >/dev/null
 $UI wait "Szansa przełomu" 90
 $UI wait "Lin" 10
 $UI shot shots/08-after-restart.png
+
+step "layout audit: every screen fits without scrolling"
+adb logcat -d > shots/logcat.txt
+grep "JianghuLayout" shots/logcat.txt | grep "AUDIT" || true
+if grep -E "JianghuLayout.*(OVERFLOW|CLIPPED)" shots/logcat.txt; then
+  echo "::error::layout does not fit the screen ($(grep -cE 'JianghuLayout.*(OVERFLOW|CLIPPED)' shots/logcat.txt) problems)"; exit 1
+fi
 
 step "crash check"
 adb logcat -d > shots/logcat.txt

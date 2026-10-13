@@ -1,0 +1,403 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Threading.Tasks;
+using Android.Graphics;
+using Android.Views;
+using Android.Widget;
+using JianghuGo.Client.Application;
+
+namespace JianghuGo.Android
+{
+    /// <summary>Hero hub: equipment silhouette, meridian constellation, technique slots, spirit pet and the Dao lab.</summary>
+    public sealed partial class MainActivity
+    {
+        private static readonly string[] HeroTabs = { "Postać", "Meridiany", "Techniki", "Towarzysz", "Dao" };
+
+        private async Task ShowHeroTabAsync(int tab)
+        {
+            switch (tab)
+            {
+                case 1:
+                    await ShowMeridiansAsync();
+                    return;
+                case 2:
+                    await ShowTechniquesAsync();
+                    return;
+                case 3:
+                    await ShowPetAsync();
+                    return;
+                case 4:
+                    await ShowDaoLabAsync();
+                    return;
+                default:
+                    await ShowHeroAsync();
+                    return;
+            }
+        }
+
+        private Ui HeroScreen(int tab, int art)
+        {
+            var ui = NewScreen(null, art: art, tab: TabHero);
+            ui.Tabs(ui.Content, HeroTabs, tab, i => Run(() => ShowHeroTabAsync(i)));
+            return ui;
+        }
+
+        // ---- Postać: the silhouette with five equipment slots ---------------------------------------------------
+
+        private async Task ShowHeroAsync()
+        {
+            var c = _me;
+            var economy = new EconomyFlow(_api, c.Id);
+            await economy.LoadAsync(Ct);
+            PetDto pet = null;
+            MeridiansDto meridians = null;
+            try
+            {
+                pet = (await _api.GetPetAsync(c.Id, Ct)).Pet;
+                meridians = await _api.GetMeridiansAsync(c.Id, Ct);
+            }
+            catch (ApiException)
+            {
+                // optional extras
+            }
+
+            var ui = HeroScreen(0, Resource.Drawable.tile_menu_hero);
+            var page = ui.Content;
+            var inv = economy.Inventory;
+            var doll = new HeroDollView(this) { PetNpcId = pet?.NpcId };
+            foreach (var slot in HeroDollView.Slots)
+                doll.Equipped[slot] = inv.Equipped.TryGetValue(slot, out var id) ? inv.Items.FirstOrDefault(i => i.Id == id) : null;
+            ui.AddWeighted(page, doll, 1f);
+            ui.Text("Dotknij slotu, by założyć lub ulepszyć przedmiot.", page, 11, Ui.Muted, center: true);
+
+            // combat stats: base + equipment + meridians/realm + pet, 3×3
+            var statsCard = ui.Card(page, 0f, 8);
+            statsCard.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, Px(96)) { TopMargin = Px(6) };
+            LinearLayout row = null;
+            var k = 0;
+            foreach (var st in c.Stats)
+            {
+                if (k++ % 3 == 0) row = ui.HRow(statsCard, 24, 2);
+                var eq = inv.Bonuses.TryGetValue(st.Id, out var e) ? e : 0;
+                var mer = meridians == null ? 0 : (meridians.Allocated.TryGetValue(st.Id, out var a) ? a : 0) + meridians.RealmBonus;
+                var pb = pet != null && pet.Bonuses.TryGetValue(st.Id, out var b) ? b : 0;
+                var total = st.Value + eq + mer + pb;
+                var cell = ui.Box(row, 1f, horizontal: true, marginDp: 4);
+                ui.Icon(cell, "icon_" + st.Id, 18);
+                var name = StatName(st.Id);
+                ui.Text((name.Length > 9 ? name.Substring(0, 8) + "." : name) + " " + total, cell, 11, total > st.Value ? Ui.Gold : Ui.Ink, bold: total > st.Value)
+                    .LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f) { LeftMargin = Px(4), Gravity = GravityFlags.CenterVertical };
+            }
+
+            doll.SlotTapped += slot =>
+            {
+                Sfx.Play(Sfx.Click);
+                var current = doll.Equipped.TryGetValue(slot, out var it) ? it : null;
+                var body = Sheet(HeroDollView.SlotName(slot), 0.62f, out var close, current != null && ui.ArtId("item_" + current.ItemId) != 0 ? "item_" + current.ItemId : "item_slot_empty");
+                if (current != null)
+                {
+                    var cc = ui.Card(body, 0f, 8, Ui.RarityOf(current.Rarity).Color);
+                    cc.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, Px(108));
+                    ui.Text(current.NamePl + (current.UpgradeLevel > 0 ? " +" + current.UpgradeLevel : string.Empty) + "  ·  " + Ui.RarityOf(current.Rarity).Name, cc, 15, Ui.Gold, bold: true);
+                    ui.Text(string.Join("  ·  ", current.Stats.Select(x => StatName(x.Key) + " +" + x.Value)), cc, 12, Ui.Ink, maxLines: 2);
+                    var acts = ui.HRow(cc, 40, 4);
+                    ui.Btn("Zdejmij", () => Run(async () =>
+                    {
+                        close();
+                        await economy.ToggleEquipAsync(current, Ct);
+                        await ShowHeroAsync();
+                    }), acts, secondary: true, sp: 12, heightDp: 40);
+                    var next = economy.NextUpgrade(current);
+                    if (next != null)
+                        ui.Btn("⚒ +" + next.Level + " (" + next.Stones + " KD, " + next.SuccessPermille / 10 + "%)", () => Run(async () =>
+                        {
+                            var r = await economy.UpgradeAsync(current, Ct);
+                            close();
+                            Sfx.Play(r != null && r.Success ? Sfx.Breakthrough : Sfx.Defeat, 0.6f);
+                            await ShowHeroAsync();
+                            SetStatus(r == null ? "Odświeżono." : r.Success ? "Udane! Teraz +" + r.Level : "Nieudane — poziom +" + r.Level + " zachowany.");
+                            RefreshHud();
+                        }), acts, sp: 12, heightDp: 40);
+                }
+
+                var options = inv.Items.Where(i => i.Slot == slot && i.InBag).ToList();
+                ui.Text("W sakwie:", body, 12, Ui.Muted);
+                ui.Pages(body, options.Count, 1, 3, (i, cell) =>
+                {
+                    var item = options[i];
+                    var card = ui.Card(cell, 1f, 6, Ui.RarityOf(item.Rarity).Color, 0);
+                    var r = ui.HRow(card, 44, 0);
+                    ui.Icon(r, ui.ArtId("item_" + item.ItemId) != 0 ? "item_" + item.ItemId : "item_slot_empty", 38);
+                    var col = ui.Box(r, 1f, marginDp: 8);
+                    ui.Text(item.NamePl + (item.UpgradeLevel > 0 ? " +" + item.UpgradeLevel : string.Empty), col, 13, Ui.Ink, bold: true);
+                    ui.Text(string.Join(" ", item.Stats.Select(x => StatName(x.Key) + "+" + x.Value)), col, 11, Ui.Muted);
+                    ui.Btn("Załóż", () => Run(async () =>
+                    {
+                        close();
+                        await economy.ToggleEquipAsync(item, Ct);
+                        Sfx.Play(Sfx.Chime, 0.6f);
+                        await ShowHeroAsync();
+                    }), r, sp: 12, heightDp: 38).LayoutParameters = new LinearLayout.LayoutParams(Px(84), Px(38)) { Gravity = GravityFlags.CenterVertical };
+                }, empty: "Brak przedmiotów na ten slot — wykuj je w Kuźni lub kup na targu.");
+            };
+        }
+
+        // ---- Meridiany ----------------------------------------------------------------------------------------
+
+        private async Task ShowMeridiansAsync()
+        {
+            var c = _me;
+            var m = await _api.GetMeridiansAsync(c.Id, Ct);
+            var ui = HeroScreen(1, Resource.Drawable.tile_menu_meridians);
+            var page = ui.Content;
+            var head = ui.HRow(page, 40);
+            ui.Icon(head, "menu_meridians", 34);
+            var col = ui.Box(head, 1f, marginDp: 8);
+            ui.Text("Wolne punkty: " + m.Free + "  (zdobyte " + m.PointsEarned + ", otwarte " + m.PointsSpent + ")", col, 14, m.Free > 0 ? Ui.Gold : Ui.Ink, bold: true);
+            ui.Text("1 punkt za każdy etap · królestwo: +" + m.RealmBonus + " do wszystkich cech", col, 11, Ui.Muted);
+            var view = new MeridianView(this, StatName) { State = m };
+            ui.AddWeighted(page, view, 1f);
+            ui.Text(m.Free > 0 ? "Dotknij punktu, by otworzyć meridian (+1 do cechy w walce)." : "Zdobądź kolejny etap kultywacji, by otworzyć następny meridian.", page, 11, Ui.Muted, center: true, maxLines: 2);
+            var actions = ui.HRow(page, 42);
+            ui.Btn(m.PointsSpent > 0 ? "Zamknij wszystkie (" + m.ResetQiCost + " Qi)" : "Brak otwartych meridianów", () =>
+            {
+                if (m.PointsSpent == 0) return;
+                Run(async () =>
+                {
+                    await _api.ResetMeridiansAsync(c.Id, Ct);
+                    await ShowMeridiansAsync();
+                    SetStatus("Meridiany zamknięte — punkty wróciły.");
+                    RefreshHud();
+                });
+            }, actions, secondary: true, sp: 12, heightDp: 42);
+            view.NodeTapped += stat =>
+            {
+                if (m.Free <= 0)
+                {
+                    SetStatus("Brak wolnych punktów — osiągnij kolejny etap.");
+                    return;
+                }
+
+                Run(async () =>
+                {
+                    var after = await _api.OpenMeridianAsync(c.Id, stat, m.PointsSpent, Ct);
+                    Sfx.Play(Sfx.Chime);
+                    m = after;
+                    view.State = after;
+                    view.Invalidate();
+                    await ShowMeridiansAsync();
+                    SetStatus(StatName(stat) + " +1");
+                });
+            };
+        }
+
+        // ---- Techniki: the 8 combat slots ---------------------------------------------------------------------
+
+        private async Task ShowTechniquesAsync()
+        {
+            var c = _me;
+            var loadout = await _api.GetLoadoutAsync(c.Id, Ct);
+            var ui = HeroScreen(2, Resource.Drawable.place_qiarray);
+            var page = ui.Content;
+            ui.Text("4 ataki · 2 obrony · ruch · kontra. Dotknij slotu, by zmienić technikę.", page, 11, Ui.Muted, center: true);
+            var slots = loadout.Slots.OrderBy(s => s.Slot).ToList();
+            var grid = ui.Pages(page, slots.Count, 2, 4, (i, cell) =>
+            {
+                var slot = slots[i];
+                var card = ui.Card(cell, 1f, 6, slot.TechniqueId == null ? (Color?)null : slot.Kind == "attack" ? Ui.Cinnabar : Ui.QiBlue, 0);
+                card.Clickable = true;
+                var row = ui.HRow(card, 46, 0);
+                var icon = slot.TechniqueId != null && ui.ArtId("tech_" + slot.TechniqueId) != 0 ? "tech_" + slot.TechniqueId : "icon_" + slot.Kind;
+                ui.Icon(row, icon, 42);
+                var col = ui.Box(row, 1f, marginDp: 6);
+                ui.Text(slot.NamePl ?? "— pusty —", col, 12, slot.TechniqueId == null ? Ui.Muted : Ui.Ink, bold: true, maxLines: 2);
+                ui.Text(ActionName(slot.Kind) + (slot.Level > 0 ? " · poz. " + slot.Level : string.Empty) + (slot.QiCost > 0 ? " · " + slot.QiCost + " Qi" : string.Empty), col, 10, Ui.Muted);
+                card.Click += (_, __) => PickTechnique(loadout, slot);
+            });
+        }
+
+        private void PickTechnique(LoadoutDto loadout, LoadoutSlotDto slot)
+        {
+            var c = _me;
+            var body = Sheet("Slot " + (slot.Slot + 1) + " · " + ActionName(slot.Kind), 0.62f, out var close, "icon_" + slot.Kind);
+            async Task Set(string techniqueId)
+            {
+                var ids = loadout.Slots.OrderBy(x => x.Slot).Select(x => x.Slot == slot.Slot ? techniqueId : x.TechniqueId).ToList();
+                await _api.SetLoadoutAsync(c.Id, loadout.Version, ids, Ct);
+                close();
+                Sfx.Play(Sfx.Chime, 0.6f);
+                await ShowTechniquesAsync();
+                SetStatus("Zestaw zapisany.");
+            }
+
+            var options = loadout.Known.Where(k => k.Slot == slot.Kind).ToList();
+            ui_Pages();
+
+            void ui_Pages()
+            {
+                _ui.Pages(body, options.Count, 1, 4, (i, cell) =>
+                {
+                    var known = options[i];
+                    var card = _ui.Card(cell, 1f, 6, known.Id == slot.TechniqueId ? Ui.Gold : (Color?)null, 0);
+                    var row = _ui.HRow(card, 44, 0);
+                    _ui.Icon(row, _ui.ArtId("tech_" + known.Id) != 0 ? "tech_" + known.Id : "tech_custom_" + (slot.Kind == "movement" ? "movement" : slot.Kind == "attack" ? "attack" : "defense"), 38);
+                    var col = _ui.Box(row, 1f, marginDp: 8);
+                    _ui.Text(known.NamePl, col, 13, Ui.Ink, bold: true);
+                    _ui.Text("poz. " + known.Level + " · " + known.Xp + "/" + known.XpToNextLevel + " XP", col, 11, Ui.Muted);
+                    if (known.Id != slot.TechniqueId)
+                        _ui.Btn("Wybierz", () => Run(() => Set(known.Id)), row, sp: 12, heightDp: 38).LayoutParameters = new LinearLayout.LayoutParams(Px(88), Px(38)) { Gravity = GravityFlags.CenterVertical };
+                }, empty: "Nie znasz jeszcze technik tego rodzaju — stwórz je w Laboratorium Dao.");
+            }
+
+            if (slot.TechniqueId != null) _ui.Btn("Opróżnij slot", () => Run(() => Set(null)), body, secondary: true, sp: 13, heightDp: 42);
+        }
+
+        // ---- Towarzysz ----------------------------------------------------------------------------------------
+
+        private async Task ShowPetAsync()
+        {
+            var c = _me;
+            var pet = (await _api.GetPetAsync(c.Id, Ct)).Pet;
+            var ui = HeroScreen(3, Resource.Drawable.tile_menu_pet);
+            var page = ui.Content;
+            if (pet == null)
+            {
+                var card = ui.Card(page, 1f, 14);
+                card.SetGravity(GravityFlags.Center);
+                ui.Icon(card, "menu_pet", 72).LayoutParameters = new LinearLayout.LayoutParams(Px(72), Px(72)) { Gravity = GravityFlags.CenterHorizontal };
+                ui.Text("Nie masz jeszcze towarzysza.", card, 17, Ui.Gold, bold: true, center: true);
+                ui.Text("Pokonaj bestię oznaczoną 🐾 — w treningu lub w świecie. Po zwycięstwie jest szansa (wyższa z Losem), że pójdzie za tobą. Towarzysz rośnie z każdą wygraną i dodaje część swoich cech do twoich w walce.",
+                    card, 13, Ui.Ink, center: true, maxLines: 6);
+                ui.Btn("Do treningu", () => GoTab(TabCombat), page, sp: 14, heightDp: 46);
+                return;
+            }
+
+            var tileCell = ui.Box(page, 1f);
+            ui.TileIn(tileCell, pet.NamePl, "Poziom " + pet.Level, NpcLooks.For(pet.NpcId).TileArt, () => Sfx.Play(Sfx.Chime, 0.5f), pixelArt: true, accent: Ui.Jade, titleSp: 18);
+            var info = ui.Card(page, 0f, 10);
+            info.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, Px(118)) { TopMargin = Px(6) };
+            ui.MeterIn(info, Ui.Jade, pet.XpToNextLevel > 0 ? "XP " + pet.Xp + " / " + (pet.Xp + pet.XpToNextLevel) : "Poziom maksymalny",
+                pet.XpToNextLevel > 0 ? pet.Xp : 1, pet.XpToNextLevel > 0 ? pet.Xp + pet.XpToNextLevel : 1, 18);
+            ui.Text("Premie w walce: " + string.Join("  ·  ", pet.Bonuses.Select(kv => StatName(kv.Key) + " +" + kv.Value)), info, 12, Ui.Gold, bold: true, maxLines: 2);
+            ui.Text("Oswojony " + pet.TamedAt.ToLocalTime().ToString("dd.MM.yyyy"), info, 11, Ui.Muted);
+            var confirm = false;
+            Button release = null;
+            release = ui.Btn("Uwolnij towarzysza", () =>
+            {
+                if (!confirm)
+                {
+                    confirm = true;
+                    release.Text = "Na pewno? Dotknij ponownie";
+                    return;
+                }
+
+                Run(async () =>
+                {
+                    await _api.ReleasePetAsync(c.Id, Ct);
+                    await ShowPetAsync();
+                    SetStatus(pet.NamePl + " wraca na wolność.");
+                });
+            }, page, secondary: true, sp: 13, heightDp: 42);
+        }
+
+        // ---- Laboratorium Dao ---------------------------------------------------------------------------------
+
+        private async Task ShowDaoLabAsync()
+        {
+            var c = _me;
+            var lab = new DaoLabFlow(_api, c.Id);
+            await lab.LoadAsync(Ct);
+            var economy = new EconomyFlow(_api, c.Id);
+            await economy.LoadAsync(Ct);
+            var ui = HeroScreen(4, Resource.Drawable.place_qiarray);
+            var page = ui.Content;
+            var form = ui.Card(page, 1f, 10);
+            ui.Text("Ułóż własną technikę ataku. Serwer liczy jej moc i pilnuje budżetu twojego poziomu.", form, 12, Ui.Muted, maxLines: 2);
+            var name = ui.Field("Nazwa techniki", parent: form);
+            var r1 = ui.HRow(form, 60, 2);
+            var power = ui.Field("Moc 1–30", number: true, parent: ui.Box(r1, 1f, marginDp: 6));
+            var qi = ui.Field("Qi 0–20", number: true, parent: ui.Box(r1, 1f, marginDp: 6));
+            var r2 = ui.HRow(form, 60, 2);
+            var cooldown = ui.Field("Odnowienie 0–4", number: true, parent: ui.Box(r2, 1f, marginDp: 6));
+            var reach = ui.Field("Zasięg 1–3", number: true, parent: ui.Box(r2, 1f, marginDp: 6));
+            var verdict = ui.Text("Ułóż technikę i sprawdź budżet.", form, 12, Ui.Ink, bold: true, maxLines: 3);
+
+            DaoDesignDto Compose()
+            {
+                var d = DaoLabFlow.StarterStrike(name.Text.Trim());
+                if (int.TryParse(power.Text, out var p)) d.Attack.Power = p;
+                if (int.TryParse(qi.Text, out var q)) d.QiCost = q;
+                if (int.TryParse(cooldown.Text, out var cd)) d.Cooldown = cd;
+                if (int.TryParse(reach.Text, out var r)) d.Attack.RangeMax = r;
+                return d;
+            }
+
+            string DescribePreview(DaoPreviewDto p) =>
+                (p.Valid ? "✔ Dozwolona" : "✘ Niedozwolona") + " — moc " + p.Points + " / budżet " + p.Allowance +
+                (p.Problems.Count > 0 ? "\n" + string.Join("; ", p.Problems) : string.Empty);
+
+            var buttons = ui.HRow(page, 46);
+            ui.Btn("Sprawdź", () => Run(async () => verdict.Text = DescribePreview(await lab.PreviewAsync(Compose(), Ct))), buttons, secondary: true, sp: 13, heightDp: 46);
+            ui.Btn("☯ Stwórz (KD)", () => Run(async () =>
+            {
+                var created = await lab.CreateAsync(Compose(), Ct);
+                if (created == null)
+                {
+                    verdict.Text = DescribePreview(lab.LastPreview);
+                    return;
+                }
+
+                Sfx.Play(Sfx.Breakthrough, 0.6f);
+                await ShowDaoLabAsync();
+                ShowBanner("NOWA TECHNIKA", created.Technique.NamePl, "Załóż ją w zakładce Techniki.", "tech_custom_attack");
+                RefreshHud();
+            }), buttons, sp: 13, heightDp: 46);
+
+            var scrolls = economy.Inventory.Items.Where(i => i.BoundRef != null && i.InBag).ToList();
+            var more = ui.HRow(page, 42);
+            ui.Btn("Znane techniki (" + lab.Known.Count + ")", () =>
+            {
+                var body = Sheet("Twoje techniki Dao", 0.62f, out var close, "menu_daolab");
+                ui.Pages(body, lab.Known.Count, 1, 4, (i, cell) =>
+                {
+                    var known = lab.Known[i];
+                    var card = ui.Card(cell, 1f, 6, null, 0);
+                    var row = ui.HRow(card, 40, 0);
+                    ui.Text(known.Technique.NamePl + " · " + ActionName(known.Technique.Slot), row, 13, Ui.Ink, bold: true);
+                    ui.Btn("Załóż", () => Run(async () =>
+                    {
+                        var ok = await lab.EquipAsync(known.Technique.Id, known.Technique.Slot, Ct);
+                        close();
+                        SetStatus(ok ? "Technika w zestawie walki." : "Zestaw zmienił się na innym urządzeniu — odświeżono.");
+                    }), row, sp: 11, heightDp: 36).LayoutParameters = new LinearLayout.LayoutParams(Px(70), Px(36)) { Gravity = GravityFlags.CenterVertical };
+                    if (known.Source == "designed")
+                        ui.Btn("📜 Zwój", () => Run(async () =>
+                        {
+                            await lab.InscribeAsync(known.Technique.Id, Ct);
+                            close();
+                            SetStatus("Zwój trafił do sakwy — możesz go wystawić na targu.");
+                        }), row, secondary: true, sp: 11, heightDp: 36).LayoutParameters = new LinearLayout.LayoutParams(Px(70), Px(36)) { Gravity = GravityFlags.CenterVertical, LeftMargin = Px(4) };
+                }, empty: "Jeszcze żadnej — stwórz pierwszą.");
+            }, more, secondary: true, sp: 12, heightDp: 42);
+            ui.Btn("Zwoje (" + scrolls.Count + ")", () =>
+            {
+                var body = Sheet("Zwoje technik", 0.55f, out var close, "menu_scroll");
+                ui.Pages(body, scrolls.Count, 1, 4, (i, cell) =>
+                {
+                    var scroll = scrolls[i];
+                    var row = ui.HRow(cell, 44, 0);
+                    ui.Icon(row, "item_technique_scroll", 36);
+                    ui.Text(scroll.BoundRef, row, 13, Ui.Ink).LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f) { LeftMargin = Px(8), Gravity = GravityFlags.CenterVertical };
+                    ui.Btn("Przeczytaj", () => Run(async () =>
+                    {
+                        var learned = await lab.LearnAsync(scroll, Ct);
+                        close();
+                        await ShowDaoLabAsync();
+                        SetStatus("Poznano technikę: " + learned.Technique.NamePl);
+                    }), row, sp: 12, heightDp: 38).LayoutParameters = new LinearLayout.LayoutParams(Px(100), Px(38)) { Gravity = GravityFlags.CenterVertical };
+                }, empty: "Brak zwojów w sakwie.");
+            }, more, secondary: true, sp: 12, heightDp: 42);
+        }
+    }
+}

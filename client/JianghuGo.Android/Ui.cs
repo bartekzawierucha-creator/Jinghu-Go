@@ -13,7 +13,7 @@ namespace JianghuGo.Android
     /// Visual language of the game, built from code: night-ink panels framed in gold, cinnabar seals for actions,
     /// pixel-art illustrations from the concept sheets. Every screen is composed from these pieces.
     /// </summary>
-    public sealed class Ui
+    public sealed partial class Ui
     {
         // palette
         public static readonly Color Night = Color.Rgb(11, 14, 17);
@@ -41,13 +41,30 @@ namespace JianghuGo.Android
             Content = content;
         }
 
-        public LinearLayout Content { get; }
+        public LinearLayout Content { get; set; }
         public Context Context => _ctx;
 
         public int Dp(float dp) => (int)(dp * _density + 0.5f);
 
-        public static Typeface Display => Typeface.Create(Typeface.Serif, TypefaceStyle.Bold);
+        private static Typeface _display, _displayMedium;
+
+        /// <summary>Cinzel (OFL, bundled) for titles, buttons and numbers; the system serif for reading text.</summary>
+        public static Typeface Display => _display ?? Typeface.Create(Typeface.Serif, TypefaceStyle.Bold);
+        public static Typeface DisplayMedium => _displayMedium ?? Display;
         public static Typeface Body => Typeface.Create(Typeface.Serif, TypefaceStyle.Normal);
+
+        public static void LoadFonts(Context ctx)
+        {
+            try
+            {
+                _display = Typeface.CreateFromAsset(ctx.Assets, "fonts/Cinzel-Bold.ttf");
+                _displayMedium = Typeface.CreateFromAsset(ctx.Assets, "fonts/Cinzel-Medium.ttf");
+            }
+            catch (Exception)
+            {
+                _display = null; // fall back to the system serif
+            }
+        }
 
         /// <summary>Decoded art, cached for the process (the pixel art is small).</summary>
         public static Bitmap Art(Context ctx, int resId)

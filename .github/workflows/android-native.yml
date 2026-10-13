@@ -65,10 +65,15 @@ jobs:
           path: dist/*.apk
 
   smoke:
-    # Installs the APK on an emulator and plays through the main screens in offline mode (server inside the app).
+    # Installs the APK on an emulator and plays through the main screens in offline mode (server inside the app),
+    # on three screen sizes (16:9, 18.5:9, 20:9): every screen must fit without scrolling.
     needs: apk
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    timeout-minutes: 50
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: ["pixel_6", "pixel_3a", "Nexus 5"]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
@@ -86,7 +91,7 @@ jobs:
           api-level: 34
           target: google_apis
           arch: x86_64
-          profile: pixel_6
+          profile: ${{ matrix.profile }}
           cores: 4
           ram-size: 4096M
           heap-size: 512M
@@ -96,7 +101,9 @@ jobs:
       - name: Pack screenshots and logs
         if: always()
         run: |
-          (cd shots && zip -qr ../android-smoke.zip .) || true
+          name="android-smoke-$(echo '${{ matrix.profile }}' | tr ' ' '_').zip"
+          echo "SMOKE_ZIP=$name" >> "$GITHUB_ENV"
+          (cd shots && zip -qr "../$name" .) || true
       - name: Publish screenshots and logs (android-smoke pre-release)
         if: always()
         uses: softprops/action-gh-release@v2
@@ -104,14 +111,23 @@ jobs:
           tag_name: android-smoke
           name: "Android smoke test — screenshots and logs"
           prerelease: true
-          files: android-smoke.zip
-          body: Screenshots and logs of the latest emulator smoke test (${{ github.sha }}).
+          files: ${{ env.SMOKE_ZIP }}
+          body: Screenshots and logs of the latest emulator smoke tests on three screen sizes (${{ github.sha }}).
       - name: Upload screenshots and logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: android-smoke
+          name: android-smoke-${{ strategy.job-index }}
           path: shots/
+
+  release:
+    needs: smoke
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: JianghuGo-dev-apk
+          path: dist
       - name: Publish to the android-latest pre-release
         uses: softprops/action-gh-release@v2
         with:
