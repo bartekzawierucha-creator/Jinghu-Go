@@ -54,7 +54,6 @@ namespace JianghuGo.Android
             _prefs = GetSharedPreferences(Prefs, FileCreationMode.Private);
             _location = new AndroidLocationSource(this);
             _location.Updated += () => RunOnUiThread(() => _onLocation?.Invoke());
-            Window.SetStatusBarColor(Ui.Cinnabar);
 
             var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
             root.SetBackgroundColor(Ui.Paper);
@@ -74,7 +73,12 @@ namespace JianghuGo.Android
             content.SetPadding(0, 0, 0, pad * 2);
             _scroll.AddView(content);
             root.AddView(_scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0, 1f));
-            SetContentView(root);
+            // Android 15+ draws edge-to-edge: keep the content clear of the status and navigation bars.
+            var frame = new FrameLayout(this);
+            frame.SetFitsSystemWindows(true);
+            frame.SetBackgroundColor(Ui.Paper);
+            frame.AddView(root);
+            SetContentView(frame);
             _ui = new Ui(this, content);
 
             Run(async () =>
@@ -191,7 +195,7 @@ namespace JianghuGo.Android
                 await action();
                 if (_status.Text == "…") SetStatus(string.Empty);
             }
-            catch (OperationCanceledException)
+            catch (System.OperationCanceledException)
             {
                 // activity is closing
             }
@@ -501,7 +505,7 @@ namespace JianghuGo.Android
                         {
                             if (gen == _screen) SetStatus(Describe(e));
                         }
-                        catch (OperationCanceledException)
+                        catch (System.OperationCanceledException)
                         {
                             return;
                         }
@@ -511,7 +515,7 @@ namespace JianghuGo.Android
                     {
                         await Task.Delay(_paused ? TimeSpan.FromSeconds(2) : exploration.RecommendedInterval, Ct);
                     }
-                    catch (OperationCanceledException)
+                    catch (System.OperationCanceledException)
                     {
                         return;
                     }
