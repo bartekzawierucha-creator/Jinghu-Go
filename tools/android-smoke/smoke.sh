@@ -83,7 +83,7 @@ adb shell input keyevent KEYCODE_BACK; sleep 2
 $UI wait "Slot 1" 30
 adb shell input keyevent KEYCODE_BACK; sleep 2
 $UI tap "Miejsca Płomienia"
-$UI wait "Góry Wudang" 60
+$UI wait "Smocza Jama" 60
 $UI shot shots/11-flame-sites.png
 adb shell input keyevent KEYCODE_BACK; sleep 2
 $UI tap "Powiadomienia"
