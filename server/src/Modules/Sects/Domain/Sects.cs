@@ -94,6 +94,23 @@ public sealed record SectApplication(
     CharacterId? DecidedBy);
 
 /// <summary>Append-only sect history: who joined, left, was kicked or promoted, who donated, seat changes.</summary>
+/// <summary>A sect chat line. Members only; plain text, no location, kept for a limited time.</summary>
+public sealed record ChatMessage(Guid Id, Guid SectId, CharacterId CharacterId, string Name, string Text, DateTimeOffset At);
+
+public static class SectChat
+{
+    public const int MaxLength = 300;
+    public const int BurstMessages = 5;
+    public static readonly TimeSpan BurstWindow = TimeSpan.FromSeconds(30);
+
+    /// <summary>Trimmed text, or null when empty, too long or containing control characters (newlines included).</summary>
+    public static string? Clean(string? text)
+    {
+        var t = (text ?? string.Empty).Trim();
+        return t.Length is 0 or > MaxLength || t.Any(char.IsControl) ? null : t;
+    }
+}
+
 public sealed record SectEvent(Guid Id, Guid SectId, string Kind, CharacterId? Actor, CharacterId? Subject, string DataJson, DateTimeOffset At);
 
 public static class SectNames

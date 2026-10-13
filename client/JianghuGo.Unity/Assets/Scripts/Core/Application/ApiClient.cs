@@ -227,6 +227,21 @@ namespace JianghuGo.Client.Application
         public Task<BattleDto> AutoActAsync(Guid battleId, CancellationToken ct) =>
             SendAsync<BattleDto>("POST", "/api/v1/combat/battles/" + battleId + "/auto", null, true, NewIdempotencyKey(), ct);
 
+        public Task<TowerDto> GetTowerAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<TowerDto>("GET", "/api/v1/characters/" + characterId + "/combat/tower", null, true, null, ct);
+
+        public Task<BattleDto> StartTowerAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<BattleDto>("POST", "/api/v1/characters/" + characterId + "/combat/tower/start", null, true, NewIdempotencyKey(), ct);
+
+        public Task<WorldBossDto> GetWorldBossAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<WorldBossDto>("GET", "/api/v1/characters/" + characterId + "/combat/world-boss", null, true, null, ct);
+
+        public Task<BattleDto> StartWorldBossAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<BattleDto>("POST", "/api/v1/characters/" + characterId + "/combat/world-boss/start", null, true, NewIdempotencyKey(), ct);
+
+        public Task<WorldBossDto> ClaimWorldBossAsync(Guid characterId, int? cycle, CancellationToken ct) =>
+            SendAsync<WorldBossDto>("POST", "/api/v1/characters/" + characterId + "/combat/world-boss/claim", new { cycle }, true, null, ct);
+
         public Task<HuntEnvelopeDto> GetHuntAsync(Guid characterId, CancellationToken ct) =>
             SendAsync<HuntEnvelopeDto>("GET", "/api/v1/characters/" + characterId + "/combat/hunt", null, true, null, ct);
 
@@ -347,6 +362,12 @@ namespace JianghuGo.Client.Application
 
         public Task<SectPageDto> ListSectsAsync(Guid? before, CancellationToken ct) =>
             SendAsync<SectPageDto>("GET", "/api/v1/sects?limit=30" + (before.HasValue ? "&before=" + before.Value : string.Empty), null, true, null, ct);
+
+        public Task<ChatPageDto> GetSectChatAsync(Guid sectId, Guid characterId, Guid? after, CancellationToken ct) =>
+            SendAsync<ChatPageDto>("GET", "/api/v1/sects/" + sectId + "/chat?characterId=" + characterId + (after.HasValue ? "&after=" + after.Value : string.Empty), null, true, null, ct);
+
+        public Task<ChatMessageDto> PostSectChatAsync(Guid sectId, Guid characterId, string text, CancellationToken ct) =>
+            SendAsync<ChatMessageDto>("POST", "/api/v1/sects/" + sectId + "/chat", new { characterId, text }, true, NewIdempotencyKey(), ct);
 
         public Task<SectDto> GetSectAsync(Guid sectId, CancellationToken ct) => SendAsync<SectDto>("GET", "/api/v1/sects/" + sectId, null, true, null, ct);
 

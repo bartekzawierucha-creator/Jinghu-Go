@@ -18,11 +18,13 @@ namespace JianghuGo.Android
         {
             var c = _me;
             _catalog ??= await _api.GetCombatCatalogAsync(Ct);
-            var open = tab == 3 ? (await _api.GetOpenBattlesAsync(c.Id, Ct)).Items : new List<BattleDto>();
+            var open = tab == 4 ? (await _api.GetOpenBattlesAsync(c.Id, Ct)).Items : new List<BattleDto>();
             var hunt = tab == 1 ? (await _api.GetHuntAsync(c.Id, Ct)).Hunt : null;
-            var ui = NewScreen(null, art: Resource.Drawable.arena_courtyard, tab: TabCombat);
+            var tower = tab == 2 ? await _api.GetTowerAsync(c.Id, Ct) : null;
+            var boss = tab == 3 ? await _api.GetWorldBossAsync(c.Id, Ct) : null;
+            var ui = NewScreen(null, art: tab == 2 ? Resource.Drawable.arena_tower : Resource.Drawable.arena_courtyard, tab: TabCombat);
             var page = ui.Content;
-            ui.Tabs(page, new[] { "Trening", "Polowanie", "Bossowie", "Pojedynki" }, tab, i => Run(() => ShowCombatTabAsync(i)));
+            ui.Tabs(page, new[] { "Trening", "Łowy", "Wieża", "Bossy", "PvP" }, tab, i => Run(() => ShowCombatTabAsync(i)));
 
             if (tab == 0)
             {
@@ -41,8 +43,13 @@ namespace JianghuGo.Android
             }
             else if (tab == 2)
             {
-                var bosses = _catalog.Npcs.Where(n => n.Boss).OrderBy(n => n.Tier).ToList();
-                ui.Pages(page, bosses.Count, 2, 2, (i, cell) =>
+                Tower(ui, page, tower);
+            }
+            else if (tab == 3)
+            {
+                WorldBoss(ui, page, boss);
+                var bosses = _catalog.Npcs.Where(n => n.Boss && n.Id != _catalog.WorldBossNpcId).OrderBy(n => n.Tier).ToList();
+                ui.Pages(page, bosses.Count, 2, 1, (i, cell) =>
                 {
                     var n = bosses[i];
                     ui.TileIn(cell, n.NamePl, new string('★', Math.Clamp(n.Tier, 1, 5)) + "  ·  +" + n.RewardQi + " Qi", NpcLooks.For(n.Id).TileArt, () =>
@@ -51,7 +58,7 @@ namespace JianghuGo.Android
                         GoTab(TabWorld);
                     }, pixelArt: true, accent: Ui.Cinnabar, titleSp: 13, badge: "BOSS");
                 });
-                ui.Text("Bossowie walczą tylko w swoich legowiskach — szukaj 👹 na mapie.", page, 11, Ui.Muted, center: true, maxLines: 2);
+                ui.Text("Bossowie legowisk walczą tylko w świecie — szukaj 👹 na mapie.", page, 11, Ui.Muted, center: true);
             }
             else
             {
@@ -96,7 +103,7 @@ namespace JianghuGo.Android
                         await _api.StartHuntAsync(c.Id, n.Id, Ct);
                         Sfx.Play(Sfx.Chime);
                         await ShowCombatTabAsync(1);
-                        SetStatus("Polowanie rozpoczęte — wróć za jakiś czas po łupy.");
+                        SetStatus("Polowanie rozpoczęte. Wróć później po łupy.");
                     }), pixelArt: true, accent: Ui.Jade, titleSp: 13);
                 });
                 return;
@@ -123,7 +130,7 @@ namespace JianghuGo.Android
                 ui.Text(label, col, 11, Ui.Muted, center: true);
             }
 
-            ui.Text(hunt.NextBattleAt is { } next && !hunt.Finished ? "Następna walka o " + next.ToLocalTime().ToString("HH:mm") + " · co " + hunt.MinutesPerBattle + " min"
+            ui.Text(hunt.NextBattleAt is { } next && !hunt.Finished ? (hunt.Battles == 0 ? "Pierwsza walka o " : "Następna walka o ") + next.ToLocalTime().ToString("HH:mm") + " · co " + hunt.MinutesPerBattle + " min"
                 : "Odbierz wynik i zacznij nowe polowanie.", card, 11, Ui.Muted, center: true);
             var row = ui.HRow(page, 46, 6);
             ui.Btn("Odśwież", () => Run(() => ShowCombatTabAsync(1)), row, secondary: true, sp: 13, heightDp: 46);
@@ -135,6 +142,113 @@ namespace JianghuGo.Android
                 ShowBanner("POLOWANIE", final.Wins + " zwycięstw z " + final.Battles + " walk", "+" + final.Qi + " Qi · łupy trafiły do sakwy", "menu_battle");
                 RefreshHud();
             }), row, sp: 14, heightDp: 46);
+        }
+
+        /// <summary>Tower of Trials: one floor at a time, first clears pay, milestones every few floors, a leaderboard.</summary>
+        private void Tower(Ui ui, LinearLayout page, TowerDto t)
+        {
+            var c = _me;
+            var head = ui.Card(page, 1.25f, 8, Ui.Gold);
+            var top = ui.Box(head, 1f, horizontal: true, marginDp: 0);
+            var art = new ImageView(this);
+            art.SetImageBitmap(Ui.Art(this, Resource.Drawable.tile_tower));
+            art.SetScaleType(ImageView.ScaleType.CenterCrop);
+            top.AddView(art, new LinearLayout.LayoutParams(Px(72), ViewGroup.LayoutParams.MatchParent) { RightMargin = Px(8) });
+            var info = ui.Box(top, 1f, marginDp: 0);
+            ui.Text("WIEŻA PRÓB", info, 16, Ui.Gold, bold: true);
+            ui.Text("Piętro " + t.BestFloor + " z " + t.Floors + (t.Me != null ? "  ·  #" + t.Me.Rank + " w rankingu" : string.Empty), info, 13, Ui.Ink);
+            ui.MeterIn(info, Ui.Gold, t.BestFloor + " / " + t.Floors, t.BestFloor, t.Floors, 14);
+            if (t.NextMilestone is { } m)
+                ui.Text("Nagroda na piętrze " + m.Floor + ": " + m.Stones + " KD" + (m.Items.Count > 0 ? " + " + string.Join(", ", m.Items.Select(i => i.Quantity + "× " + (i.NamePl ?? i.ItemId))) : string.Empty),
+                    info, 11, Ui.Jade, maxLines: 2);
+            if (t.Next is { } next)
+            {
+                var row = ui.HRow(page, 92, 6);
+                var cell = ui.Box(row, 1f, marginDp: 0);
+                ui.TileIn(cell, "Piętro " + next.Floor + ": " + next.NamePl, (next.Guardian ? "STRAŻNIK  ·  " : string.Empty) + new string('★', Math.Clamp(next.Tier, 1, 5)) + "  ·  +" + next.Qi + " Qi",
+                    NpcLooks.For(next.NpcId).TileArt, () => Run(() => StartTowerAsync()), pixelArt: true, accent: next.Guardian ? Ui.Cinnabar : Ui.Gold, titleSp: 13, badge: next.Guardian ? "BOSS" : null);
+                ui.Btn("Wejdź na piętro " + next.Floor, () => Run(() => StartTowerAsync()), page, sp: 14, heightDp: 46);
+            }
+            else
+            {
+                ui.Text("Wieża zdobyta. Jesteś na szczycie!", page, 15, Ui.Gold, bold: true, center: true);
+            }
+
+            var board = ui.Card(page, 1.1f, 8);
+            ui.Text("NAJWYŻEJ W WIEŻY", board, 12, Ui.GoldDim, bold: true);
+            if (t.Top.Count == 0) ui.Text("Nikt jeszcze nie wszedł. Bądź pierwszy.", board, 12, Ui.Muted);
+            foreach (var r in t.Top.Take(5))
+                ui.Text("#" + r.Rank + "  " + r.Name + "  ·  piętro " + r.Value, board, 12, r.CharacterId == c.Id ? Ui.Gold : Ui.Ink);
+        }
+
+        private async Task StartTowerAsync()
+        {
+            await StartOrResumeAsync(() => _api.StartTowerAsync(_me.Id, Ct));
+        }
+
+        /// <summary>The world boss: one shared HP pool for everyone this cycle, a few attempts a day, a kill reward.</summary>
+        private void WorldBoss(Ui ui, LinearLayout page, WorldBossDto b)
+        {
+            var c = _me;
+            var card = ui.Card(page, 1.6f, 8, b.Defeated ? Ui.Jade : Ui.Cinnabar);
+            var top = ui.Box(card, 1f, horizontal: true, marginDp: 0);
+            var art = new ImageView(this);
+            art.SetImageBitmap(Ui.Art(this, Resource.Drawable.tile_worldboss));
+            art.SetScaleType(ImageView.ScaleType.CenterCrop);
+            top.AddView(art, new LinearLayout.LayoutParams(Px(84), ViewGroup.LayoutParams.MatchParent) { RightMargin = Px(8) });
+            var info = ui.Box(top, 1f, marginDp: 0);
+            ui.Text("BOSS ŚWIATA: " + b.NamePl.ToUpperInvariant(), info, 14, Ui.Gold, bold: true);
+            ui.MeterIn(info, b.Defeated ? Ui.Jade : Ui.Cinnabar, b.Defeated ? "POKONANY" : b.HpLeft + " / " + b.PoolHp + " HP", b.HpLeft, b.PoolHp, 18);
+            var days = Math.Max(0, (int)Math.Ceiling((b.EndsAt - DateTimeOffset.UtcNow).TotalDays));
+            ui.Text("Wspólne HP wszystkich graczy  ·  nowy boss za " + days + " d", info, 11, Ui.Muted);
+            ui.Text("Twoje obrażenia: " + b.MyDamage + (b.MyRank is int rank ? "  ·  #" + rank : string.Empty) + "  ·  próby dziś: " + b.AttemptsLeft + "/" + b.AttemptsPerDay, info, 12, Ui.Ink);
+            ui.Text("Nagroda za ubicie (min. " + b.MinDamageForKillReward + " obrażeń): " + b.KillStones + " KD"
+                + (b.KillItems.Count > 0 ? " + " + string.Join(", ", b.KillItems.Select(i => i.Quantity + "× " + (i.NamePl ?? i.ItemId))) : string.Empty), info, 11, Ui.Jade, maxLines: 2);
+            var row = ui.HRow(card, 44, 4);
+            var claimCycle = b.CanClaim ? b.Cycle : b.UnclaimedCycle;
+            if (claimCycle is int cycle)
+            {
+                ui.Btn("Odbierz nagrodę", () => Run(async () =>
+                {
+                    await _api.ClaimWorldBossAsync(c.Id, cycle, Ct);
+                    Sfx.Play(Sfx.Coin);
+                    ShowBanner("BOSS POKONANY", "Nagroda trafiła do sakwy", "+" + b.KillStones + " KD", "menu_worldboss");
+                    await ShowCombatTabAsync(3);
+                    RefreshHud();
+                }), row, sp: 13, heightDp: 44);
+            }
+            else
+            {
+                var can = !b.Defeated && b.AttemptsLeft > 0;
+                var btn = ui.Btn(b.Defeated ? (b.Claimed ? "Nagroda odebrana" : "Boss pokonany") : b.AttemptsLeft > 0 ? "Atakuj bossa" : "Wróć jutro", () => Run(async () =>
+                {
+                    await StartOrResumeAsync(() => _api.StartWorldBossAsync(c.Id, Ct));
+                }), row, sp: 13, heightDp: 44);
+                btn.Enabled = can;
+                btn.Alpha = can ? 1f : 0.5f;
+            }
+        }
+
+        /// <summary>Starts a battle; a fight left unfinished earlier is resumed instead (one battle at a time).</summary>
+        private async Task StartOrResumeAsync(Func<Task<BattleDto>> start)
+        {
+            var combat = new CombatFlow(_api);
+            try
+            {
+                var started = await start();
+                await combat.OpenAsync(started.Id, Ct);
+            }
+            catch (ApiException e) when (e.Code == "already_in_battle")
+            {
+                var open = (await _api.GetOpenBattlesAsync(_me.Id, Ct)).Items.FirstOrDefault(b => b.IsActive);
+                if (open == null) throw;
+                await combat.OpenAsync(open.Id, Ct);
+                ShowBattle(combat);
+                SetStatus("Najpierw dokończ trwającą walkę z: " + open.Opponent.Name);
+                return;
+            }
+
+            ShowBattle(combat);
         }
 
         /// <summary>Starts a training fight; a fight left unfinished earlier is resumed instead (one battle at a time).</summary>
@@ -163,10 +277,11 @@ namespace JianghuGo.Android
         private void ShowBattle(CombatFlow combat)
         {
             var c = _me;
-            var ui = NewScreen("Pojedynek", () => GoTab(TabCombat), subtitle: combat.Battle.Opponent.Name.ToUpperInvariant(), chrome: false);
+            var title = combat.Battle.Kind == "tower" ? "Wieża Prób" : combat.Battle.Kind == "boss" ? "Boss Świata" : "Pojedynek";
+            var ui = NewScreen(title, () => GoTab(TabCombat), subtitle: combat.Battle.Opponent.Name.ToUpperInvariant(), chrome: false);
             var page = ui.Content;
             var gen = _screen;
-            var stage = new BattleStageView(this, combat.Battle.Kind == "pvp" ? "pvp" : combat.Battle.NpcId);
+            var stage = new BattleStageView(this, combat.Battle.Kind == "pvp" ? "pvp" : combat.Battle.NpcId, c.Path, combat.Battle.Kind, combat.Battle.Opponent?.Name);
             ui.AddWeighted(page, stage, 1f, 0);
             var ticker = ui.Text(string.Empty, page, 12, Ui.Ink, maxLines: 2);
             var buttons = new List<View>();
@@ -186,27 +301,27 @@ namespace JianghuGo.Android
             var slots = combat.Battle.MySlots.OrderBy(s => s.Slot).ToList();
             for (var r = 0; r < 2; r++)
             {
-                var row = ui.HRow(page, 58, 4);
+                var row = ui.HRow(page, 64, 4);
                 for (var k = 0; k < 4; k++)
                 {
                     var idx = r * 4 + k;
                     if (idx >= slots.Count || slots[idx].TechniqueId == null)
                     {
                         var empty = new View(this);
-                        row.AddView(empty, new LinearLayout.LayoutParams(0, Px(58), 1f) { LeftMargin = k > 0 ? Px(6) : 0 });
+                        row.AddView(empty, new LinearLayout.LayoutParams(0, Px(64), 1f) { LeftMargin = k > 0 ? Px(6) : 0 });
                         continue;
                     }
 
                     var slot = slots[idx];
                     var cost = slot.QiCost > 0 ? slot.QiCost + " Qi" : null;
-                    var b = ui.SkillTile(row, TechIcon(slot), (slot.Kind == "special" ? "★ " : string.Empty) + slot.NamePl, cost, slot.Kind is "attack" or "special", () => Act(slot.Slot, null));
+                    var b = ui.SkillTile(row, TechIcon(slot), (slot.Kind == "special" ? "★ " : string.Empty) + slot.NamePl, cost, slot.Kind is "attack" or "special", () => Act(slot.Slot, null), 64);
                     b.Tag = slot.Slot;
                     buttons.Add(b);
                 }
             }
 
             var controls = ui.HRow(page, 42, 6);
-            buttons.Add(ui.Btn("Odpocznij", () => Act(null, null), controls, secondary: true, sp: 12, heightDp: 42));
+            buttons.Add(ui.Btn("+Qi", () => Act(null, null), controls, secondary: true, sp: 13, heightDp: 42));
             // Auto-battle: the server plays each turn for the player (same AI as the enemies); tap again to take over.
             var auto = false;
             Button autoBtn = null;
@@ -275,7 +390,8 @@ namespace JianghuGo.Android
                 ticker.Text = b.Status == "pending_acceptance" ? "Czekasz, aż przeciwnik przyjmie wyzwanie…"
                     : b.Status == "declined" ? "Przeciwnik odrzucił wyzwanie." : b.Status == "expired" ? "Wyzwanie wygasło."
                     : !b.IsActive ? "WYNIK: " + ResultName(b) + (b.RewardQi > 0 ? "  (+" + b.RewardQi + " Qi)" : string.Empty)
-                    : b.LastTurnEvents.Count == 0 ? "Tura " + b.Turn + " · Qi " + b.Me.Qi + "/" + b.Me.MaxQi + " — przeciwnicy mierzą się wzrokiem…"
+                    : b.OpponentIntent != null ? IntentHint(b.OpponentIntent)
+                    : b.LastTurnEvents.Count == 0 ? "Tura " + b.Turn + " · Qi " + b.Me.Qi + "/" + b.Me.MaxQi + ". Przeciwnicy mierzą się wzrokiem."
                     : "Tura " + b.Turn + " · " + string.Join("  ·  ", b.LastTurnEvents.Select(e =>
                         (b.IsMine(e) ? "Ty" : "Wróg") + ": " + ActionName(e.Action) + (e.Hit == true ? " " + e.Damage : e.Hit == false ? " pudło" : string.Empty)
                         + (e.Healed > 0 ? " +" + e.Healed + " HP" : string.Empty)));
@@ -306,6 +422,16 @@ namespace JianghuGo.Android
                     }, b.LastTurnEvents.Count * 760 + 1500);
                 }
             }
+
+            static string IntentHint(IntentPreviewDto i) => i.Action switch
+            {
+                "attack" => "Wróg szykuje atak" + (i.NamePl != null ? " (" + i.NamePl + ")" : string.Empty) + ". Garda lub kontra go osłabi.",
+                "special" => "Wróg szykuje umiejętność specjalną" + (i.NamePl != null ? " (" + i.NamePl + ")" : string.Empty) + ". Osłoń się!",
+                "defend" => "Wróg się osłania. Zbierz Qi albo przygotuj mocny cios.",
+                "counter" => "Wróg czeka z kontrą. Nie atakuj teraz, odpocznij lub się osłoń.",
+                "stunned" => "Wróg jest ogłuszony. Uderz z całej siły!",
+                _ => "Wróg odpoczywa. Okazja do ataku!",
+            };
 
             // PvP: the other player acts on their own phone, so poll while waiting
             async void Poll()

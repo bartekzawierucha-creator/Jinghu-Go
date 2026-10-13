@@ -24,6 +24,10 @@ public static class CombatModule
         }
 
         var combat = LoadConfig(path);
+        var catalog = Inventory.InventoryModule.LoadCatalog(configuration);
+        var unknown = (combat.Tower?.Rewards.SelectMany(r => r.Items) ?? []).Concat(combat.WorldBoss?.KillItems ?? [])
+            .Where(i => catalog.Find(i.Item) is null).Select(i => i.Item).Distinct().ToList();
+        if (unknown.Count > 0) throw new InvalidOperationException($"Invalid combat config '{path}': unknown reward items {string.Join(", ", unknown)}.");
         services.AddSingleton(combat);
         var daoPath = configuration["GameConfig:DaoLabPath"] ?? "game-config/dao-lab.json";
         if (!Path.IsPathRooted(daoPath))
@@ -31,7 +35,7 @@ public static class CombatModule
             daoPath = Path.Combine(AppContext.BaseDirectory, daoPath);
         }
 
-        services.AddSingleton(LoadDaoLabConfig(daoPath, Inventory.InventoryModule.LoadCatalog(configuration)));
+        services.AddSingleton(LoadDaoLabConfig(daoPath, catalog));
         if (StorageProvider.From(configuration) == StorageKind.Postgres)
         {
             services.AddSingleton<ICombatRepository, PostgresCombatRepository>();

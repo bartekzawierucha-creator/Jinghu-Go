@@ -20,7 +20,10 @@ public sealed record CombatConfig(
     IReadOnlyDictionary<string, IReadOnlyList<string>> StarterLoadouts,
     IReadOnlyList<NpcDefinition> Npcs,
     IdleRules? Idle = null,
-    IReadOnlyDictionary<string, PathPerks>? PathPerks = null)
+    IReadOnlyDictionary<string, PathPerks>? PathPerks = null,
+    ComboRules? Combo = null,
+    TowerRules? Tower = null,
+    WorldBossRules? WorldBoss = null)
 {
     /// <summary>Combat perks of a cultivation path (none for an unknown path or a config without them).</summary>
     public PathPerks? Perks(string? path) => path is not null && PathPerks is not null && PathPerks.TryGetValue(path, out var p) ? p : null;
@@ -41,6 +44,60 @@ public sealed record CombatConfig(
 }
 
 public sealed record DistanceRules(int Start, int Min, int Max);
+
+/// <summary>Combos: each momentum stack (consecutive landed strikes, up to <see cref="MaxMomentum"/>) adds damage; so does striking an afflicted foe.</summary>
+public sealed record ComboRules(int MomentumPermillePerStack, int MaxMomentum, int ExploitPermille);
+
+public sealed record RewardItem(string Item, int Quantity);
+
+/// <summary>Rewards for clearing a tower floor for the first time (on top of <see cref="TowerRules.QiPerFloor"/> × floor).</summary>
+public sealed record TowerReward(int Floor, long Stones, IReadOnlyList<RewardItem> Items);
+
+/// <summary>
+/// Tower of Trials: floors climbed one by one. The pool is ordered from weakest to strongest and spread evenly over the
+/// floors; every <see cref="BossEvery"/>-th floor is a guardian from <see cref="BossPool"/>. Stats and HP grow per floor.
+/// Rewards only for the first clear of each floor, so there is nothing to farm.
+/// </summary>
+public sealed record TowerRules(int Floors, IReadOnlyList<string> Pool, IReadOnlyList<string> BossPool, int BossEvery, int StatPermillePerFloor, int HpPermillePerFloor,
+    int QiPerFloor, IReadOnlyList<TowerReward> Rewards)
+{
+    public bool IsBossFloor(int floor) => BossEvery > 0 && floor % BossEvery == 0;
+
+    public string NpcFor(int floor) => IsBossFloor(floor) && BossPool.Count > 0
+        ? BossPool[((floor / BossEvery) - 1) % BossPool.Count]
+        : Pool[Math.Min(Pool.Count - 1, (floor - 1) * Pool.Count / Floors)];
+
+    /// <summary>The floor's opponent: the pool NPC with stats and HP raised for the floor.</summary>
+    public NpcDefinition Scaled(NpcDefinition npc, int floor)
+    {
+        var stat = 1000 + ((floor - 1) * StatPermillePerFloor);
+        var hp = 1000 + ((floor - 1) * HpPermillePerFloor);
+        return npc with
+        {
+            Stats = npc.Stats.ToDictionary(s => s.Key, s => (int)((long)s.Value * stat / 1000)),
+            HpOverride = npc.HpOverride is { } h ? (int)((long)h * hp / 1000) : null,
+        };
+    }
+
+    public TowerReward? RewardFor(int floor) => Rewards.FirstOrDefault(r => r.Floor == floor);
+}
+
+/// <summary>
+/// World boss: one shared HP pool per cycle (<see cref="CycleDays"/> days, UTC). Each attempt is a battle against a
+/// phase of at most <see cref="PhaseHp"/> HP; the damage dealt comes off the pool. Every attempt pays Qi for damage;
+/// once the pool is empty, everyone who dealt at least <see cref="MinDamageForKillReward"/> claims the kill reward.
+/// </summary>
+public sealed record WorldBossRules(string NpcId, int PoolHp, int PhaseHp, int AttemptsPerDay, int CycleDays, int QiPerHundredDamage, int MaxQiPerAttempt,
+    int MinDamageForKillReward, long KillStones, IReadOnlyList<RewardItem> KillItems)
+{
+    public static readonly DateTimeOffset Epoch = new(2026, 1, 5, 0, 0, 0, TimeSpan.Zero); // a Monday
+
+    public int CycleOf(DateTimeOffset at) => (int)Math.Floor((at - Epoch).TotalDays / CycleDays);
+
+    public DateTimeOffset CycleEnd(int cycle) => Epoch.AddDays((long)(cycle + 1) * CycleDays);
+
+    public long QiFor(int damage) => Math.Min(MaxQiPerAttempt, (long)damage * QiPerHundredDamage / 100);
+}
 
 /// <summary>
 /// What a cultivation path is good at in battle (all ‰ unless noted). Frozen into the combatant when a battle starts.
@@ -137,6 +194,7 @@ public static class EffectTypes
     public const string Guard = "guard";     // this turn: magnitude = ‰ damage blocked
     public const string Evasion = "evasion"; // this turn: magnitude = ‰ hit chance removed
     public const string Counter = "counter"; // this turn: magnitude = ‰ reflected, second value = qi steal
+    public const string Momentum = "momentum"; // combo stacks (consecutive landed strikes); never expires on its own
     public static readonly IReadOnlyList<string> Applicable = [Bleed, Stun, Weaken];
 }
 
@@ -175,6 +233,30 @@ public static class CombatConfigValidator
                 || p.EffectChancePermille is < 0 or > 500 || p.BleedPermille is < 0 or > 1000 || p.HealPermille is < 0 or > 500
                 || (p.ScalingDamagePermille ?? new Dictionary<string, int>()).Any(kv => !ScalingStats.Contains(kv.Key) || kv.Value is < 0 or > 500))))
             e.Add("pathPerks must cover every path with values in range and a Polish description.");
+
+        if (c.Combo is { } combo && (combo.MomentumPermillePerStack is < 0 or > 300 || combo.MaxMomentum is < 0 or > 10 || combo.ExploitPermille is < 0 or > 500))
+            e.Add("combo: momentum 0-300‰ per stack, max 0-10 stacks, exploit 0-500‰.");
+        if (c.Tower is { } tower)
+        {
+            if (tower.Floors is < 1 or > 500 || tower.Pool is null || tower.Pool.Count == 0 || tower.BossPool is null || tower.BossEvery is < 0 or > 100
+                || tower.StatPermillePerFloor is < 0 or > 1000 || tower.HpPermillePerFloor is < 0 or > 1000 || tower.QiPerFloor < 0 || tower.Rewards is null)
+                e.Add("tower: floors 1-500, a non-empty pool, bossEvery 0-100, per-floor growth 0-1000‰, qiPerFloor >= 0.");
+            else
+            {
+                foreach (var id in tower.Pool.Concat(tower.BossPool))
+                    if (c.Npcs?.Any(n => n.Id == id) != true || id == c.WorldBoss?.NpcId) e.Add($"tower: '{id}' must be a known opponent (not the world boss).");
+                foreach (var r in tower.Rewards)
+                    if (r.Floor < 1 || r.Floor > tower.Floors || r.Stones < 0 || r.Items is null || r.Items.Any(i => string.IsNullOrWhiteSpace(i.Item) || i.Quantity is < 1 or > 100))
+                        e.Add($"tower: reward for floor {r.Floor} invalid.");
+                if (tower.Rewards.GroupBy(r => r.Floor).Any(g => g.Count() > 1)) e.Add("tower: one reward per floor.");
+            }
+        }
+
+        if (c.WorldBoss is { } boss && (c.Npcs?.FirstOrDefault(n => n.Id == boss.NpcId) is not { WorldOnly: true }
+                || boss.PoolHp < 1 || boss.PhaseHp < 1 || boss.PhaseHp > boss.PoolHp || boss.AttemptsPerDay is < 1 or > 20 || boss.CycleDays is < 1 or > 28
+                || boss.QiPerHundredDamage < 0 || boss.MaxQiPerAttempt < 0 || boss.MinDamageForKillReward < 0 || boss.KillStones < 0
+                || boss.KillItems is null || boss.KillItems.Any(i => string.IsNullOrWhiteSpace(i.Item) || i.Quantity is < 1 or > 100)))
+            e.Add("worldBoss: a world-only opponent, 1 <= phaseHp <= poolHp, 1-20 attempts a day, cycle 1-28 days, non-negative rewards.");
 
         if (c.Techniques is null || c.Techniques.Count == 0)
         {

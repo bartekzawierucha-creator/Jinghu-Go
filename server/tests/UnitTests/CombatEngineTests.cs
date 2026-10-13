@@ -268,15 +268,132 @@ public class CombatEngineTests
     /// deliberate rules-version bump (then update this hash). Replays of stored battles depend on it.
     /// </summary>
     [Fact]
-    public void Golden_battle_is_unchanged_for_rules_combat_2()
+    public void Golden_battle_is_unchanged_for_rules_combat_3()
     {
         var (final, log) = Simulate(FromNpc("mountain_bandit"), Player("poison"), 20261012);
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(final) + string.Join("\n", log))))[..16];
-        Assert.Equal("combat-2", Config.RulesVersion);
+        Assert.Equal("combat-3", Config.RulesVersion);
         Assert.Equal(GoldenHash, hash, $"outcome {final.Outcome} after {final.Turn} turns, {log.Count} events");
     }
 
-    private const string GoldenHash = "C9A37960B899952B"; // bandit vs poison starter, seed 20261012: b_won after 15 turns, 36 events (rules combat-2)
+    private const string GoldenHash = "57BC866ADEA4723B"; // bandit vs poison starter, seed 20261012: b_won after 14 turns, 34 events (rules combat-3)
+
+    [Fact]
+    public void Momentum_builds_on_landed_strikes_and_is_lost_by_resting()
+    {
+        var a = Player("qi");
+        var b = FromNpc("training_dummy") with { HpOverride = 5000 };
+        var palm = new Intent(SlotOf(a, "palm_strike"), null);
+        var s = CombatEngine.Start(Exact, a, b);
+        int Hit(IReadOnlyList<TurnEvent> ev) => ev.Single(e => e.Actor == "a" && e.Action == "attack").Damage;
+
+        var (s1, e1) = Resolve(Exact, a, b, s, palm, Intent.Rest);
+        var (s2, e2) = Resolve(Exact, a, b, s1, palm, Intent.Rest);
+        var (s3, e3) = Resolve(Exact, a, b, s2, palm, Intent.Rest);
+        var (s4, e4) = Resolve(Exact, a, b, s3, palm, Intent.Rest);
+        Assert.Equal(1, e1.Single(e => e.Actor == "a").Momentum);
+        Assert.Equal(2, e2.Single(e => e.Actor == "a").Momentum);
+        Assert.Equal(3, e4.Single(e => e.Actor == "a").Momentum); // capped at maxMomentum
+        var step = Config.Combo!.MomentumPermillePerStack;
+        Assert.InRange(Hit(e2), (Hit(e1) * (1000 + step) / 1000) - 1, (Hit(e1) * (1000 + step) / 1000) + 1);
+        Assert.InRange(Hit(e4), (Hit(e1) * (1000 + (3 * step)) / 1000) - 1, (Hit(e1) * (1000 + (3 * step)) / 1000) + 1);
+        Assert.True(Hit(e4) >= Hit(e3));
+
+        var (s5, e5) = Resolve(Exact, a, b, s4, Intent.Rest, Intent.Rest);
+        Assert.Equal(0, e5.Single(e => e.Actor == "a").Momentum);
+        var (_, e6) = Resolve(Exact, a, b, s5, palm, Intent.Rest);
+        Assert.Equal(Hit(e1), Hit(e6));
+
+        var noCombo = Exact with { Combo = null };
+        var (n1, _) = Resolve(noCombo, a, b, s, palm, Intent.Rest);
+        var (_, n2) = Resolve(noCombo, a, b, n1, palm, Intent.Rest);
+        Assert.Equal(Hit(e1), Hit(n2));
+        Assert.Equal(0, n2.Single(e => e.Actor == "a").Momentum);
+    }
+
+    [Fact]
+    public void Striking_an_afflicted_foe_exploits_the_opening()
+    {
+        var a = Player("qi");
+        var b = FromNpc("training_dummy") with { HpOverride = 5000 };
+        var palm = new Intent(SlotOf(a, "palm_strike"), null);
+        var s = CombatEngine.Start(Exact, a, b);
+        var (_, clean) = Resolve(Exact, a, b, s, palm, Intent.Rest);
+        var bleeding = s with { B = s.B with { Effects = [new Effect(EffectTypes.Bleed, 1, 0, 3)] } };
+        var (_, opened) = Resolve(Exact, a, b, bleeding, palm, Intent.Rest);
+        var hitClean = clean.Single(e => e.Actor == "a" && e.Action == "attack");
+        var hitOpened = opened.Single(e => e.Actor == "a" && e.Action == "attack");
+        Assert.False(hitClean.Exploit);
+        Assert.True(hitOpened.Exploit);
+        var expected = hitClean.Damage * (1000 + Config.Combo!.ExploitPermille) / 1000;
+        Assert.InRange(hitOpened.Damage, expected - 1, expected + 1);
+    }
+
+    [Fact]
+    public void Telegraph_preview_names_the_action_and_auto_play_answers_it()
+    {
+        var bandit = FromNpc("mountain_bandit");
+        var s = CombatEngine.Start(Config, bandit, bandit);
+        Assert.Equal("attack", CombatAi.Preview(Config, bandit, s.A, new Intent(0, null)).Action);
+        Assert.Equal("defend", CombatAi.Preview(Config, bandit, s.A, new Intent(4, null)).Action);
+        Assert.Equal("special", CombatAi.Preview(Config, bandit, s.A, new Intent(6, null)).Action);
+        Assert.Equal("counter", CombatAi.Preview(Config, bandit, s.A, new Intent(7, null)).Action);
+        Assert.Equal("rest", CombatAi.Preview(Config, bandit, s.A, Intent.Rest).Action);
+        Assert.Equal("Pchnięcie Miecza", CombatAi.Preview(Config, bandit, s.A, new Intent(1, null)).NamePl);
+        var stunned = s.A with { Effects = [new Effect(EffectTypes.Stun, 0, 0, 1)] };
+        Assert.Equal("stunned", CombatAi.Preview(Config, bandit, stunned, new Intent(0, null)).Action);
+
+        int Guarding(string foeAction)
+        {
+            var n = 0;
+            for (ulong seed = 1; seed <= 400; seed++)
+            {
+                var pick = CombatAi.ChooseAgainst(Config, bandit, s.A, s.Distance, new IntentPreview(foeAction, null, null), new DeterministicRandom(seed));
+                Assert.Null(CombatEngine.Validate(Config, bandit, s.A, s.Distance, pick), "auto-play picks only legal intents");
+                if (pick.Slot is >= 4 and not 6) n++;
+            }
+
+            return n;
+        }
+
+        Assert.True(Guarding("attack") > 2 * Guarding("rest"), "an incoming attack is answered with guard or counter far more often");
+    }
+
+    [Fact]
+    public void Tower_floors_climb_through_the_pool_with_guardians_and_growth()
+    {
+        var t = Config.Tower!;
+        Assert.Equal("training_dummy", t.NpcFor(1));
+        Assert.Equal("bandit_chief", t.NpcFor(10));
+        Assert.Equal("ancient_tortoise", t.NpcFor(20));
+        Assert.Equal("blood_demon_lord", t.NpcFor(50));
+        Assert.Equal("corpse_puppet", t.NpcFor(49));
+        Assert.True(t.IsBossFloor(30) && !t.IsBossFloor(31));
+        var tiers = Enumerable.Range(1, t.Floors).Where(f => !t.IsBossFloor(f)).Select(f => Config.Npc(t.NpcFor(f))!.Tier).ToList();
+        Assert.True(tiers.Order().SequenceEqual(tiers), "never easier going up");
+        var wolf = Config.Npc("grey_wolf")!;
+        var high = t.Scaled(wolf, 26);
+        Assert.Equal(wolf.Stats["strength"] * (1000 + (25 * t.StatPermillePerFloor)) / 1000, high.Stats["strength"]);
+        Assert.Equal(t.Scaled(Config.Npc("stone_golem")!, 11).HpOverride, 320 * (1000 + (10 * t.HpPermillePerFloor)) / 1000);
+        Assert.Equal(1, t.Rewards.Count(r => r.Floor == 50));
+    }
+
+    [Fact]
+    public void World_boss_cycles_and_qi_for_damage()
+    {
+        var w = Config.WorldBoss!;
+        Assert.Equal(0, w.CycleOf(WorldBossRules.Epoch));
+        Assert.Equal(0, w.CycleOf(WorldBossRules.Epoch.AddDays(w.CycleDays).AddTicks(-1)));
+        Assert.Equal(1, w.CycleOf(WorldBossRules.Epoch.AddDays(w.CycleDays)));
+        Assert.Equal(WorldBossRules.Epoch.AddDays(2L * w.CycleDays), w.CycleEnd(1));
+        Assert.Equal(8, w.QiFor(100));
+        Assert.Equal(w.MaxQiPerAttempt, w.QiFor(1_000_000));
+        Assert.True(Config.Npc(w.NpcId) is { WorldOnly: true, Boss: true });
+        var bad = Config with { WorldBoss = w with { PhaseHp = w.PoolHp + 1 } };
+        Assert.True(CombatConfigValidator.Validate(bad).Any(e => e.Contains("worldBoss", StringComparison.Ordinal)));
+        var badTower = Config with { Tower = Config.Tower! with { Pool = ["storm_qilin"] } };
+        Assert.True(CombatConfigValidator.Validate(badTower).Any(e => e.Contains("tower", StringComparison.Ordinal)));
+    }
 
     [Fact]
     public void Random_battles_always_terminate_with_consistent_state()

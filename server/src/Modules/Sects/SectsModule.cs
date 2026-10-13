@@ -26,9 +26,15 @@ public static class SectsModule
 
         services.AddSingleton(LoadConfig(path));
         if (StorageProvider.From(configuration) == StorageKind.Postgres)
+        {
             services.AddSingleton<ISectRepository, PostgresSectRepository>();
+            services.AddSingleton(new JianghuGo.Application.RetentionPolicy("sects.chat_messages",
+                "DELETE FROM sects.chat_messages WHERE ctid IN (SELECT ctid FROM sects.chat_messages WHERE created_at < $1 - interval '30 days' LIMIT 1000)"));
+        }
         else
+        {
             services.AddSingleton<ISectRepository, InMemorySectRepository>();
+        }
         services.AddSingleton<ISectDirectory, SectDirectory>();
         services.AddScoped<SectService>();
         return services;

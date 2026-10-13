@@ -23,6 +23,11 @@ public static class BattleKinds
 {
     public const string Pve = "pve";
     public const string Pvp = "pvp";
+    public const string Tower = "tower";
+    public const string Boss = "boss";
+
+    /// <summary>Side B is played by the server AI (PvE, tower floor, world boss).</summary>
+    public static bool AgainstNpc(string kind) => kind is Pve or Tower or Boss;
 }
 
 public static class BattleStatuses
@@ -57,8 +62,15 @@ public sealed record Battle(
     long RewardQi,
     DateTimeOffset CreatedAt,
     DateTimeOffset UpdatedAt,
-    DateTimeOffset? FinishedAt)
+    DateTimeOffset? FinishedAt,
+    string? Context = null)
 {
+    /// <summary>Tower floor fought in a tower battle (context "tower:n").</summary>
+    public int? TowerFloor => Kind == BattleKinds.Tower && Context is { } ctx && ctx.StartsWith("tower:", StringComparison.Ordinal) && int.TryParse(ctx[6..], out var n) ? n : null;
+
+    /// <summary>World boss cycle of a boss battle (context "boss:n").</summary>
+    public int? BossCycle => Kind == BattleKinds.Boss && Context is { } ctx && ctx.StartsWith("boss:", StringComparison.Ordinal) && int.TryParse(ctx[5..], out var n) ? n : null;
+
     public char? SideOf(AccountId account) =>
         account == AccountA ? 'a' : AccountB is { } b && account == b ? 'b' : null;
 }
@@ -76,3 +88,12 @@ public sealed record TurnRecord(
     IReadOnlyList<TurnEvent> Events,
     BattleState StateAfter,
     DateTimeOffset ResolvedAt);
+
+/// <summary>Highest Tower of Trials floor a character has cleared.</summary>
+public sealed record TowerProgress(CharacterId CharacterId, AccountId AccountId, string Name, int BestFloor, DateTimeOffset UpdatedAt, int Version);
+
+/// <summary>The shared world boss of one cycle.</summary>
+public sealed record WorldBossState(int Cycle, string NpcId, int PoolHp, int HpLeft, DateTimeOffset? DefeatedAt, int Version);
+
+/// <summary>A character's contribution to one world boss cycle; <see cref="ClaimedAt"/> is set once the kill reward is taken.</summary>
+public sealed record WorldBossDamage(int Cycle, CharacterId CharacterId, AccountId AccountId, string Name, long Damage, int Attempts, DateTimeOffset? ClaimedAt, int Version);

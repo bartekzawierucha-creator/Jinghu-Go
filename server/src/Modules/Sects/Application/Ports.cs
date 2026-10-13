@@ -39,6 +39,12 @@ public interface ISectRepository
     /// <summary>Appends a treasury ledger line (error insufficient_treasury). Duplicate (sect, reason, reference) throws.</summary>
     Task<Result<long>> PostTreasuryAsync(IUnitOfWork uow, Guid sectId, long delta, string reason, string referenceId, DateTimeOffset at, CancellationToken ct);
 
+    Task AddChatAsync(IUnitOfWork uow, ChatMessage message, CancellationToken ct);
+
+    /// <summary>Newest first; only messages after <paramref name="after"/> when given.</summary>
+    Task<IReadOnlyList<ChatMessage>> ListChatAsync(IUnitOfWork uow, Guid sectId, Guid? after, int limit, CancellationToken ct);
+    Task<int> CountChatSinceAsync(IUnitOfWork uow, CharacterId characterId, DateTimeOffset since, CancellationToken ct);
+
     Task AddEventAsync(IUnitOfWork uow, SectEvent e, CancellationToken ct);
     Task<IReadOnlyList<SectEvent>> ListEventsAsync(IUnitOfWork uow, Guid sectId, Guid? before, int limit, CancellationToken ct);
 }

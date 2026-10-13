@@ -149,6 +149,76 @@ namespace JianghuGo.Client.Application
     {
         public List<CombatNpcDto> Npcs { get; set; } = new List<CombatNpcDto>();
         public Dictionary<string, PathPerksDto> Paths { get; set; } = new Dictionary<string, PathPerksDto>();
+        public ComboDto Combo { get; set; }
+        public string WorldBossNpcId { get; set; }
+    }
+
+    public sealed class ComboDto
+    {
+        public int MomentumPermillePerStack { get; set; }
+        public int MaxMomentum { get; set; }
+        public int ExploitPermille { get; set; }
+    }
+
+    public sealed class RankDto
+    {
+        public int Rank { get; set; }
+        public Guid CharacterId { get; set; }
+        public string Name { get; set; }
+        public long Value { get; set; }
+    }
+
+    public sealed class RewardLineDto
+    {
+        public string ItemId { get; set; }
+        public string NamePl { get; set; }
+        public int Quantity { get; set; }
+    }
+
+    public sealed class TowerFloorDto
+    {
+        public int Floor { get; set; }
+        public string NpcId { get; set; }
+        public string NamePl { get; set; }
+        public int Tier { get; set; }
+        public bool Guardian { get; set; }
+        public long Qi { get; set; }
+        public long Stones { get; set; }
+        public List<RewardLineDto> Items { get; set; } = new List<RewardLineDto>();
+    }
+
+    /// <summary>Tower of Trials: floors cleared, the next fight, the next milestone and the leaderboard.</summary>
+    public sealed class TowerDto
+    {
+        public int BestFloor { get; set; }
+        public int Floors { get; set; }
+        public TowerFloorDto Next { get; set; }
+        public TowerFloorDto NextMilestone { get; set; }
+        public List<RankDto> Top { get; set; } = new List<RankDto>();
+        public RankDto Me { get; set; }
+    }
+
+    /// <summary>The shared world boss of the current cycle.</summary>
+    public sealed class WorldBossDto
+    {
+        public int Cycle { get; set; }
+        public string NpcId { get; set; }
+        public string NamePl { get; set; }
+        public int PoolHp { get; set; }
+        public int HpLeft { get; set; }
+        public bool Defeated { get; set; }
+        public DateTimeOffset EndsAt { get; set; }
+        public int AttemptsLeft { get; set; }
+        public int AttemptsPerDay { get; set; }
+        public long MyDamage { get; set; }
+        public int? MyRank { get; set; }
+        public bool CanClaim { get; set; }
+        public bool Claimed { get; set; }
+        public int MinDamageForKillReward { get; set; }
+        public long KillStones { get; set; }
+        public List<RewardLineDto> KillItems { get; set; } = new List<RewardLineDto>();
+        public List<RankDto> Top { get; set; } = new List<RankDto>();
+        public int? UnclaimedCycle { get; set; }
     }
 
     /// <summary>Idle hunt: automatic battles while away.</summary>

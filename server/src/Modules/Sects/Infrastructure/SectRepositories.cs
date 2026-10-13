@@ -130,6 +130,24 @@ internal sealed class InMemorySectRepository : ISectRepository
         return Task.FromResult<Result<long>>(after);
     }
 
+    private const string Chat = "sects.chat_messages";
+
+    public Task AddChatAsync(IUnitOfWork uow, ChatMessage m, CancellationToken ct)
+    {
+        U(uow).SetTable(Chat, U(uow).Table<Guid, ChatMessage>(Chat).Add(m.Id, m));
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<ChatMessage>> ListChatAsync(IUnitOfWork uow, Guid sectId, Guid? after, int limit, CancellationToken ct)
+    {
+        IReadOnlyList<ChatMessage> list = [.. U(uow).Table<Guid, ChatMessage>(Chat).Values
+            .Where(m => m.SectId == sectId && (after is null || m.Id.CompareTo(after.Value) > 0)).OrderByDescending(m => m.Id).Take(limit)];
+        return Task.FromResult(list);
+    }
+
+    public Task<int> CountChatSinceAsync(IUnitOfWork uow, CharacterId characterId, DateTimeOffset since, CancellationToken ct) =>
+        Task.FromResult(U(uow).Table<Guid, ChatMessage>(Chat).Values.Count(m => m.CharacterId == characterId && m.At >= since));
+
     public Task AddEventAsync(IUnitOfWork uow, SectEvent e, CancellationToken ct)
     {
         U(uow).SetTable(Events, U(uow).Table<Guid, SectEvent>(Events).Add(e.Id, e));
@@ -233,6 +251,20 @@ internal sealed class PostgresSectRepository : ISectRepository
             ct, Uuid7.New(), sectId, delta, after, reason, referenceId, at);
         return after;
     }
+
+    public Task AddChatAsync(IUnitOfWork uow, ChatMessage m, CancellationToken ct) =>
+        Pg(uow).ExecuteAsync("INSERT INTO sects.chat_messages (id, sect_id, character_id, name, text, created_at) VALUES ($1, $2, $3, $4, $5, $6)",
+            ct, m.Id, m.SectId, m.CharacterId.Value, m.Name, m.Text, m.At);
+
+    public async Task<IReadOnlyList<ChatMessage>> ListChatAsync(IUnitOfWork uow, Guid sectId, Guid? after, int limit, CancellationToken ct) =>
+        await Pg(uow).QueryAsync(
+            "SELECT id, character_id, name, text, created_at FROM sects.chat_messages WHERE sect_id = $1 AND ($2::uuid IS NULL OR id > $2::uuid) ORDER BY id DESC LIMIT $3",
+            r => new ChatMessage(r.GetGuid(0), sectId, new CharacterId(r.GetGuid(1)), r.GetString(2), r.GetString(3), r.GetFieldValue<DateTimeOffset>(4)),
+            ct, sectId, after, limit);
+
+    public async Task<int> CountChatSinceAsync(IUnitOfWork uow, CharacterId characterId, DateTimeOffset since, CancellationToken ct) =>
+        (int)(await Pg(uow).QueryAsync("SELECT count(*) FROM sects.chat_messages WHERE character_id = $1 AND created_at >= $2",
+            r => r.GetInt64(0), ct, characterId.Value, since)).Single();
 
     public Task AddEventAsync(IUnitOfWork uow, SectEvent e, CancellationToken ct) =>
         Pg(uow).ExecuteAsync("INSERT INTO sects.events (id, sect_id, kind, actor_character_id, subject_character_id, data, created_at) VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7)",

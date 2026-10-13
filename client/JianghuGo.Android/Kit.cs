@@ -203,14 +203,15 @@ namespace JianghuGo.Android
             if (id != 0) img.SetImageBitmap(Art(_ctx, id));
             img.SetScaleType(ImageView.ScaleType.FitCenter);
             tile.AddView(img, new LinearLayout.LayoutParams(Dp(26), Dp(26)));
+            // the full technique name: two lines, shrinking to fit instead of being cut off
             var t = new TextView(_ctx) { Text = name, Gravity = GravityFlags.Center };
-            t.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 9);
-            t.SetTypeface(Display, TypefaceStyle.Bold);
+            t.SetTypeface(Typeface.Create("sans-serif-medium", TypefaceStyle.Normal), TypefaceStyle.Normal);
             t.SetTextColor(primary ? Ink : Gold);
-            t.SetMaxLines(1);
-            t.Ellipsize = global::Android.Text.TextUtils.TruncateAt.End;
+            t.SetMaxLines(2);
             t.SetIncludeFontPadding(false);
-            tile.AddView(t, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Dp(2) });
+            t.SetLineSpacing(0, 0.9f);
+            t.SetAutoSizeTextTypeUniformWithConfiguration(7, 11, 1, global::Android.Util.ComplexUnitType.Sp);
+            tile.AddView(t, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0, 1f) { TopMargin = Dp(1) });
             if (!string.IsNullOrEmpty(cost))
             {
                 var c = new TextView(_ctx) { Text = cost, Gravity = GravityFlags.Center };

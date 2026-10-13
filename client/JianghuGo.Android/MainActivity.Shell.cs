@@ -339,6 +339,7 @@ namespace JianghuGo.Android
         private void EnterGame(CharacterDto c)
         {
             _me = c;
+            HeroArt.CurrentPath = c?.Path;
             CurrentCharacterId = c.Id;
             _tab = TabHome;
             ShowHomeTab();

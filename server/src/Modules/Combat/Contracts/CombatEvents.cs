@@ -5,6 +5,12 @@ public static class CombatEvents
 {
     public const string BattleFinished = "combat.battle_finished";
     public const string ChallengeReceived = "combat.challenge_received";
+    public const string ItemsRewarded = "combat.items_rewarded";
+
+    public sealed record RewardLine(string ItemId, int Quantity);
+
+    /// <summary>Spirit stones and items earned in the Tower of Trials or from the world boss (granted by Inventory, once per event).</summary>
+    public sealed record ItemsRewardedV1(Guid AccountId, Guid CharacterId, string Source, string ReferenceId, long Stones, IReadOnlyList<RewardLine> Items);
 
     public sealed record Participant(Guid AccountId, Guid CharacterId, string Side, string Result, long RewardQi);
 

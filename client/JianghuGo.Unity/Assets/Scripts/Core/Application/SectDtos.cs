@@ -109,4 +109,18 @@ namespace JianghuGo.Client.Application
         public List<TerritoryDto> Territories { get; set; } = new List<TerritoryDto>();
         public List<WarDto> Wars { get; set; } = new List<WarDto>();
     }
+
+    public sealed class ChatMessageDto
+    {
+        public Guid Id { get; set; }
+        public Guid CharacterId { get; set; }
+        public string Name { get; set; }
+        public string Text { get; set; }
+        public DateTimeOffset At { get; set; }
+    }
+
+    public sealed class ChatPageDto
+    {
+        public List<ChatMessageDto> Items { get; set; } = new List<ChatMessageDto>();
+    }
 }

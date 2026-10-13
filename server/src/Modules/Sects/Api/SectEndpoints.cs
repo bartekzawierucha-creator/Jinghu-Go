@@ -30,6 +30,12 @@ public static class SectEndpoints
         g.MapGet("/{sectId:guid}/history", async (Guid sectId, Guid characterId, Guid? before, int? limit, HttpContext http, SectService svc, CancellationToken ct) =>
             ApiResults.From(await svc.HistoryAsync(http.User.GetAccountId(), sectId, characterId, before, limit, ct), list => Results.Ok(new { items = list })));
 
+        g.MapGet("/{sectId:guid}/chat", async (Guid sectId, Guid characterId, Guid? after, int? limit, HttpContext http, SectService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.ChatAsync(http.User.GetAccountId(), sectId, characterId, after, limit, ct), list => Results.Ok(new { items = list })));
+
+        g.MapPost("/{sectId:guid}/chat", async (Guid sectId, PostChatCommand body, [FromHeader(Name = "Idempotency-Key")] string? key, HttpContext http, SectService svc, CancellationToken ct) =>
+            await Guard(async () => ApiResults.From(await svc.PostChatAsync(http.User.GetAccountId(), sectId, key, body, ct), v => Results.Created($"/api/v1/sects/{sectId}/chat", v))));
+
         g.MapPost("/{sectId:guid}/applications", async (Guid sectId, ApplyCommand body, [FromHeader(Name = "Idempotency-Key")] string? key, HttpContext http, SectService svc, CancellationToken ct) =>
             await Guard(async () => ApiResults.From(await svc.ApplyAsync(http.User.GetAccountId(), sectId, key, body, ct), v => Results.Created($"/api/v1/sects/{sectId}", v))));
 

@@ -43,7 +43,11 @@ public sealed record BattleView(
     string SeedHash,
     string? Seed,
     long RewardQi,
-    string? TamedPetNpcId = null);
+    string? TamedPetNpcId = null,
+    IntentPreview? OpponentIntent = null,
+    int? TowerFloor = null,
+    int? BossCycle = null,
+    int DamageDealt = 0);
 
 public sealed record PetView(string NpcId, string NamePl, int Level, int Xp, int XpToNextLevel, IReadOnlyDictionary<string, int> Bonuses, DateTimeOffset TamedAt);
 
@@ -63,7 +67,7 @@ public sealed record HuntView(string NpcId, string NpcNamePl, int Tier, DateTime
 
 public sealed record TurnView(int Turn, Intent IntentA, Intent IntentB, bool ForcedA, bool ForcedB, IReadOnlyList<TurnEvent> Events, BattleState StateAfter, DateTimeOffset ResolvedAt);
 
-public sealed class CombatService(
+public sealed partial class CombatService(
     IUnitOfWorkFactory uowFactory,
     ICombatRepository repo,
     ICharacterDirectory characters,
@@ -75,7 +79,8 @@ public sealed class CombatService(
     ICorrelationContext correlation,
     IRandomSeedSource seeds,
     CombatConfig config,
-    TimeProvider clock) : ICombatEncounters
+    TimeProvider clock,
+    IItemCatalog items) : ICombatEncounters
 {
     public const int MaxConsecutiveTimeouts = 3;
     public const int MaxPendingChallenges = 3;
@@ -376,7 +381,7 @@ public sealed class CombatService(
                 await repo.AddIntentAsync(uow, new SubmittedIntent(battle.Id, state.Turn, side, intent, now), ct);
                 var other = intents.FirstOrDefault(i => i.Side != side);
                 battle = side == 'a' ? battle with { TimeoutsA = 0 } : battle with { TimeoutsB = 0 };
-                if (battle.Kind == BattleKinds.Pve || other is not null)
+                if (BattleKinds.AgainstNpc(battle.Kind) || other is not null)
                 {
                     var (ia, ib) = side == 'a' ? (intent, other?.Intent) : (other!.Intent, intent);
                     battle = await ResolveAsync(uow, battle, ia, ib, false, false, now, ct)
@@ -439,11 +444,7 @@ public sealed class CombatService(
     private async Task<Battle?> ResolveAsync(IUnitOfWork uow, Battle battle, Intent ia, Intent? ib, bool forcedA, bool forcedB, DateTimeOffset at, CancellationToken ct)
     {
         var state = battle.State!;
-        if (battle.Kind == BattleKinds.Pve)
-        {
-            // Separate stream for AI decisions keeps the resolution stream identical in replays from recorded intents.
-            ib = CombatAi.Choose(config, battle.CombatantB!, state.B, state.Distance, CombatEngine.TurnRng(battle.Seed ^ 0xA1A1A1A1A1A1A1A1UL, state.Turn));
-        }
+        if (BattleKinds.AgainstNpc(battle.Kind)) ib = NpcIntent(battle);
 
         var (next, events) = CombatEngine.ResolveTurn(config, battle.CombatantA!, battle.CombatantB!, state, ia, ib!, CombatEngine.TurnRng(battle.Seed, state.Turn));
         await repo.AddTurnAsync(uow, new TurnRecord(battle.Id, state.Turn, ia, ib!, forcedA, forcedB, events, next, at), ct);
@@ -458,10 +459,23 @@ public sealed class CombatService(
         return await repo.TryUpdateBattleAsync(uow, updated, battle.Version, ct) ? updated : null;
     }
 
+    /// <summary>
+    /// The AI's choice for side B this turn. It depends only on the battle seed, the turn and B's state at the start of
+    /// the turn (a separate stream keeps the resolution stream identical in replays), so it can be shown to the player
+    /// before they act — the telegraph — and is exactly what B then does.
+    /// </summary>
+    private Intent NpcIntent(Battle battle) =>
+        CombatAi.Choose(config, battle.CombatantB!, battle.State!.B, battle.State.Distance, CombatEngine.TurnRng(battle.Seed ^ 0xA1A1A1A1A1A1A1A1UL, battle.State.Turn));
+
     private async Task<Battle?> FinishAsync(IUnitOfWork uow, Battle battle, int expectedVersion, DateTimeOffset at, CancellationToken ct)
     {
         var outcome = battle.State!.Outcome!;
-        long reward = 0;
+        long reward = battle.Kind switch
+        {
+            BattleKinds.Tower => await TowerFinishedAsync(uow, battle, outcome, at, ct),
+            BattleKinds.Boss => await BossFinishedAsync(uow, battle, at, ct),
+            _ => 0,
+        };
         if (battle.Kind == BattleKinds.Pve && outcome == Outcomes.AWon && config.Npc(battle.NpcId!) is { } npc && npc.RewardQi > 0
             && await repo.CountRewardedPveWinsSinceAsync(uow, battle.CharacterA, at.AddDays(-1), ct) < config.Progression.DailyRewardedPveWins)
         {
@@ -585,6 +599,9 @@ public sealed class CombatService(
         string? result = state?.Outcome is null ? null
             : state.Outcome == Outcomes.Draw ? "draw" : (state.Outcome == Outcomes.AWon) == (side == 'a') ? "won" : "lost";
         var finished = b.Status is BattleStatuses.Finished;
+        var telegraph = b.Status == BattleStatuses.Active && side == 'a' && state is { Outcome: null } && BattleKinds.AgainstNpc(b.Kind)
+            ? CombatAi.Preview(config, b.CombatantB!, state.B, NpcIntent(b))
+            : null;
 
         return new BattleView(b.Id, b.Kind, b.Status, b.RulesVersion, b.Version, side.ToString(), state?.Turn ?? 0, state?.Distance ?? config.Distance.Start,
             b.Deadline, Fighter(me, state?.Of(side)), Fighter(foe, state?.Of(side == 'a' ? 'b' : 'a')), slots,
@@ -592,7 +609,8 @@ public sealed class CombatService(
             lastTurn?.Events ?? [], result, b.NpcId,
             side == 'a' ? b.CharacterB?.Value : b.CharacterA.Value,
             b.SeedHash, finished ? b.Seed.ToString(CultureInfo.InvariantCulture) : null, b.RewardQi,
-            finished && side == 'a' && b.Kind == BattleKinds.Pve && await repo.FindPetAsync(uow, b.CharacterA, ct) is { } tamed && tamed.TamedInBattle == b.Id ? tamed.NpcId : null);
+            finished && side == 'a' && b.Kind == BattleKinds.Pve && await repo.FindPetAsync(uow, b.CharacterA, ct) is { } tamed && tamed.TamedInBattle == b.Id ? tamed.NpcId : null,
+            telegraph, b.TowerFloor, b.BossCycle, b.Kind == BattleKinds.Boss && state is not null ? Math.Max(0, state.B.MaxHp - state.B.Hp) : 0);
     }
 
     // ---------------------------------------------------------------- automatic play
@@ -607,7 +625,8 @@ public sealed class CombatService(
             if (battle.Status != BattleStatuses.Active) return Error.Conflict("battle_not_active", $"The battle is {battle.Status}.");
             var state = battle.State!;
             var me = side == 'a' ? battle.CombatantA! : battle.CombatantB!;
-            var intent = CombatAi.Choose(config, me, state.Of(side), state.Distance, new DeterministicRandom(seeds.NextSeed()));
+            var foe = BattleKinds.AgainstNpc(battle.Kind) && side == 'a' ? CombatAi.Preview(config, battle.CombatantB!, state.B, NpcIntent(battle)) : null;
+            var intent = CombatAi.ChooseAgainst(config, me, state.Of(side), state.Distance, foe, new DeterministicRandom(seeds.NextSeed()));
             await uow.CommitAsync(ct); // persists turns resolved by elapsed deadlines
             return new ActionCommand(state.Turn, intent.Slot, intent.Direction);
         }, ct);

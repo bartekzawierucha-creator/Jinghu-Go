@@ -104,6 +104,7 @@ namespace JianghuGo.Android
                             }), r, secondary: true, sp: 14, heightDp: 38).LayoutParameters = new LinearLayout.LayoutParams(Px(56), Px(38)) { LeftMargin = Px(6) };
                         });
                     }, card, sp: 13, heightDp: 42);
+                ui.Btn("Czat sekty", () => OpenSectChat(mine.Sect.Id), page, sp: 14, heightDp: 44, icon: "menu_chat");
                 var acts = ui.HRow(page, 44);
                 ui.Btn("Wpłać 100 KD", () => Run(async () =>
                 {
@@ -236,6 +237,85 @@ namespace JianghuGo.Android
                         }), row, secondary: true, sp: 12, heightDp: 36).LayoutParameters = new LinearLayout.LayoutParams(Px(80), Px(36)) { Gravity = GravityFlags.CenterVertical };
                 }, empty: "Sekta nie ma jeszcze terytoriów — zajmij to, na którym stoisz.");
             }
+        }
+
+        /// <summary>
+        /// Sect chat in a sheet: the latest lines (no scrolling, newest at the bottom), a field and Send; while the sheet
+        /// is open it polls for new lines every few seconds.
+        /// </summary>
+        private void OpenSectChat(Guid sectId)
+        {
+            var c = _me;
+            var body = Sheet("Czat sekty", 0.72f, out var close, "menu_chat");
+            var list = new LinearLayout(this) { Orientation = Orientation.Vertical };
+            list.SetGravity(GravityFlags.Bottom);
+            body.AddView(list, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0, 1f));
+            var row = _ui.HRow(body, 46, 6);
+            var field = _ui.Field("Napisz do sekty…", parent: row);
+            field.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 1f);
+            field.SetFilters(new global::Android.Text.IInputFilter[] { new global::Android.Text.InputFilterLengthFilter(300) });
+            var lines = new List<ChatMessageDto>();
+            const int MaxShown = 9;
+
+            void Render()
+            {
+                list.RemoveAllViews();
+                if (lines.Count == 0) _ui.Text("Cisza w sekcie. Napisz pierwszy!", list, 12, Ui.Muted, center: true);
+                foreach (var m in lines.Skip(Math.Max(0, lines.Count - MaxShown)))
+                {
+                    var mine = m.CharacterId == c.Id;
+                    var t = _ui.Text(m.Name + "  " + m.At.ToLocalTime().ToString("HH:mm") + "\n" + m.Text, list, 12, mine ? Ui.Gold : Ui.Ink, maxLines: 3);
+                    var bg = new global::Android.Graphics.Drawables.GradientDrawable();
+                    bg.SetColor(mine ? Color.Argb(60, 200, 160, 80) : Color.Argb(110, 20, 24, 28));
+                    bg.SetCornerRadius(Px(10));
+                    t.Background = bg;
+                    t.SetPadding(Px(8), Px(4), Px(8), Px(4));
+                    ((LinearLayout.LayoutParams)t.LayoutParameters).TopMargin = Px(4);
+                }
+            }
+
+            async Task Pull()
+            {
+                var page = await _api.GetSectChatAsync(sectId, c.Id, lines.Count > 0 ? lines[lines.Count - 1].Id : (Guid?)null, Ct);
+                if (page.Items.Count == 0) return;
+                lines.AddRange(page.Items);
+                if (lines.Count > 60) lines.RemoveRange(0, lines.Count - 60);
+                Render();
+            }
+
+            _ui.Btn("Wyślij", () => Run(async () =>
+            {
+                var text = field.Text?.Trim();
+                if (string.IsNullOrEmpty(text)) return;
+                await _api.PostSectChatAsync(sectId, c.Id, text, Ct);
+                field.Text = string.Empty;
+                Sfx.Play(Sfx.Click, 0.5f);
+                await Pull();
+            }), row, sp: 13, heightDp: 46).LayoutParameters = new LinearLayout.LayoutParams(Px(92), ViewGroup.LayoutParams.MatchParent) { LeftMargin = Px(6) };
+
+            Render();
+            async void Poll()
+            {
+                for (var wait = 0; wait < 20 && !body.IsAttachedToWindow; wait++) await Task.Delay(100);
+                while (body.IsAttachedToWindow)
+                {
+                    try
+                    {
+                        if (!_paused) await Pull();
+                        await Task.Delay(TimeSpan.FromSeconds(4), Ct);
+                    }
+                    catch (System.OperationCanceledException)
+                    {
+                        return;
+                    }
+                    catch (ApiException)
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(8));
+                    }
+                }
+            }
+
+            Poll();
         }
 
         private void Stat(Ui ui, LinearLayout row, string label, string value)

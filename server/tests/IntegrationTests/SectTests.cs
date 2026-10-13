@@ -194,6 +194,45 @@ public class SectTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Chat_is_for_members_only_validated_rate_limited_and_pollable()
+    {
+        var (sectId, leader, others) = await _c.SectAsync("Sekta Emei", "member");
+        var member = others[0];
+        var url = $"/api/v1/sects/{sectId}/chat";
+        var first = await Cultivators.Ok(await leader.P.PostAsync(url, new { characterId = leader.C.Str("id"), text = "  Witajcie, uczniowie!  " }, Player.NewKey()), HttpStatusCode.Created);
+        Assert.Equal("Witajcie, uczniowie!", first.Str("text"));
+        Assert.Equal(leader.C.Str("name"), first.Str("name"));
+        var key = Player.NewKey();
+        var reply = await Cultivators.Ok(await member.P.PostAsync(url, new { characterId = member.C.Str("id"), text = "Mistrzu!" }, key), HttpStatusCode.Created);
+        var replay = await Cultivators.Ok(await member.P.PostAsync(url, new { characterId = member.C.Str("id"), text = "Mistrzu!" }, key), HttpStatusCode.Created);
+        Assert.Equal(reply.Str("id"), replay.Str("id")); // idempotent retry, no duplicate line
+
+        var all = (await Cultivators.Ok(await member.P.GetAsync($"{url}?characterId={member.C.Str("id")}")))["items"]!.AsArray();
+        Assert.Equal(2, all.Count);
+        Assert.Equal(first.Str("id"), all[0]!.Str("id")); // oldest first
+        var since = (await Cultivators.Ok(await leader.P.GetAsync($"{url}?characterId={leader.C.Str("id")}&after={first.Str("id")}")))["items"]!.AsArray();
+        Assert.Equal(1, since.Count);
+        Assert.Equal("Mistrzu!", since[0]!.Str("text"));
+
+        await Cultivators.Problem(await member.P.PostAsync(url, new { characterId = member.C.Str("id"), text = "   " }, Player.NewKey()), HttpStatusCode.BadRequest, "chat_message_invalid");
+        await Cultivators.Problem(await member.P.PostAsync(url, new { characterId = member.C.Str("id"), text = new string('x', 301) }, Player.NewKey()), HttpStatusCode.BadRequest, "chat_message_invalid");
+        await Cultivators.Problem(await member.P.PostAsync(url, new { characterId = member.C.Str("id"), text = "a\nb" }, Player.NewKey()), HttpStatusCode.BadRequest, "chat_message_invalid");
+
+        var (outsider, oc) = await _c.NewAsync();
+        await Cultivators.Problem(await outsider.PostAsync(url, new { characterId = oc.Str("id"), text = "Hej" }, Player.NewKey()), HttpStatusCode.Forbidden, "not_a_member");
+        await Cultivators.Problem(await outsider.GetAsync($"{url}?characterId={oc.Str("id")}"), HttpStatusCode.Forbidden, "not_a_member");
+        await Cultivators.Problem(await outsider.GetAsync($"{url}?characterId={member.C.Str("id")}"), HttpStatusCode.NotFound, "character_not_found");
+
+        for (var i = 0; i < 4; i++) // 5 lines in 30 s with the greeting
+            await Cultivators.Ok(await leader.P.PostAsync(url, new { characterId = leader.C.Str("id"), text = "Linia " + i }, Player.NewKey()), HttpStatusCode.Created);
+        await Cultivators.Problem(await leader.P.PostAsync(url, new { characterId = leader.C.Str("id"), text = "Za dużo" }, Player.NewKey()),
+            (HttpStatusCode)422, "chat_rate_limited");
+        _host.Clock.Advance(TimeSpan.FromSeconds(31));
+        await leader.P.RefreshAsync();
+        await Cultivators.Ok(await leader.P.PostAsync(url, new { characterId = leader.C.Str("id"), text = "Już można" }, Player.NewKey()), HttpStatusCode.Created);
+    }
+
+    [Fact]
     public async Task Leaving_applications_and_disbanding()
     {
         var (sectId, leader, others) = await _c.SectAsync("Sekta Tai", "member");

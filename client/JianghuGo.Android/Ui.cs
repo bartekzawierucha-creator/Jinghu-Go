@@ -51,7 +51,8 @@ namespace JianghuGo.Android
         /// <summary>Cinzel (OFL, bundled) for titles, buttons and numbers; the system serif for reading text.</summary>
         public static Typeface Display => _display ?? Typeface.Create(Typeface.Serif, TypefaceStyle.Bold);
         public static Typeface DisplayMedium => _displayMedium ?? Display;
-        public static Typeface Body => Typeface.Create(Typeface.Serif, TypefaceStyle.Normal);
+        // Body text in a clean sans-serif (readable at small sizes); the Cinzel display face is for headings and titles.
+        public static Typeface Body => Typeface.Create("sans-serif", TypefaceStyle.Normal);
 
         public static void LoadFonts(Context ctx)
         {

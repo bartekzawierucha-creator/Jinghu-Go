@@ -144,6 +144,70 @@ internal sealed class InMemoryCombatRepository : ICombatRepository
         Task.FromResult(U(uow).Table<Guid, Battle>(Battles).Values.Count(b =>
             b.CharacterA == characterId && b.Kind == BattleKinds.Pve && b.RewardQi > 0 && b.FinishedAt >= since));
 
+    public Task<int> CountBattlesSinceAsync(IUnitOfWork uow, CharacterId characterId, string kind, string context, DateTimeOffset since, CancellationToken ct) =>
+        Task.FromResult(U(uow).Table<Guid, Battle>(Battles).Values.Count(b =>
+            b.CharacterA == characterId && b.Kind == kind && b.Context == context && b.CreatedAt >= since));
+
+    private const string Towers = "combat.tower_progress";
+    private const string Bosses = "combat.world_bosses";
+    private const string BossDamage = "combat.world_boss_damage";
+
+    public Task<TowerProgress?> FindTowerAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
+        Task.FromResult(U(uow).Table<CharacterId, TowerProgress>(Towers).GetValueOrDefault(characterId));
+
+    public Task<bool> TrySaveTowerAsync(IUnitOfWork uow, TowerProgress p, int expectedVersion, CancellationToken ct)
+    {
+        var t = U(uow).Table<CharacterId, TowerProgress>(Towers);
+        if ((t.GetValueOrDefault(p.CharacterId)?.Version ?? 0) != expectedVersion) return Task.FromResult(false);
+        U(uow).SetTable(Towers, t.SetItem(p.CharacterId, p));
+        return Task.FromResult(true);
+    }
+
+    public Task<IReadOnlyList<TowerProgress>> ListTowerTopAsync(IUnitOfWork uow, int limit, CancellationToken ct)
+    {
+        IReadOnlyList<TowerProgress> list = [.. U(uow).Table<CharacterId, TowerProgress>(Towers).Values
+            .OrderByDescending(p => p.BestFloor).ThenBy(p => p.UpdatedAt).ThenBy(p => p.CharacterId.Value).Take(limit)];
+        return Task.FromResult(list);
+    }
+
+    public Task<int> CountTowerAheadAsync(IUnitOfWork uow, TowerProgress mine, CancellationToken ct) =>
+        Task.FromResult(U(uow).Table<CharacterId, TowerProgress>(Towers).Values.Count(p =>
+            p.BestFloor > mine.BestFloor || (p.BestFloor == mine.BestFloor && (p.UpdatedAt < mine.UpdatedAt
+                || (p.UpdatedAt == mine.UpdatedAt && p.CharacterId.Value.CompareTo(mine.CharacterId.Value) < 0)))));
+
+    public Task<WorldBossState?> FindBossAsync(IUnitOfWork uow, int cycle, CancellationToken ct) =>
+        Task.FromResult(U(uow).Table<int, WorldBossState>(Bosses).GetValueOrDefault(cycle));
+
+    public Task<bool> TrySaveBossAsync(IUnitOfWork uow, WorldBossState b, int expectedVersion, CancellationToken ct)
+    {
+        var t = U(uow).Table<int, WorldBossState>(Bosses);
+        if ((t.GetValueOrDefault(b.Cycle)?.Version ?? 0) != expectedVersion) return Task.FromResult(false);
+        U(uow).SetTable(Bosses, t.SetItem(b.Cycle, b));
+        return Task.FromResult(true);
+    }
+
+    public Task<WorldBossDamage?> FindBossDamageAsync(IUnitOfWork uow, int cycle, CharacterId characterId, CancellationToken ct) =>
+        Task.FromResult(U(uow).Table<(int, CharacterId), WorldBossDamage>(BossDamage).GetValueOrDefault((cycle, characterId)));
+
+    public Task<bool> TrySaveBossDamageAsync(IUnitOfWork uow, WorldBossDamage d, int expectedVersion, CancellationToken ct)
+    {
+        var t = U(uow).Table<(int, CharacterId), WorldBossDamage>(BossDamage);
+        if ((t.GetValueOrDefault((d.Cycle, d.CharacterId))?.Version ?? 0) != expectedVersion) return Task.FromResult(false);
+        U(uow).SetTable(BossDamage, t.SetItem((d.Cycle, d.CharacterId), d));
+        return Task.FromResult(true);
+    }
+
+    public Task<IReadOnlyList<WorldBossDamage>> ListBossTopAsync(IUnitOfWork uow, int cycle, int limit, CancellationToken ct)
+    {
+        IReadOnlyList<WorldBossDamage> list = [.. U(uow).Table<(int, CharacterId), WorldBossDamage>(BossDamage).Values
+            .Where(d => d.Cycle == cycle).OrderByDescending(d => d.Damage).ThenBy(d => d.CharacterId.Value).Take(limit)];
+        return Task.FromResult(list);
+    }
+
+    public Task<int> CountBossAheadAsync(IUnitOfWork uow, WorldBossDamage mine, CancellationToken ct) =>
+        Task.FromResult(U(uow).Table<(int, CharacterId), WorldBossDamage>(BossDamage).Values.Count(d =>
+            d.Cycle == mine.Cycle && (d.Damage > mine.Damage || (d.Damage == mine.Damage && d.CharacterId.Value.CompareTo(mine.CharacterId.Value) < 0))));
+
     public Task<IReadOnlyList<SubmittedIntent>> ListIntentsAsync(IUnitOfWork uow, Guid battleId, int turn, CancellationToken ct)
     {
         IReadOnlyList<SubmittedIntent> list = [.. U(uow).Table<(Guid, int, char), SubmittedIntent>(Intents).Values.Where(i => i.BattleId == battleId && i.Turn == turn).OrderBy(i => i.Side)];
@@ -208,7 +272,7 @@ internal sealed class PostgresCombatRepository : ICombatRepository
 
     private const string BattleColumns =
         "id, kind, status, rules_version, seed, seed_hash, character_a, account_a, character_b, account_b, npc_id, combatant_a::text, combatant_b::text, state::text, " +
-        "version, deadline, timeouts_a, timeouts_b, reward_qi, created_at, updated_at, finished_at";
+        "version, deadline, timeouts_a, timeouts_b, reward_qi, created_at, updated_at, finished_at, context";
 
     private static PostgresUnitOfWork Pg(IUnitOfWork uow) => PostgresUnitOfWork.From(uow);
 
@@ -256,13 +320,13 @@ internal sealed class PostgresCombatRepository : ICombatRepository
         r.IsDBNull(11) ? null : CombatJson.Read<Combatant>(r.GetString(11)), r.IsDBNull(12) ? null : CombatJson.Read<Combatant>(r.GetString(12)),
         r.IsDBNull(13) ? null : CombatJson.Read<BattleState>(r.GetString(13)),
         r.GetInt32(14), r.GetFieldValue<DateTimeOffset>(15), r.GetInt32(16), r.GetInt32(17), r.GetInt64(18),
-        r.GetFieldValue<DateTimeOffset>(19), r.GetFieldValue<DateTimeOffset>(20), r.IsDBNull(21) ? null : r.GetFieldValue<DateTimeOffset>(21));
+        r.GetFieldValue<DateTimeOffset>(19), r.GetFieldValue<DateTimeOffset>(20), r.IsDBNull(21) ? null : r.GetFieldValue<DateTimeOffset>(21), r.IsDBNull(22) ? null : r.GetString(22));
 
     private static object?[] BattleArgs(Battle b) =>
     [
         b.Id, b.Kind, b.Status, b.RulesVersion, (decimal)b.Seed, b.SeedHash, b.CharacterA.Value, b.AccountA.Value, b.CharacterB?.Value, b.AccountB?.Value, b.NpcId,
         b.CombatantA is null ? null : CombatJson.Write(b.CombatantA), b.CombatantB is null ? null : CombatJson.Write(b.CombatantB),
-        b.State is null ? null : CombatJson.Write(b.State), b.Version, b.Deadline, b.TimeoutsA, b.TimeoutsB, b.RewardQi, b.CreatedAt, b.UpdatedAt, b.FinishedAt,
+        b.State is null ? null : CombatJson.Write(b.State), b.Version, b.Deadline, b.TimeoutsA, b.TimeoutsB, b.RewardQi, b.CreatedAt, b.UpdatedAt, b.FinishedAt, b.Context,
     ];
 
     public Task<Loadout?> FindLoadoutAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
@@ -292,8 +356,8 @@ internal sealed class PostgresCombatRepository : ICombatRepository
     public Task AddBattleAsync(IUnitOfWork uow, Battle b, CancellationToken ct) =>
         Pg(uow).ExecuteAsync(
             "INSERT INTO combat.battles (id, kind, status, rules_version, seed, seed_hash, character_a, account_a, character_b, account_b, npc_id, combatant_a, combatant_b, state, " +
-            "version, deadline, timeouts_a, timeouts_b, reward_qi, created_at, updated_at, finished_at) " +
-            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13::jsonb, $14::jsonb, $15, $16, $17, $18, $19, $20, $21, $22)",
+            "version, deadline, timeouts_a, timeouts_b, reward_qi, created_at, updated_at, finished_at, context) " +
+            "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13::jsonb, $14::jsonb, $15, $16, $17, $18, $19, $20, $21, $22, $23)",
             ct, BattleArgs(b));
 
     public Task<Battle?> FindBattleAsync(IUnitOfWork uow, Guid id, CancellationToken ct) =>
@@ -320,6 +384,75 @@ internal sealed class PostgresCombatRepository : ICombatRepository
         (int)(await Pg(uow).QueryAsync(
             "SELECT count(*) FROM combat.battles WHERE character_a = $1 AND kind = 'pve' AND reward_qi > 0 AND finished_at >= $2",
             r => r.GetInt64(0), ct, characterId.Value, since)).Single();
+
+    public async Task<int> CountBattlesSinceAsync(IUnitOfWork uow, CharacterId characterId, string kind, string context, DateTimeOffset since, CancellationToken ct) =>
+        (int)(await Pg(uow).QueryAsync(
+            "SELECT count(*) FROM combat.battles WHERE character_a = $1 AND kind = $2 AND context = $3 AND created_at >= $4",
+            r => r.GetInt64(0), ct, characterId.Value, kind, context, since)).Single();
+
+    private const string TowerColumns = "character_id, account_id, name, best_floor, updated_at, version";
+
+    private static TowerProgress MapTower(NpgsqlDataReader r) =>
+        new(new CharacterId(r.GetGuid(0)), new AccountId(r.GetGuid(1)), r.GetString(2), r.GetInt32(3), r.GetFieldValue<DateTimeOffset>(4), r.GetInt32(5));
+
+    public Task<TowerProgress?> FindTowerAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
+        Pg(uow).QuerySingleOrDefaultAsync($"SELECT {TowerColumns} FROM combat.tower_progress WHERE character_id = $1", MapTower, ct, characterId.Value);
+
+    public async Task<bool> TrySaveTowerAsync(IUnitOfWork uow, TowerProgress p, int expectedVersion, CancellationToken ct) =>
+        expectedVersion == 0
+            ? await Pg(uow).ExecuteAsync(
+                "INSERT INTO combat.tower_progress (character_id, account_id, name, best_floor, updated_at, version) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (character_id) DO NOTHING",
+                ct, p.CharacterId.Value, p.AccountId.Value, p.Name, p.BestFloor, p.UpdatedAt, p.Version) == 1
+            : await Pg(uow).ExecuteAsync(
+                "UPDATE combat.tower_progress SET name = $2, best_floor = $3, updated_at = $4, version = $5 WHERE character_id = $1 AND version = $6",
+                ct, p.CharacterId.Value, p.Name, p.BestFloor, p.UpdatedAt, p.Version, expectedVersion) == 1;
+
+    public async Task<IReadOnlyList<TowerProgress>> ListTowerTopAsync(IUnitOfWork uow, int limit, CancellationToken ct) =>
+        await Pg(uow).QueryAsync($"SELECT {TowerColumns} FROM combat.tower_progress ORDER BY best_floor DESC, updated_at, character_id LIMIT $1", MapTower, ct, limit);
+
+    public async Task<int> CountTowerAheadAsync(IUnitOfWork uow, TowerProgress mine, CancellationToken ct) =>
+        (int)(await Pg(uow).QueryAsync(
+            "SELECT count(*) FROM combat.tower_progress WHERE best_floor > $1 OR (best_floor = $1 AND (updated_at < $2 OR (updated_at = $2 AND character_id < $3)))",
+            r => r.GetInt64(0), ct, mine.BestFloor, mine.UpdatedAt, mine.CharacterId.Value)).Single();
+
+    public Task<WorldBossState?> FindBossAsync(IUnitOfWork uow, int cycle, CancellationToken ct) =>
+        Pg(uow).QuerySingleOrDefaultAsync("SELECT npc_id, pool_hp, hp_left, defeated_at, version FROM combat.world_bosses WHERE cycle = $1",
+            r => new WorldBossState(cycle, r.GetString(0), r.GetInt32(1), r.GetInt32(2), r.IsDBNull(3) ? null : r.GetFieldValue<DateTimeOffset>(3), r.GetInt32(4)), ct, cycle);
+
+    public async Task<bool> TrySaveBossAsync(IUnitOfWork uow, WorldBossState b, int expectedVersion, CancellationToken ct) =>
+        expectedVersion == 0
+            ? await Pg(uow).ExecuteAsync(
+                "INSERT INTO combat.world_bosses (cycle, npc_id, pool_hp, hp_left, defeated_at, version) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (cycle) DO NOTHING",
+                ct, b.Cycle, b.NpcId, b.PoolHp, b.HpLeft, b.DefeatedAt, b.Version) == 1
+            : await Pg(uow).ExecuteAsync("UPDATE combat.world_bosses SET hp_left = $2, defeated_at = $3, version = $4 WHERE cycle = $1 AND version = $5",
+                ct, b.Cycle, b.HpLeft, b.DefeatedAt, b.Version, expectedVersion) == 1;
+
+    private const string DamageColumns = "cycle, character_id, account_id, name, damage, attempts, claimed_at, version";
+
+    private static WorldBossDamage MapDamage(NpgsqlDataReader r) =>
+        new(r.GetInt32(0), new CharacterId(r.GetGuid(1)), new AccountId(r.GetGuid(2)), r.GetString(3), r.GetInt64(4), r.GetInt32(5),
+            r.IsDBNull(6) ? null : r.GetFieldValue<DateTimeOffset>(6), r.GetInt32(7));
+
+    public Task<WorldBossDamage?> FindBossDamageAsync(IUnitOfWork uow, int cycle, CharacterId characterId, CancellationToken ct) =>
+        Pg(uow).QuerySingleOrDefaultAsync($"SELECT {DamageColumns} FROM combat.world_boss_damage WHERE cycle = $1 AND character_id = $2", MapDamage, ct, cycle, characterId.Value);
+
+    public async Task<bool> TrySaveBossDamageAsync(IUnitOfWork uow, WorldBossDamage d, int expectedVersion, CancellationToken ct) =>
+        expectedVersion == 0
+            ? await Pg(uow).ExecuteAsync(
+                "INSERT INTO combat.world_boss_damage (cycle, character_id, account_id, name, damage, attempts, claimed_at, version) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) " +
+                "ON CONFLICT (cycle, character_id) DO NOTHING",
+                ct, d.Cycle, d.CharacterId.Value, d.AccountId.Value, d.Name, d.Damage, d.Attempts, d.ClaimedAt, d.Version) == 1
+            : await Pg(uow).ExecuteAsync(
+                "UPDATE combat.world_boss_damage SET name = $3, damage = $4, attempts = $5, claimed_at = $6, version = $7 WHERE cycle = $1 AND character_id = $2 AND version = $8",
+                ct, d.Cycle, d.CharacterId.Value, d.Name, d.Damage, d.Attempts, d.ClaimedAt, d.Version, expectedVersion) == 1;
+
+    public async Task<IReadOnlyList<WorldBossDamage>> ListBossTopAsync(IUnitOfWork uow, int cycle, int limit, CancellationToken ct) =>
+        await Pg(uow).QueryAsync($"SELECT {DamageColumns} FROM combat.world_boss_damage WHERE cycle = $1 ORDER BY damage DESC, character_id LIMIT $2", MapDamage, ct, cycle, limit);
+
+    public async Task<int> CountBossAheadAsync(IUnitOfWork uow, WorldBossDamage mine, CancellationToken ct) =>
+        (int)(await Pg(uow).QueryAsync(
+            "SELECT count(*) FROM combat.world_boss_damage WHERE cycle = $1 AND (damage > $2 OR (damage = $2 AND character_id < $3))",
+            r => r.GetInt64(0), ct, mine.Cycle, mine.Damage, mine.CharacterId.Value)).Single();
 
     public async Task<IReadOnlyList<SubmittedIntent>> ListIntentsAsync(IUnitOfWork uow, Guid battleId, int turn, CancellationToken ct) =>
         await Pg(uow).QueryAsync("SELECT side, intent::text, submitted_at FROM combat.intents WHERE battle_id = $1 AND turn = $2 ORDER BY side",

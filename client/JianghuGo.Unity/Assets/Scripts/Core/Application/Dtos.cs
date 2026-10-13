@@ -167,6 +167,15 @@ namespace JianghuGo.Client.Application
         public int MaxHp { get; set; }
         public int Qi { get; set; }
         public int MaxQi { get; set; }
+        public List<EffectDto> Effects { get; set; } = new List<EffectDto>();
+
+        public int EffectMagnitude(string type)
+        {
+            foreach (var e in Effects) if (e.Type == type) return e.Magnitude;
+            return 0;
+        }
+
+        public bool Has(string type) => Effects.Exists(e => e.Type == type);
     }
 
     public sealed class TurnEventDto
@@ -183,6 +192,23 @@ namespace JianghuGo.Client.Application
         public int HpA { get; set; }
         public int HpB { get; set; }
         public int Healed { get; set; }
+        public int Momentum { get; set; }
+        public bool Exploit { get; set; }
+    }
+
+    /// <summary>What the opponent will do this turn (telegraphed by the server for NPC battles).</summary>
+    public sealed class IntentPreviewDto
+    {
+        public string Action { get; set; }
+        public string TechniqueId { get; set; }
+        public string NamePl { get; set; }
+    }
+
+    public sealed class EffectDto
+    {
+        public string Type { get; set; }
+        public int Magnitude { get; set; }
+        public int TurnsLeft { get; set; }
     }
 
     public sealed class BattleDto
@@ -206,6 +232,10 @@ namespace JianghuGo.Client.Application
         public string Seed { get; set; }
         public long RewardQi { get; set; }
         public string TamedPetNpcId { get; set; }
+        public IntentPreviewDto OpponentIntent { get; set; }
+        public int? TowerFloor { get; set; }
+        public int? BossCycle { get; set; }
+        public int DamageDealt { get; set; }
 
         public bool IsActive => Status == "active";
         public bool IsMine(TurnEventDto e) => e.Actor == MySide;

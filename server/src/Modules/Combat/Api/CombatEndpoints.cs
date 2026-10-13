@@ -24,6 +24,8 @@ public static class CombatEndpoints
             techniques = c.Techniques,
             paths = c.PathPerks,
             npcs = c.Npcs.Select(n => new { n.Id, n.NamePl, n.NameEn, n.RewardQi, n.Tier, n.Boss, n.WorldOnly, n.Tameable }),
+            combo = c.Combo,
+            worldBossNpcId = c.WorldBoss?.NpcId,
         })).WithTags("Combat").RequireAuthorization();
 
         var character = app.MapGroup("/api/v1/characters/{characterId:guid}/combat").WithTags("Combat").RequireAuthorization();
@@ -41,6 +43,16 @@ public static class CombatEndpoints
             ApiResults.From(await svc.StartHuntAsync(http.User.GetAccountId(), characterId, body, ct), hunt => Results.Ok(new { hunt })));
         character.MapPost("/hunt/claim", async (Guid characterId, HttpContext http, CombatService svc, CancellationToken ct) =>
             ApiResults.From(await svc.ClaimHuntAsync(http.User.GetAccountId(), characterId, ct), hunt => Results.Ok(new { hunt })));
+        character.MapGet("/tower", async (Guid characterId, HttpContext http, CombatService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.GetTowerAsync(http.User.GetAccountId(), characterId, ct), Results.Ok));
+        character.MapPost("/tower/start", async (Guid characterId, [FromHeader(Name = "Idempotency-Key")] string? key, HttpContext http, CombatService svc, CancellationToken ct) =>
+            await Guard(async () => ApiResults.From(await svc.StartTowerAsync(http.User.GetAccountId(), characterId, key, ct), v => Results.Created($"/api/v1/combat/battles/{v.Id}", v))));
+        character.MapGet("/world-boss", async (Guid characterId, HttpContext http, CombatService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.GetWorldBossAsync(http.User.GetAccountId(), characterId, ct), Results.Ok));
+        character.MapPost("/world-boss/start", async (Guid characterId, [FromHeader(Name = "Idempotency-Key")] string? key, HttpContext http, CombatService svc, CancellationToken ct) =>
+            await Guard(async () => ApiResults.From(await svc.StartWorldBossAsync(http.User.GetAccountId(), characterId, key, ct), v => Results.Created($"/api/v1/combat/battles/{v.Id}", v))));
+        character.MapPost("/world-boss/claim", async (Guid characterId, ClaimBossCommand body, HttpContext http, CombatService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.ClaimWorldBossAsync(http.User.GetAccountId(), characterId, body, ct), Results.Ok));
         character.MapGet("/battles", async (Guid characterId, HttpContext http, CombatService svc, CancellationToken ct) =>
             ApiResults.From(await svc.ListOpenAsync(http.User.GetAccountId(), characterId, ct), list => Results.Ok(new { items = list })));
 

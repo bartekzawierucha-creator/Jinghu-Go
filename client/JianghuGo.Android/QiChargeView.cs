@@ -32,10 +32,13 @@ namespace JianghuGo.Android
             _d = ctx.Resources.DisplayMetrics.Density;
             _text.SetTypeface(Ui.Display);
             _text.SetShadowLayer(4, 0, 1, Color.Black);
-            _meditate = new Anim(Ui.Art(ctx, Resource.Drawable.anim_hero_meditate), 320, 6, true);
-            _idle = new Anim(Ui.Art(ctx, Resource.Drawable.anim_hero_idle), 320, 6, true);
-            _gather = new Anim(Ui.Art(ctx, Resource.Drawable.fx_qi_gather), 256, 7, true);
+            _meditate = HeroArt.Load(ctx, HeroArt.CurrentPath, "meditate", 3, true);
+            _idle = HeroArt.Load(ctx, HeroArt.CurrentPath, "idle", 6, true);
+            _gather = HeroArt.Overlay(ctx, "ovl_meditate", 200, 8, true) ?? new Anim(Ui.Art(ctx, Resource.Drawable.fx_qi_gather), 256, 7, true);
+            _aura = HeroArt.Overlay(ctx, "ovl_aura_" + HeroArt.Normalize(HeroArt.CurrentPath), 200, 9, true);
         }
+
+        private readonly Anim _aura;
 
         public CultivationDto State { get; set; }
         public MeditationForecast Forecast { get; private set; }
@@ -64,9 +67,19 @@ namespace JianghuGo.Android
             var heroRect = new RectF(0, 0, side, side);
             if (meditating)
             {
-                var g = side * 1.05f;
-                _art.Alpha = 200;
-                canvas.DrawBitmap(_gather.Strip, _gather.Frame(now), new RectF(side / 2 - g / 2, side * 0.62f - g / 2, side / 2 + g / 2, side * 0.62f + g / 2), _art);
+                // qi spiralling into the cultivator, and the path's aura around them
+                var gw = side * 0.9f;
+                var gh = gw * _gather.Strip.Height / _gather.CellW;
+                _art.Alpha = 220;
+                canvas.DrawBitmap(_gather.Strip, _gather.Frame(now), new RectF(side / 2 - gw / 2, side - gh, side / 2 + gw / 2, side), _art);
+                if (_aura != null)
+                {
+                    _art.Alpha = 110;
+                    var ah = side * 1.0f;
+                    var aw = ah * 200f / 356f;
+                    canvas.DrawBitmap(_aura.Strip, _aura.Frame(now), new RectF(side / 2 - aw / 2, side - ah, side / 2 + aw / 2, side), _art);
+                }
+
                 _art.Alpha = 255;
             }
 

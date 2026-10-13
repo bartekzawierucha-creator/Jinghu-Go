@@ -62,7 +62,9 @@ public sealed record TurnEvent(
     int HpB,
     int QiA,
     int QiB,
-    int Healed = 0);
+    int Healed = 0,
+    int Momentum = 0,
+    bool Exploit = false);
 
 /// <summary>
 /// The whole combat ruleset as a pure function: (config, combatants, state, intents, rng) → (state', events).
@@ -110,6 +112,17 @@ public static class CombatEngine
         public readonly List<Effect> Effects = [.. f.Effects];
 
         public int Sum(string type) => Math.Min(900, Effects.Where(e => e.Type == type).Sum(e => e.Magnitude));
+
+        /// <summary>Momentum stacks (consecutive turns with a landed strike).</summary>
+        public int Momentum => Effects.FirstOrDefault(e => e.Type == EffectTypes.Momentum)?.Magnitude ?? 0;
+
+        public void SetMomentum(int stacks)
+        {
+            Effects.RemoveAll(e => e.Type == EffectTypes.Momentum);
+            if (stacks > 0) Effects.Add(new Effect(EffectTypes.Momentum, stacks, 0, 1));
+        }
+
+        public bool Weakened => Effects.Any(e => e.Type is EffectTypes.Bleed or EffectTypes.Weaken or EffectTypes.Stun);
         public Fighter Freeze() => new(Math.Max(0, Hp), MaxHp, Qi, MaxQi, [.. Cd], [.. Effects]);
     }
 
@@ -122,8 +135,10 @@ public static class CombatEngine
         var b = new W(s.B);
         var distance = s.Distance;
         var events = new List<TurnEvent>();
-        void Log(char actor, string action, string? tech = null, bool? hit = null, int dmg = 0, int reflected = 0, int stolen = 0, string? fx = null, int healed = 0) =>
-            events.Add(new TurnEvent(actor.ToString(), action, tech, hit, dmg, reflected, stolen, fx, distance, Math.Max(0, a.Hp), Math.Max(0, b.Hp), a.Qi, b.Qi, healed));
+        void Log(char actor, string action, string? tech = null, bool? hit = null, int dmg = 0, int reflected = 0, int stolen = 0, string? fx = null, int healed = 0,
+            bool exploit = false) =>
+            events.Add(new TurnEvent(actor.ToString(), action, tech, hit, dmg, reflected, stolen, fx, distance, Math.Max(0, a.Hp), Math.Max(0, b.Hp), a.Qi, b.Qi, healed,
+                (actor == 'a' ? a : b).Momentum, exploit));
 
         // 1. Effective intents: stun consumes the action; anything no longer legal degrades to rest (defence in depth).
         (Intent? Intent, bool Stunned) Effective(Combatant who, Fighter f, W w, Intent intent)
@@ -159,6 +174,7 @@ public static class CombatEngine
 
             if (stunned)
             {
+                me.SetMomentum(0);
                 Log(side, "stunned");
                 continue;
             }
@@ -166,6 +182,7 @@ public static class CombatEngine
             if (intent!.Slot is not { } slot)
             {
                 me.Qi = Math.Min(me.MaxQi, me.Qi + c.Vitals.RestQiGain);
+                me.SetMomentum(0);
                 Log(side, "rest");
                 continue;
             }
@@ -205,8 +222,8 @@ public static class CombatEngine
 
                 if (sp.Power > 0)
                 {
-                    var (hit, damage, reflected, stolen, applied) = Strike(me, foe, who, foeWho, eq, sp.Power, sp.Scaling!, sp.AccuracyPermille, sp.Effect);
-                    Log(side, "special", t.Id, hit: hit, dmg: damage, reflected: reflected, stolen: stolen, fx: applied, healed: healed);
+                    var (hit, damage, reflected, stolen, applied, exploit) = Strike(me, foe, who, foeWho, eq, sp.Power, sp.Scaling!, sp.AccuracyPermille, sp.Effect);
+                    Log(side, "special", t.Id, hit: hit, dmg: damage, reflected: reflected, stolen: stolen, fx: applied, healed: healed, exploit: exploit);
                 }
                 else
                 {
@@ -215,13 +232,15 @@ public static class CombatEngine
             }
             else if (t.Attack is { } atk)
             {
-                var (hit, damage, reflected, stolen, applied) = Strike(me, foe, who, foeWho, eq, atk.Power, atk.Scaling, atk.AccuracyPermille, atk.Effect);
-                Log(side, "attack", t.Id, hit: hit, dmg: damage, reflected: reflected, stolen: stolen, fx: applied);
+                var (hit, damage, reflected, stolen, applied, exploit) = Strike(me, foe, who, foeWho, eq, atk.Power, atk.Scaling, atk.AccuracyPermille, atk.Effect);
+                Log(side, "attack", t.Id, hit: hit, dmg: damage, reflected: reflected, stolen: stolen, fx: applied, exploit: exploit);
             }
         }
 
         // A strike (attack or special): hit roll, damage, counter-reflection, effect. Same RNG order as before 1.3.
-        (bool Hit, int Damage, int Reflected, int Stolen, string? Applied) Strike(W me, W foe, Combatant who, Combatant foeWho, EquippedTechnique eq,
+        // Combo rules (1.4): every momentum stack adds damage; striking a bleeding/weakened/stunned foe exploits the opening.
+        // A landed strike builds momentum, a miss loses it (as do resting and being stunned).
+        (bool Hit, int Damage, int Reflected, int Stolen, string? Applied, bool Exploit) Strike(W me, W foe, Combatant who, Combatant foeWho, EquippedTechnique eq,
             int power, string scaling, int accuracy, EffectSpec? effect)
         {
             var chance = c.HitChance.BasePermille
@@ -230,12 +249,19 @@ public static class CombatEngine
             chance = Math.Clamp(chance, c.HitChance.MinPermille, c.HitChance.MaxPermille);
             var hit = rng.NextInt(0, 1000) < chance;
             var variance = rng.NextInt(-c.Damage.VariancePermille, c.Damage.VariancePermille + 1);
-            if (!hit) return (false, 0, 0, 0, null);
+            if (!hit)
+            {
+                me.SetMomentum(0);
+                return (false, 0, 0, 0, null, false);
+            }
 
+            var combo = c.Combo;
+            var exploit = combo is not null && combo.ExploitPermille > 0 && foe.Weakened;
             long dmg = power;
             dmg = dmg * (1000 + ((eq.Level - 1) * c.Damage.LevelScalingPermille)) / 1000;
             dmg = dmg * (1000 + (who.Stat(scaling) * c.Damage.StatScalingPermille)) / 1000;
             dmg = dmg * (1000 + (who.Perks?.DamageBonus(scaling) ?? 0)) / 1000;
+            if (combo is not null) dmg = dmg * (1000 + (me.Momentum * combo.MomentumPermillePerStack) + (exploit ? combo.ExploitPermille : 0)) / 1000;
             dmg = dmg * (1000 - me.Sum(EffectTypes.Weaken)) / 1000;
             dmg = dmg * (1000 + variance) / 1000;
             dmg = dmg * (1000 - foe.Sum(EffectTypes.Guard)) / 1000;
@@ -260,7 +286,8 @@ public static class CombatEngine
                 applied = fx.Type;
             }
 
-            return (true, damage, reflected, stolen, applied);
+            if (combo is not null) me.SetMomentum(Math.Min(combo.MaxMomentum, me.Momentum + 1));
+            return (true, damage, reflected, stolen, applied, exploit);
         }
 
         // 4. End of turn: bleeding, effect expiry, cooldowns, Qi regeneration.
@@ -284,7 +311,7 @@ public static class CombatEngine
                 {
                     w.Effects.RemoveAt(i);
                 }
-                else if (e.Type != EffectTypes.Stun)
+                else if (e.Type is not (EffectTypes.Stun or EffectTypes.Momentum))
                 {
                     w.Effects[i] = e with { TurnsLeft = e.TurnsLeft - 1 };
                     if (e.TurnsLeft - 1 <= 0) w.Effects.RemoveAt(i);
@@ -345,4 +372,69 @@ public static class CombatAi
 
         return Intent.Rest;
     }
+
+    /// <summary>
+    /// Auto-battle for a player: the same legal options, weighted against what the opponent is about to do (the
+    /// telegraphed intent): guard or counter an incoming blow, strike hard into a resting or stunned foe, gather Qi
+    /// while the foe only defends.
+    /// </summary>
+    public static Intent ChooseAgainst(CombatConfig c, Combatant self, Fighter me, int distance, IntentPreview? foe, DeterministicRandom rng)
+    {
+        if (me.IsStunned) return Intent.Rest;
+        var foeAction = foe?.Action;
+        var options = new List<(Intent Intent, int Weight)> { (Intent.Rest, me.Qi < 10 ? 6 : foeAction == "defend" ? 3 : 1) };
+        for (var slot = 0; slot < 8; slot++)
+        {
+            if (self.Slots[slot] is not { } eq) continue;
+            var candidate = new Intent(slot, null);
+            if (CombatEngine.Validate(c, self, me, distance, candidate) is not null) continue;
+            var t = c.Technique(eq);
+            var weight = (t.Kind, foeAction) switch
+            {
+                (SlotKinds.Attack, "rest" or "stunned") => 10,
+                (SlotKinds.Attack, "defend") => 2,
+                (SlotKinds.Attack, "counter") => 1,
+                (SlotKinds.Attack, _) => 6,
+                (SlotKinds.Defense, "attack" or "special") => 5,
+                (SlotKinds.Defense, _) => 1,
+                (SlotKinds.Counter, "attack") => 8,
+                (SlotKinds.Counter, _) => 1,
+                (SlotKinds.Special, _) when t.Special is { HealPermille: > 0 } && me.Hp * 2 < me.MaxHp => 10,
+                (SlotKinds.Special, "rest" or "stunned") when t.Special is { Power: > 0 } => 9,
+                (SlotKinds.Special, "counter") when t.Special is { Power: > 0 } => 1,
+                (SlotKinds.Special, _) when t.Special is { Power: > 0 } => 6,
+                _ => 2,
+            };
+            options.Add((candidate, weight));
+        }
+
+        var total = options.Sum(o => o.Weight);
+        var pick = rng.NextInt(0, total);
+        foreach (var (intent, weight) in options)
+        {
+            pick -= weight;
+            if (pick < 0) return intent;
+        }
+
+        return Intent.Rest;
+    }
+
+    /// <summary>What an intent will do, as shown to the other side (telegraph): action kind and technique.</summary>
+    public static IntentPreview Preview(CombatConfig c, Combatant who, Fighter f, Intent intent)
+    {
+        if (f.IsStunned) return new IntentPreview("stunned", null, null);
+        if (intent.Slot is not { } slot || who.Slots.ElementAtOrDefault(slot) is not { } eq) return new IntentPreview("rest", null, null);
+        var t = c.Technique(eq);
+        var action = t.Kind switch
+        {
+            SlotKinds.Attack => "attack",
+            SlotKinds.Defense => "defend",
+            SlotKinds.Counter => "counter",
+            _ => "special",
+        };
+        return new IntentPreview(action, t.Id, t.NamePl);
+    }
 }
+
+/// <summary>A telegraphed action: attack / defend / special / counter / rest / stunned, with the technique when there is one.</summary>
+public sealed record IntentPreview(string Action, string? TechniqueId, string? NamePl);

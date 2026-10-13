@@ -14,6 +14,11 @@ internal static class EventMirrors
 {
     public const string BattleFinished = "combat.battle_finished";
     public const string ItemsGathered = "world.items_gathered";
+    public const string CombatItemsRewarded = "combat.items_rewarded";
+
+    public sealed record RewardLine(string ItemId, int Quantity);
+
+    public sealed record CombatItemsRewarded1(Guid AccountId, Guid CharacterId, string Source, string ReferenceId, long Stones, IReadOnlyList<RewardLine> Items);
 
     public sealed record BattleParticipant(Guid AccountId, Guid CharacterId, string Side, string Result, long RewardQi);
 
@@ -77,7 +82,8 @@ internal sealed class CombatLootHandler(IInventoryRepository repo, InventoryLedg
     public async Task HandleAsync(IUnitOfWork uow, OutboxMessage message, CancellationToken ct)
     {
         var e = message.Payload<EventMirrors.BattleFinished1>();
-        if (e.NpcId is null || !config.LootTables.TryGetValue(e.NpcId, out var table)) return;
+        // Only ordinary PvE: tower floors and the world boss pay their own rewards (combat.items_rewarded).
+        if (e.Kind != "pve" || e.NpcId is null || !config.LootTables.TryGetValue(e.NpcId, out var table)) return;
         foreach (var p in e.Participants.Where(p => p.RewardQi > 0))
         {
             // Seed from the outbox message id: generated server-side, never exposed, stable across handler retries.
@@ -98,5 +104,18 @@ internal sealed class WorldItemsHandler(IInventoryRepository repo, InventoryLedg
         var e = message.Payload<EventMirrors.ItemsGathered1>();
         return RewardGrant.ApplyAsync(repo, ledger, characters, audit, uow, message, e.AccountId, e.CharacterId,
             "gather", message.Id.ToString(), 0, [.. e.Items.Select(i => new LootLine(i.ItemId, i.Quantity))], config, ct);
+    }
+}
+
+/// <summary>Tower of Trials milestones and world boss kill rewards (Combat decides who earned what; granted once per event).</summary>
+internal sealed class CombatItemsHandler(IInventoryRepository repo, InventoryLedger ledger, ICharacterDirectory characters, IAuditLog audit, ItemsConfig config) : IOutboxHandler
+{
+    public string EventType => EventMirrors.CombatItemsRewarded;
+
+    public Task HandleAsync(IUnitOfWork uow, OutboxMessage message, CancellationToken ct)
+    {
+        var e = message.Payload<EventMirrors.CombatItemsRewarded1>();
+        return RewardGrant.ApplyAsync(repo, ledger, characters, audit, uow, message, e.AccountId, e.CharacterId,
+            e.Source, e.ReferenceId, e.Stones, [.. e.Items.Select(i => new LootLine(i.ItemId, i.Quantity))], config, ct);
     }
 }

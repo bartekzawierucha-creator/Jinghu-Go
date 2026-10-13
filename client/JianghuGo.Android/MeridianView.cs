@@ -37,7 +37,7 @@ namespace JianghuGo.Android
             _text.SetTypeface(Ui.Display);
             _text.TextAlign = Paint.Align.Center;
             _text.SetShadowLayer(4, 0, 1, Color.Black);
-            _silhouette = Ui.Art(ctx, Resource.Drawable.anim_hero_meditate);
+            _silhouette = Ui.Art(ctx, HeroArt.Id(ctx, HeroArt.CurrentPath, "meditate"));
             foreach (var (stat, _, _) in Nodes)
             {
                 var id = ctx.Resources.GetIdentifier("icon_" + stat, "drawable", ctx.PackageName);

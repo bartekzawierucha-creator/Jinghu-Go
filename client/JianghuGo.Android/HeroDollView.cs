@@ -29,7 +29,7 @@ namespace JianghuGo.Android
         public HeroDollView(Context ctx) : base(ctx)
         {
             _d = ctx.Resources.DisplayMetrics.Density;
-            _idle = new Anim(Ui.Art(ctx, Resource.Drawable.anim_hero_idle), 320, 7, true);
+            _idle = HeroArt.Load(ctx, HeroArt.CurrentPath, "idle", 7, true);
             _empty = Ui.Art(ctx, Resource.Drawable.item_slot_empty);
             _text.SetTypeface(Ui.Display);
             _text.TextAlign = Paint.Align.Center;

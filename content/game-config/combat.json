@@ -1,5 +1,5 @@
 {
-  "rulesVersion": "combat-2",
+  "rulesVersion": "combat-3",
   "maxTurns": 30,
   "turnDeadlineSeconds": 90,
   "challengeExpirySeconds": 600,
@@ -67,12 +67,51 @@
     {"id": "bandit_chief", "namePl": "Herszt Bandytów", "nameEn": "Bandit Chief", "hpOverride": 360, "rewardQi": 260, "stats": {"strength": 24, "spirit": 16, "agility": 20, "constitution": 24, "insight": 18, "willpower": 24, "focus": 14, "elementalAffinity": 5, "fate": 6}, "loadout": [{"id": "sword_thrust", "level": 5}, {"id": "thunder_palm", "level": 4}, {"id": "flying_daggers", "level": 5}, {"id": "tiger_claw", "level": 4}, {"id": "iron_shirt", "level": 5}, {"id": "flowing_water", "level": 5}, {"id": "cloud_step", "level": 4}, {"id": "mirror_palm", "level": 4}], "tier": 2, "boss": true, "worldOnly": true},
     {"id": "ancient_tortoise", "namePl": "Prastary Żółw", "nameEn": "Ancient Tortoise", "hpOverride": 700, "rewardQi": 420, "stats": {"strength": 28, "spirit": 30, "agility": 10, "constitution": 40, "insight": 20, "willpower": 30, "focus": 9, "elementalAffinity": 10, "fate": 3}, "loadout": [{"id": "mountain_splitter", "level": 6}, {"id": "spirit_lance", "level": 6}, {"id": "palm_strike", "level": 6}, null, {"id": "golden_bell", "level": 7}, {"id": "lotus_shield", "level": 7}, null, {"id": "turtle_reversal", "level": 7}], "tier": 3, "boss": true, "worldOnly": true, "tameable": true},
     {"id": "jiao_dragon", "namePl": "Smok Jiao", "nameEn": "Jiao Dragon", "hpOverride": 900, "rewardQi": 700, "stats": {"strength": 40, "spirit": 42, "agility": 34, "constitution": 40, "insight": 38, "willpower": 40, "focus": 21, "elementalAffinity": 14, "fate": 8}, "loadout": [{"id": "spirit_lance", "level": 8}, {"id": "inferno_burst", "level": 7}, {"id": "heavenly_sword_rain", "level": 8}, {"id": "thunder_palm", "level": 7}, {"id": "golden_bell", "level": 7}, {"id": "ember_aura", "level": 7}, {"id": "swallow_glide", "level": 7}, {"id": "cloud_mirror", "level": 7}], "tier": 4, "boss": true, "worldOnly": true},
-    {"id": "blood_demon_lord", "namePl": "Władca Krwawych Demonów", "nameEn": "Blood Demon Lord", "hpOverride": 1300, "rewardQi": 1200, "stats": {"strength": 48, "spirit": 50, "agility": 40, "constitution": 48, "insight": 45, "willpower": 48, "focus": 24, "elementalAffinity": 16, "fate": 10}, "loadout": [{"id": "inferno_burst", "level": 10}, {"id": "miasma_cloud", "level": 9}, {"id": "spirit_lance", "level": 10}, {"id": "tiger_claw", "level": 9}, {"id": "golden_bell", "level": 9}, {"id": "smoke_veil", "level": 9}, {"id": "ghost_step", "level": 9}, {"id": "qi_siphon", "level": 10}], "tier": 5, "boss": true, "worldOnly": true}
+    {"id": "blood_demon_lord", "namePl": "Władca Krwawych Demonów", "nameEn": "Blood Demon Lord", "hpOverride": 1300, "rewardQi": 1200, "stats": {"strength": 48, "spirit": 50, "agility": 40, "constitution": 48, "insight": 45, "willpower": 48, "focus": 24, "elementalAffinity": 16, "fate": 10}, "loadout": [{"id": "inferno_burst", "level": 10}, {"id": "miasma_cloud", "level": 9}, {"id": "spirit_lance", "level": 10}, {"id": "tiger_claw", "level": 9}, {"id": "golden_bell", "level": 9}, {"id": "smoke_veil", "level": 9}, {"id": "ghost_step", "level": 9}, {"id": "qi_siphon", "level": 10}], "tier": 5, "boss": true, "worldOnly": true},
+    {"id": "storm_qilin", "namePl": "Burzowy Qilin", "nameEn": "Storm Qilin", "hpOverride": 2500, "rewardQi": 0, "stats": {"strength": 40, "spirit": 46, "agility": 30, "constitution": 44, "insight": 40, "willpower": 42, "focus": 22, "elementalAffinity": 15, "fate": 8}, "loadout": [{"id": "thunder_palm", "level": 6}, {"id": "spirit_lance", "level": 6}, {"id": "heavenly_sword_rain", "level": 5}, {"id": "tiger_claw", "level": 5}, {"id": "golden_bell", "level": 5}, {"id": "lotus_shield", "level": 5}, {"id": "swallow_glide", "level": 4}, {"id": "cloud_mirror", "level": 4}], "tier": 5, "boss": true, "worldOnly": true}
   ],
   "pathPerks": {
     "qi": {"descriptionPl": "Mistrz energii: +25% maks. Qi, +3 Qi co turę, techniki Ducha +10% obrażeń. Poza walką medytacja daje 1,5× Qi.", "qiPermille": 250, "qiRegen": 3, "scalingDamagePermille": {"spirit": 100}},
     "body": {"descriptionPl": "Niezłomne ciało: +25% życia, gardy i osłony +10 pkt, leczenie +5% maks. HP, techniki Siły +10% obrażeń. Poza walką Qi z kroków.", "guardPermille": 100, "healPermille": 50, "scalingDamagePermille": {"strength": 100}},
     "flame": {"descriptionPl": "Ogień wewnętrzny: krwawienie i oparzenia +50% obrażeń, efekty +10% szans, techniki Ducha +6% obrażeń. Poza walką 250 Qi z miejsc Płomienia.", "bleedPermille": 500, "effectChancePermille": 100, "scalingDamagePermille": {"spirit": 60}},
     "poison": {"descriptionPl": "Podstęp i jad: efekty +25% szans, techniki Zręczności +10% obrażeń. Poza walką medytacja nocą (21–5) daje 2× Qi.", "effectChancePermille": 250, "scalingDamagePermille": {"agility": 100}}
+  },
+  "combo": {"momentumPermillePerStack": 80, "maxMomentum": 3, "exploitPermille": 150},
+  "tower": {
+    "floors": 50,
+    "pool": ["training_dummy", "grey_wolf", "wild_boar", "bamboo_viper", "mountain_bandit", "fire_fox", "stone_golem", "frost_spider", "demonic_cultivator", "sect_traitor", "thunder_eagle", "corpse_puppet"],
+    "bossPool": ["bandit_chief", "ancient_tortoise", "jiao_dragon", "blood_demon_lord", "blood_demon_lord"],
+    "bossEvery": 10,
+    "statPermillePerFloor": 20,
+    "hpPermillePerFloor": 30,
+    "qiPerFloor": 20,
+    "rewards": [
+      {"floor": 5, "stones": 100, "items": [{"item": "refining_stone", "quantity": 2}]},
+      {"floor": 10, "stones": 200, "items": [{"item": "foundation_pill", "quantity": 1}, {"item": "spirit_silk", "quantity": 3}]},
+      {"floor": 15, "stones": 250, "items": [{"item": "refining_stone", "quantity": 4}]},
+      {"floor": 20, "stones": 400, "items": [{"item": "demon_core_pill", "quantity": 1}, {"item": "frost_silk", "quantity": 3}]},
+      {"floor": 25, "stones": 500, "items": [{"item": "refining_stone", "quantity": 6}, {"item": "lotus_seed", "quantity": 3}]},
+      {"floor": 30, "stones": 700, "items": [{"item": "core_pill", "quantity": 1}, {"item": "thunder_feather", "quantity": 2}]},
+      {"floor": 35, "stones": 800, "items": [{"item": "star_iron", "quantity": 3}]},
+      {"floor": 40, "stones": 1000, "items": [{"item": "soul_jade", "quantity": 2}, {"item": "core_pill", "quantity": 1}]},
+      {"floor": 45, "stones": 1200, "items": [{"item": "refining_stone", "quantity": 10}, {"item": "tortoise_shell", "quantity": 2}]},
+      {"floor": 50, "stones": 2000, "items": [{"item": "nascent_pill", "quantity": 1}, {"item": "dragon_scale", "quantity": 3}]}
+    ]
+  },
+  "worldBoss": {
+    "npcId": "storm_qilin",
+    "poolHp": 20000,
+    "phaseHp": 2500,
+    "attemptsPerDay": 3,
+    "cycleDays": 7,
+    "qiPerHundredDamage": 8,
+    "maxQiPerAttempt": 200,
+    "minDamageForKillReward": 300,
+    "killStones": 1500,
+    "killItems": [
+      {"item": "refining_stone", "quantity": 5},
+      {"item": "core_pill", "quantity": 1},
+      {"item": "thunder_feather", "quantity": 2}
+    ]
   }
 }

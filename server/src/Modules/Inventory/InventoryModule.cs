@@ -46,6 +46,7 @@ public static class InventoryModule
         services.AddScoped<InventoryService>();
         services.AddSingleton<JianghuGo.Application.IOutboxHandler, CombatLootHandler>();
         services.AddSingleton<JianghuGo.Application.IOutboxHandler, WorldItemsHandler>();
+        services.AddSingleton<JianghuGo.Application.IOutboxHandler, CombatItemsHandler>();
         return services;
     }
 

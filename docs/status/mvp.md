@@ -1,6 +1,6 @@
-# Jianghu Go — MVP 1.3.0
+# Jianghu Go — MVP 1.4.0
 
-Data: 2026-10-13. Wersja: **1.3.0** (aplikacja Android `pl.bz.jianghugo`, kod wersji 7). Poprzednie: 1.2.0, 1.1.x, 1.0.0-mvp.
+Data: 2026-10-13. Wersja: **1.4.0** (aplikacja Android `pl.bz.jianghugo`, kod wersji 8). Poprzednie: 1.3.0, 1.2.0, 1.1.x, 1.0.0-mvp.
 
 MVP to grywalna wersja całej pętli gry na Androidzie: od narodzin postaci, przez kultywację, eksplorację z GPS i walki, po ekonomię, sekty i wojny o terytoria. Działa w dwóch trybach: **offline** (serwer gry wbudowany w aplikację, jeden gracz) i **z serwerem** (wielu graczy, PostgreSQL). Wszystkie reguły liczy serwer — klient tylko pokazuje stan i wysyła intencje.
 
@@ -23,6 +23,8 @@ MVP to grywalna wersja całej pętli gry na Androidzie: od narodzin postaci, prz
 | Wygląd (1.1) | Samouczek mistrza, awatar z kierunkiem z kompasu, mgła wojny, sylwetka bohatera ze slotami ekwipunku, okna łupu i przełomu, wygląd i aury każdego przeciwnika, efekty zależne od techniki, dźwięki |
 | Interfejs (1.2) | Stała powłoka bez przewijania: pasek bohatera (portret, królestwo, Qi, kamienie, zadania/sakwa/wieści z licznikami), 5 sekcji w dolnym pasku (Kultywacja, Świat, Walka, Bohater, Sekta), listy na stronach przesuwanych w bok, szczegóły w panelach od dołu, samouczek wskazujący prawdziwe przyciski, kreator postaci w 3 krokach, czcionka Cinzel, wibracje i dźwięki |
 | Walka (1.3) | Bez dystansu — każdy atak sięga; slot ruchu zastąpiła umiejętność specjalna (cios, leczenie, unik, osłona, efekt; każda ścieżka ma własną), walka automatyczna (serwer gra turę za gracza), polowanie idle: walki co 5 min przez 4 h także przy zamkniętej grze, z prawdziwymi nagrodami w dziennym limicie |
+| Walka i wyzwania (1.4) | Zapowiedź ruchu przeciwnika (serwer pokazuje, co NPC zrobi w tej turze; auto-walka na to odpowiada), rozpęd (seria trafień +8% obrażeń na stos, maks. 3) i wykorzystanie słabości (+15% w krwawiącego/osłabionego/ogłuszonego), Wieża Prób (50 pięter, strażnicy co 10, nagrody za pierwsze przejście, ranking), Boss Świata (wspólna pula HP na tydzień, 3 próby dziennie, Qi za obrażenia, nagroda za ubicie, ranking obrażeń), czat sekty (członkowie, limit 5 wiadomości / 30 s, retencja 30 dni) |
+| Oprawa (1.4) | Osobny arkusz bohatera dla każdej ścieżki (ta sama postać we wszystkich ruchach: postawa, cios, technika, specjał, garda, trafienie, porażka, zwycięstwo, medytacja), szarża do przeciwnika, błysk trafienia, wstrząs ekranu, aury ścieżek, efekty świetlne z wideo (leczenie, trafienia krytyczne, statusy, piorun, deszcz, zwycięstwo, niskie HP), mniejsze postacie na arenie (głębia), nowe ikony technik i menu w jednym stylu, czytelny krój tekstu |
 | Postać (1.3) | Premie każdej ścieżki w walce (Qi: więcej Qi i regeneracja; Ciało: HP, gardy, leczenie; Płomień: oparzenia; Trucizna: szansa efektów), opisy premii cech pochodzenia/krwi/konstytucji, tytuły z premiami do cech, poziomy Alchemii i Kowalstwa (szansa, rabat, receptury od poziomu) |
 | Tryb offline | Pełny serwer w aplikacji, stan zapisywany do pliku i odtwarzany po ponownym uruchomieniu |
 

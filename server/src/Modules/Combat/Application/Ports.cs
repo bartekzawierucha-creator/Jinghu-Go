@@ -23,6 +23,33 @@ public interface ICombatRepository
 
     Task<int> CountRewardedPveWinsSinceAsync(IUnitOfWork uow, CharacterId characterId, DateTimeOffset since, CancellationToken ct);
 
+    /// <summary>Battles of this kind and context the character started (as side A) at or after <paramref name="since"/>.</summary>
+    Task<int> CountBattlesSinceAsync(IUnitOfWork uow, CharacterId characterId, string kind, string context, DateTimeOffset since, CancellationToken ct);
+
+    // ---- Tower of Trials
+    Task<TowerProgress?> FindTowerAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct);
+
+    /// <summary>Insert when <paramref name="expectedVersion"/> is 0, otherwise update only at that version.</summary>
+    Task<bool> TrySaveTowerAsync(IUnitOfWork uow, TowerProgress progress, int expectedVersion, CancellationToken ct);
+
+    /// <summary>Highest floor first; ties: who got there first.</summary>
+    Task<IReadOnlyList<TowerProgress>> ListTowerTopAsync(IUnitOfWork uow, int limit, CancellationToken ct);
+    Task<int> CountTowerAheadAsync(IUnitOfWork uow, TowerProgress mine, CancellationToken ct);
+
+    // ---- world boss
+    Task<WorldBossState?> FindBossAsync(IUnitOfWork uow, int cycle, CancellationToken ct);
+
+    /// <summary>Insert when <paramref name="expectedVersion"/> is 0, otherwise update only at that version.</summary>
+    Task<bool> TrySaveBossAsync(IUnitOfWork uow, WorldBossState boss, int expectedVersion, CancellationToken ct);
+    Task<WorldBossDamage?> FindBossDamageAsync(IUnitOfWork uow, int cycle, CharacterId characterId, CancellationToken ct);
+
+    /// <summary>Insert when <paramref name="expectedVersion"/> is 0, otherwise update only at that version.</summary>
+    Task<bool> TrySaveBossDamageAsync(IUnitOfWork uow, WorldBossDamage damage, int expectedVersion, CancellationToken ct);
+
+    /// <summary>Most damage first; ties by character id.</summary>
+    Task<IReadOnlyList<WorldBossDamage>> ListBossTopAsync(IUnitOfWork uow, int cycle, int limit, CancellationToken ct);
+    Task<int> CountBossAheadAsync(IUnitOfWork uow, WorldBossDamage mine, CancellationToken ct);
+
     Task<IReadOnlyList<SubmittedIntent>> ListIntentsAsync(IUnitOfWork uow, Guid battleId, int turn, CancellationToken ct);
 
     /// <summary>Throws <see cref="DuplicateKeyException"/> if the side already submitted for this turn.</summary>

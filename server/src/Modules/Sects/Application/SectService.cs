@@ -22,6 +22,10 @@ public sealed record ApplicationView(Guid Id, Guid SectId, Guid CharacterId, str
 
 public sealed record SectEventView(Guid Id, string Kind, Guid? Actor, Guid? Subject, JsonElement Data, DateTimeOffset At);
 
+public sealed record ChatMessageView(Guid Id, Guid CharacterId, string Name, string Text, DateTimeOffset At);
+
+public sealed record PostChatCommand(Guid CharacterId, string? Text);
+
 public sealed record FoundSectCommand(Guid CharacterId, string? Name);
 
 public sealed record ApplyCommand(Guid CharacterId, string? Message);
@@ -121,6 +125,36 @@ public sealed class SectService(
             return Result<IReadOnlyList<SectEventView>>.Success([.. rows.Select(e => new SectEventView(e.Id, e.Kind, e.Actor?.Value, e.Subject?.Value,
                 JsonDocument.Parse(e.DataJson).RootElement.Clone(), e.At))]);
         }, ct);
+
+    // ---------------------------------------------------------------- chat
+
+    /// <summary>The latest messages (oldest first), or only those after <paramref name="after"/> for polling. Members only.</summary>
+    public Task<Result<IReadOnlyList<ChatMessageView>>> ChatAsync(AccountId accountId, Guid sectId, Guid characterId, Guid? after, int? limit, CancellationToken ct) =>
+        uowFactory.RunAsync<Result<IReadOnlyList<ChatMessageView>>>(async uow =>
+        {
+            var actor = await ActorAsync(uow, accountId, characterId, sectId, ct);
+            if (!actor.IsSuccess) return actor.Error!;
+            var rows = await repo.ListChatAsync(uow, sectId, after, Math.Clamp(limit ?? 50, 1, MaxPageSize), ct);
+            return Result<IReadOnlyList<ChatMessageView>>.Success([.. rows.Reverse().Select(ChatView)]);
+        }, ct);
+
+    /// <summary>Posts a line to the sect chat: members only, plain text up to 300 characters, at most 5 lines per 30 s.</summary>
+    public Task<Result<ChatMessageView>> PostChatAsync(AccountId accountId, Guid sectId, string? key, PostChatCommand cmd, CancellationToken ct) =>
+        Write<ChatMessageView, object>(accountId, "sects.chat", key, new { sectId, cmd }, async uow =>
+        {
+            var actor = await ActorAsync(uow, accountId, cmd.CharacterId, sectId, ct);
+            if (!actor.IsSuccess) return actor.Error!;
+            if (SectChat.Clean(cmd.Text) is not { } text)
+                return Error.Validation("chat_message_invalid", $"A message has 1-{SectChat.MaxLength} characters and no control characters.");
+            var now = clock.GetUtcNow();
+            if (await repo.CountChatSinceAsync(uow, actor.Value.Character.Id, now - SectChat.BurstWindow, ct) >= SectChat.BurstMessages)
+                return Error.LimitReached("chat_rate_limited", "Too many messages; wait a moment.");
+            var message = new ChatMessage(Uuid7.New(), sectId, actor.Value.Character.Id, actor.Value.Character.Name, text, now);
+            await repo.AddChatAsync(uow, message, ct);
+            return ChatView(message);
+        }, ct);
+
+    private static ChatMessageView ChatView(ChatMessage m) => new(m.Id, m.CharacterId.Value, m.Name, m.Text, m.At);
 
     // ---------------------------------------------------------------- applications
 

@@ -956,6 +956,26 @@ paths:
       responses:
         "200": { description: OK }
         "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/sects/{sectId}/chat:
+    get:
+      tags: [Sects]
+      summary: "Sect chat, members only (?characterId= of the reading member); latest lines oldest first, or only those after ?after= for polling."
+      parameters: [{ name: sectId, in: path, required: true, schema: { type: string, format: uuid } }, { name: characterId, in: query, required: true, schema: { type: string, format: uuid } }, { name: after, in: query, required: false, schema: { type: string, format: uuid } }, { name: limit, in: query, required: false, schema: { type: integer } }]
+      responses:
+        "200": { description: OK }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+    post:
+      tags: [Sects]
+      summary: "Post a chat line (members only, 1-300 characters without control characters, at most 5 lines per 30 seconds)."
+      parameters: [{ name: sectId, in: path, required: true, schema: { type: string, format: uuid } }, { $ref: "#/components/parameters/IdempotencyKey" }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, additionalProperties: false, required: [characterId, text], properties: { characterId: { type: string, format: uuid }, text: { type: string, maxLength: 300 } } } } } }
+      responses:
+        "201": { description: Posted }
+        "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
   /api/v1/sects/{sectId}/applications:
     post:
       tags: [Sects]
@@ -1290,6 +1310,59 @@ paths:
       tags: [Combat]
       summary: End the hunt and return its final tally (rewards are credited per battle).
       parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/combat/tower:
+    get:
+      tags: [Combat]
+      summary: Tower of Trials - highest floor cleared, the next floor, the next milestone reward and the leaderboard.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/combat/tower/start:
+    post:
+      tags: [Combat]
+      summary: Fight the next tower floor (first clears pay Qi, milestones pay stones and items).
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
+      responses:
+        "201": { description: Battle started }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/combat/world-boss:
+    get:
+      tags: [Combat]
+      summary: The world boss of the current cycle - shared HP pool, attempts left today, damage ranking and kill reward.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/combat/world-boss/start:
+    post:
+      tags: [Combat]
+      summary: Attack the world boss (a battle against one phase; the damage dealt comes off the shared pool).
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
+      responses:
+        "201": { description: Battle started }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/combat/world-boss/claim:
+    post:
+      tags: [Combat]
+      summary: Collect the kill reward of a defeated world boss (once per cycle, for a fair share of the damage).
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                cycle: { type: integer, nullable: true }
       responses:
         "200": { description: OK }
         "404": { $ref: "#/components/responses/Problem" }
