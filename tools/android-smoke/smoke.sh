@@ -78,6 +78,17 @@ $UI shot shots/06-battle-turn.png
 $UI tap "Wróć"
 $UI wait "Szansa przełomu" 60
 
+step "new enemies have their own sprites"
+for foe in "Kamienny Golem" "Zdrajca Sekty"; do
+  $UI tap "$foe"
+  $UI wait "Tura" 60
+  $UI tap "Odpoczynek" 20
+  sleep 3
+  $UI shot "shots/06-$(echo "$foe" | tr ' ' '_').png"
+  $UI tap "Wróć"
+  $UI wait "Szansa przełomu" 60
+done
+
 step "bag"
 $UI tap "Sakwa, kuźnia"
 $UI wait "Kamienie Duchowe" 60
