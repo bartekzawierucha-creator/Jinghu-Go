@@ -186,7 +186,7 @@ namespace JianghuGo.Android
                 canvas.DrawText(f.SessionFull ? "Sesja osiągnęła limit — zakończ ją, by zebrać Qi" : "Dzienny limit medytacji nie wystarczy — reszta jutro", 4 * _d, side + 40 * _d, _text);
             }
 
-            if (meditating || Math.Abs(_shown - target) > 0.001f || _motes.Count > 0) PostInvalidateDelayed(33);
+            if (meditating || Math.Abs(_shown - target) > 0.001f || _motes.Count > 0) PostInvalidateDelayed(50);
             else PostInvalidateDelayed(500);
         }
     }
