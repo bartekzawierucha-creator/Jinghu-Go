@@ -24,6 +24,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../JianghuGo.Client.Core.csproj" />
-    <TrimmerRootAssembly Include="JianghuGo.Client.Core" />
+    <TrimmerRootAssembly Include="JianghuGo.Client.Core" RootMode="All" />
   </ItemGroup>
 </Project>
