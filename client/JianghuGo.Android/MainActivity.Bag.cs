@@ -180,7 +180,8 @@ namespace JianghuGo.Android
         private void Forge(EconomyFlow economy, Ui ui, LinearLayout page, int startPage)
         {
             var inv = economy.Inventory;
-            var names = inv.Stacks.GroupBy(s => s.ItemId).ToDictionary(g => g.Key, g => g.First().NamePl);
+            var names = new Dictionary<string, string>(economy.Recipes.Names ?? new Dictionary<string, string>());
+            foreach (var st in inv.Stacks) names[st.ItemId] = st.NamePl;
             foreach (var it in inv.Items) names[it.ItemId] = it.NamePl;
             string N(string id) => names.TryGetValue(id, out var n) ? n : Pretty(id);
             var recipes = economy.Recipes.Items.OrderByDescending(r => economy.CanAfford(r, 1)).ThenBy(r => r.Stones).ToList();

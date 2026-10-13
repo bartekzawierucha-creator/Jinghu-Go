@@ -14,9 +14,12 @@ public static class CraftingEndpoints
 {
     public static IEndpointRouteBuilder MapCraftingEndpoints(this IEndpointRouteBuilder app)
     {
-        app.MapGet("/api/v1/crafting/recipes", (CraftingConfig c) => Results.Ok(new
+        app.MapGet("/api/v1/crafting/recipes", (CraftingConfig c, JianghuGo.Modules.Inventory.Contracts.IItemCatalog catalog) => Results.Ok(new
         {
             c.RulesVersion,
+            // display names of every item a recipe uses or makes (the client cannot know items it has never owned)
+            names = c.Recipes.SelectMany(r => r.Inputs.Select(i => i.Item).Append(r.Output.Item)).Append(c.Upgrade.Material).Distinct()
+                .ToDictionary(id => id, id => catalog.Find(id)?.NamePl ?? id),
             c.AlchemyInsightBonusPermille,
             maxTimesPerRequest = CraftingRules.MaxTimesPerRequest,
             items = c.Recipes,

@@ -1,6 +1,6 @@
-# Jianghu Go — MVP 1.1.0
+# Jianghu Go — MVP 1.2.0
 
-Data: 2026-10-13. Wersja: **1.1.0** (aplikacja Android `pl.bz.jianghugo`, kod wersji 3). Poprzednia: 1.0.0-mvp.
+Data: 2026-10-13. Wersja: **1.2.0** (aplikacja Android `pl.bz.jianghugo`, kod wersji 6). Poprzednie: 1.1.x, 1.0.0-mvp.
 
 MVP to grywalna wersja całej pętli gry na Androidzie: od narodzin postaci, przez kultywację, eksplorację z GPS i walki, po ekonomię, sekty i wojny o terytoria. Działa w dwóch trybach: **offline** (serwer gry wbudowany w aplikację, jeden gracz) i **z serwerem** (wielu graczy, PostgreSQL). Wszystkie reguły liczy serwer — klient tylko pokazuje stan i wysyła intencje.
 
@@ -21,12 +21,13 @@ MVP to grywalna wersja całej pętli gry na Androidzie: od narodzin postaci, prz
 | Rozwój (1.1) | Dzienne zadania (3 na dzień), dzienny meldunek z serią, 13 osiągnięć z tytułami, meridiany (punkt za każdy etap + premia królestwa), duchowy towarzysz (oswajanie bestii, poziomy, premie), rankingi (kultywacja, PvP, bossowie, zwycięstwa) |
 | Gracze w okolicy (1.1) | Lista kultywatorów w promieniu 2 km z przybliżoną odległością (bez współrzędnych) i wyzwaniem na pojedynek |
 | Wygląd (1.1) | Samouczek mistrza, awatar z kierunkiem z kompasu, mgła wojny, sylwetka bohatera ze slotami ekwipunku, okna łupu i przełomu, wygląd i aury każdego przeciwnika, efekty zależne od techniki, dźwięki |
+| Interfejs (1.2) | Stała powłoka bez przewijania: pasek bohatera (portret, królestwo, Qi, kamienie, zadania/sakwa/wieści z licznikami), 5 sekcji w dolnym pasku (Kultywacja, Świat, Walka, Bohater, Sekta), listy na stronach przesuwanych w bok, szczegóły w panelach od dołu, samouczek wskazujący prawdziwe przyciski, kreator postaci w 3 krokach, czcionka Cinzel, wibracje i dźwięki |
 | Tryb offline | Pełny serwer w aplikacji, stan zapisywany do pliku i odtwarzany po ponownym uruchomieniu |
 
 ## Jak zostało sprawdzone
 - Serwer: testy jednostkowe i integracyjne na PostgreSQL i in-memory (w tym zapis/odczyt migawki stanu offline na wszystkich tabelach), testy SQL, ćwiczenie backup/restore, test obciążeniowy — CI `ci` zielone.
 - Klient: rdzeń klienta testowany z prawdziwym serwerem (m.in. prognoza medytacji zgodna z tym, co serwer przyznaje).
-- Android: CI `android-native-apk` buduje APK i przechodzi grę (w 1.1 także samouczek, meldunek, zadania, meridiany, rankingi, towarzysz i ekran postaci) na emulatorze Androida 14 bez serwera: tworzenie postaci, medytacja, eksploracja z emulowanym GPS, walka, sakwa, zestaw technik, miejsca Płomienia, powiadomienia, ponowne uruchomienie z zachowanym postępem. Zrzuty ekranu z każdego przebiegu: pre-release `android-smoke`.
+- Android: CI `android-native-apk` buduje APK i przechodzi grę (w 1.1 także samouczek, meldunek, zadania, meridiany, rankingi, towarzysz i ekran postaci) na emulatorze Androida 14 bez serwera: tworzenie postaci, medytacja, eksploracja z emulowanym GPS, walka, sakwa, zestaw technik, miejsca Płomienia, powiadomienia, ponowne uruchomienie z zachowanym postępem. Od 1.2 test idzie na trzech rozmiarach ekranu (16:9, 18.5:9, 20:9) i odrzuca każdy ekran, który wymagałby przewijania albo ucina tekst (samokontrola układu w aplikacji). Zrzuty ekranu z każdego przebiegu: pre-release `android-smoke`.
 
 ## Czego MVP nie obejmuje (świadomie)
 - Testów na fizycznych telefonach i profilowania baterii/GPS — następny krok przed szerszym udostępnieniem.
@@ -35,6 +36,6 @@ MVP to grywalna wersja całej pętli gry na Androidzie: od narodzin postaci, prz
 - Klient Unity — zastąpiony w MVP natywnym klientem Android; pozostaje w repozytorium jako alternatywa.
 
 ## Instalacja
-1. Pobierz `JianghuGo-dev.apk` z wydania **v1.1.0** (telefony ARM64; `JianghuGo-dev-arm32.apk` dla starszych 32-bitowych).
+1. Pobierz `JianghuGo-dev.apk` z wydania **v1.2.0** (telefony ARM64; `JianghuGo-dev-arm32.apk` dla starszych 32-bitowych).
 2. Zezwól na instalację z nieznanego źródła i zainstaluj.
 3. Graj offline od razu, albo uruchom serwer (`API_BIND=0.0.0.0 docker compose up --build`) i wpisz jego adres na ekranie logowania.

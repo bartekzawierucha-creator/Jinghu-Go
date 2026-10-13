@@ -119,6 +119,9 @@ namespace JianghuGo.Client.Application
         public int MaxTimesPerRequest { get; set; }
         public List<RecipeDto> Items { get; set; } = new List<RecipeDto>();
         public UpgradeRulesDto Upgrade { get; set; }
+
+        /// <summary>Polish names of all items used or made by recipes.</summary>
+        public Dictionary<string, string> Names { get; set; } = new Dictionary<string, string>();
     }
 
     public sealed class CraftResultDto
