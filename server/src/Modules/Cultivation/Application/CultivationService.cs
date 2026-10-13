@@ -26,7 +26,10 @@ public sealed record CultivationView(
     long DailyMeditationQi,
     long DailyMeditationQiCap,
     int DailySteps,
-    int DailyStepCap);
+    int DailyStepCap,
+    double MeditationQiPerMinute,
+    int MeditationMaxMinutes,
+    int MeditationMinMinutes);
 
 public sealed record MeditationResult(long QiGained, int MinutesCounted, bool DailyCapReached, CultivationView State);
 
@@ -229,7 +232,9 @@ public sealed class CultivationService(
             peak ? 0 : CultivationRules.QiRequired(config, s.RealmIndex, s.Stage),
             peak ? 0 : CultivationRules.SuccessChancePpm(config, s.RealmIndex, s.Stage, c.Stats) / (double)CultivationRules.ChanceScale,
             CultivationRules.IsMajor(config, s.RealmIndex, s.Stage), s.Version, s.DeviationUntil, s.MeditationStartedAt,
-            s.DailyMeditationQi, config.Meditation.DailyQiCap, s.DailySteps, config.Paths.Body.DailyStepCap);
+            s.DailyMeditationQi, config.Meditation.DailyQiCap, s.DailySteps, config.Paths.Body.DailyStepCap,
+            (double)CultivationRules.MeditationRate(config, s.Path, c.Stats.GetValueOrDefault("spirit"), clock.GetUtcNow(), s.DeviationUntil),
+            config.Meditation.MaxMinutes, config.Meditation.MinMinutes);
     }
 
     private Task AuditAsync(IUnitOfWork uow, AccountId accountId, string action, Guid characterId, object data, DateTimeOffset now, CancellationToken ct) =>

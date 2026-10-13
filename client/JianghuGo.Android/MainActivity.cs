@@ -504,6 +504,8 @@ namespace JianghuGo.Android
             var realm = ui.Label("…", 18, Ui.Gold, bold: true, parent: info);
             var traitsText = ui.Label(string.Join(" · ", c.Traits.Select(t => t.NamePl)), 12, Ui.Muted, parent: info);
             var qi = ui.Meter("Qi", Ui.QiBlue, info, 20);
+            var charge = new QiChargeView(this);
+            ui.Add(charge, 176, card);
             var details = ui.Label(string.Empty, 13, parent: card);
             var flow = new CultivationFlow(_api, c.Id);
             var actions = ui.Columns(card);
@@ -519,6 +521,8 @@ namespace JianghuGo.Android
                 if (st == null) return;
                 realm.Text = st.RealmNamePl + " · etap " + st.Stage + "/" + st.StagesInRealm;
                 Ui.SetMeter(qi, "Qi  " + st.Qi + " / " + st.QiRequired, st.Qi, st.QiRequired);
+                charge.State = st;
+                charge.Invalidate();
                 var deviation = st.DeviationUntil.HasValue && st.DeviationUntil > DateTimeOffset.UtcNow
                     ? "\nOdchylenie Qi do " + st.DeviationUntil.Value.ToLocalTime().ToString("HH:mm") : string.Empty;
                 details.Text = "Szansa przełomu: " + Math.Round(st.BreakthroughChance * 100) + "%" +

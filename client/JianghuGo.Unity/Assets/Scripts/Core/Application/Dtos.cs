@@ -95,6 +95,11 @@ namespace JianghuGo.Client.Application
         public int DailySteps { get; set; }
         public int DailyStepCap { get; set; }
 
+        /// <summary>Server's current meditation rate (Qi per minute) for this character.</summary>
+        public double MeditationQiPerMinute { get; set; }
+        public int MeditationMaxMinutes { get; set; }
+        public int MeditationMinMinutes { get; set; }
+
         public bool IsMeditating => MeditationStartedAt.HasValue;
         public bool CanAttemptBreakthrough => !IsPeak && Qi >= QiRequired && !IsMeditating;
     }

@@ -54,6 +54,35 @@ public class ClientCultivationTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Meditation_forecast_matches_what_the_server_credits()
+    {
+        var api = new ApiClient(new HttpClientTransport(_host.NewClient()), new StjSerializer(), new InMemoryTokenStore());
+        await api.RegisterAsync("prognoza@test.dev", ApiHost.Password, default);
+        await api.LoginAsync("prognoza@test.dev", ApiHost.Password, default);
+        var creation = new CharacterCreationFlow(api);
+        await creation.StartAsync(default);
+        var character = await creation.FinalizeAsync("Prorok", "qi", default);
+
+        var flow = new CultivationFlow(api, character.Id);
+        await flow.LoadAsync(default);
+        Assert.True(flow.State!.MeditationQiPerMinute > 0, "the server reports the meditation rate");
+        var before = MeditationForecast.For(flow.State, _host.Clock.GetUtcNow());
+        Assert.Equal(0d, before.Progress);
+        Assert.Equal((int)Math.Ceiling(flow.State.QiRequired / flow.State.MeditationQiPerMinute), before.MinutesToFull);
+
+        await flow.StartMeditationAsync(default);
+        _host.Clock.Advance(TimeSpan.FromMinutes(17));
+        await flow.LoadAsync(default);
+        var during = MeditationForecast.For(flow.State, _host.Clock.GetUtcNow());
+        Assert.Equal(17, during.SessionMinutes);
+        var result = await flow.FinishMeditationAsync(default);
+        Assert.Equal(result.QiGained, during.PendingQi);
+        var after = MeditationForecast.For(flow.State, _host.Clock.GetUtcNow());
+        Assert.Equal(during.Progress, after.Progress);
+        Assert.True(after.MinutesToFull < before.MinutesToFull, "less meditation needed after a session");
+    }
+
+    [Fact]
     public async Task Stale_breakthrough_reloads_state_instead_of_failing()
     {
         var api = new ApiClient(new HttpClientTransport(_host.NewClient()), new StjSerializer(), new InMemoryTokenStore());

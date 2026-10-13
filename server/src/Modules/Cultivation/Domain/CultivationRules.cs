@@ -79,18 +79,23 @@ public static class CultivationRules
             return (0, Math.Max(0, minutes));
         }
 
-        var perMinute = m.BaseQiPerMinute * (1 + (spirit * m.SpiritBonusPerPoint)) * c.Paths.MeditationMultiplier(path);
         decimal total = 0;
         for (var i = 0; i < minutes; i++)
         {
-            var t = start.AddMinutes(i);
-            var rate = perMinute;
-            if (path == "poison" && IsPoisonNight(c, t)) rate *= c.Paths.Poison.NightMultiplier;
-            if (deviationUntil is { } d && t < d) rate *= m.DeviationMultiplier;
-            total += rate;
+            total += MeditationRate(c, path, spirit, start.AddMinutes(i), deviationUntil);
         }
 
         return ((long)Math.Floor(total), minutes);
+    }
+
+    /// <summary>Qi per minute of meditation at a given moment (path, spirit, poison night, Qi deviation).</summary>
+    public static decimal MeditationRate(CultivationConfig c, string path, int spirit, DateTimeOffset at, DateTimeOffset? deviationUntil)
+    {
+        var m = c.Meditation;
+        var rate = m.BaseQiPerMinute * (1 + (spirit * m.SpiritBonusPerPoint)) * c.Paths.MeditationMultiplier(path);
+        if (path == "poison" && IsPoisonNight(c, at)) rate *= c.Paths.Poison.NightMultiplier;
+        if (deviationUntil is { } d && at < d) rate *= m.DeviationMultiplier;
+        return rate;
     }
 
     /// <summary>

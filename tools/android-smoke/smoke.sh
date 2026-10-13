@@ -39,6 +39,8 @@ $UI wait "Szansa przełomu" 60
 $UI shot shots/03-character.png
 $UI tap "Medytuj"
 $UI wait "Medytujesz od" 30
+sleep 2
+$UI shot shots/03b-meditating.png
 
 step "world exploration with emulated GPS (Krakow)"
 $UI tap "Eksploruj świat"
