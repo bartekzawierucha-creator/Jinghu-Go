@@ -34,7 +34,17 @@ def center(node):
 
 
 def find(text):
-    for n in nodes():
+    all_nodes = nodes()
+    # a slow emulator sometimes shows "<app> isn't responding" for the launcher: keep waiting
+    for n in all_nodes:
+        if "isn't responding" in (n.get("text") or ""):
+            for w in all_nodes:
+                if (w.get("text") or "") == "Wait":
+                    x, y = center(w)
+                    subprocess.run(["adb", "shell", "input", "tap", str(x), str(y)])
+                    time.sleep(1)
+                    return None
+    for n in all_nodes:
         if text in (n.get("text") or "") or text in (n.get("content-desc") or ""):
             return n
     return None
