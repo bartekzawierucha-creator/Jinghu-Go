@@ -22,13 +22,10 @@ adb shell pm grant $PKG android.permission.ACCESS_COARSE_LOCATION
 adb logcat -c
 adb shell monkey -p $PKG -c android.intent.category.LAUNCHER 1 >/dev/null
 
-step "login screen"
-$UI wait "Zaloguj" 90
-$UI shot shots/01-login.png
-$UI tap "Graj offline"
+step "first start goes straight into the offline world"
 
 step "character creation"
-$UI wait "Narodziny wojownika" 60
+$UI wait "Narodziny wojownika" 120
 $UI wait "Żetony Losu" 30
 $UI shot shots/02-creation.png
 $UI tap "Losuj ponownie"
