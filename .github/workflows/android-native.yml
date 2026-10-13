@@ -4,6 +4,11 @@ name: android-native-apk
 # The APK is uploaded as a workflow artifact and attached to the rolling pre-release "android-latest".
 on:
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Publish as a versioned release with this tag (e.g. v1.0.0-mvp); empty = rolling android-latest"
+        required: false
+        default: ""
   push:
     branches: [main]
     paths: ["client/**", "server/src/**", "content/**", "tools/android-smoke/**", ".github/workflows/android-native.yml"]
@@ -110,9 +115,11 @@ jobs:
       - name: Publish to the android-latest pre-release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'android-latest' }}
-          name: ${{ startsWith(github.ref, 'refs/tags/v') && format('Jianghu Go {0}', github.ref_name) || 'Jianghu Go — Android (development build)' }}
-          prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
+          tag_name: ${{ inputs.release_tag || (startsWith(github.ref, 'refs/tags/v') && github.ref_name) || 'android-latest' }}
+          target_commitish: ${{ github.sha }}
+          name: ${{ (inputs.release_tag || startsWith(github.ref, 'refs/tags/v')) && format('Jianghu Go {0}', inputs.release_tag || github.ref_name) || 'Jianghu Go — Android (development build)' }}
+          prerelease: ${{ !(inputs.release_tag || startsWith(github.ref, 'refs/tags/v')) }}
+          make_latest: ${{ (inputs.release_tag || startsWith(github.ref, 'refs/tags/v')) && 'true' || 'false' }}
           files: |
             dist/JianghuGo-dev.apk
             dist/JianghuGo-dev-arm32.apk
