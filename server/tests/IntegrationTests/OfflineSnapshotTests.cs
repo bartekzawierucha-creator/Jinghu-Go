@@ -16,6 +16,7 @@ public class OfflineSnapshotTests
         try
         {
             string email, refresh, characterId;
+            long balance;
             var first = await ApiHost.StartAsync(settings, postgres: false);
             await using (first)
             {
@@ -25,6 +26,7 @@ public class OfflineSnapshotTests
                 email = p.Email;
                 refresh = p.RefreshToken;
                 characterId = character.Str("id");
+                balance = (await Cultivators.Ok(await p.GetAsync($"/api/v1/characters/{characterId}/inventory")))["balance"]!.GetValue<long>();
             }
 
             Assert.True(File.Exists(Path.Combine(dir, "world.json")), "snapshot written");
@@ -38,7 +40,8 @@ public class OfflineSnapshotTests
             var cultivation = await Cultivators.Ok(await again.GetAsync($"/api/v1/characters/{characterId}/cultivation"));
             Assert.True(cultivation["meditationStartedAt"] is not null, "meditation state kept");
             var bag = await Cultivators.Ok(await again.GetAsync($"/api/v1/characters/{characterId}/inventory"));
-            Assert.Equal(250, bag.Int("balance"));
+            Assert.True(balance >= 250, "funded");
+            Assert.Equal(balance, bag["balance"]!.GetValue<long>());
             await second.LoginAsync(email, ApiHost.Password);
         }
         finally
