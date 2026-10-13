@@ -75,6 +75,10 @@ $UI shot shots/05-battle.png
 $UI tap "Odpoczynek" 20
 sleep 3
 $UI shot shots/06-battle-turn.png
+$UI tap "Poddaj się"
+$UI tap "Dotknij ponownie" 20
+$UI wait "PORAŻKA" 30
+$UI tap "Dalej" 20
 $UI tap "Wróć"
 $UI wait "Szansa przełomu" 60
 
@@ -85,6 +89,10 @@ for foe in "Kamienny Golem" "Zdrajca Sekty"; do
   $UI tap "Odpoczynek" 20
   sleep 3
   $UI shot "shots/06-$(echo "$foe" | tr ' ' '_').png"
+  $UI tap "Poddaj się"
+  $UI tap "Dotknij ponownie" 20
+  $UI wait "PORAŻKA" 30
+  $UI tap "Dalej" 20
   $UI tap "Wróć"
   $UI wait "Szansa przełomu" 60
 done

@@ -286,6 +286,23 @@ public sealed class CombatService(
             return declinedView;
         }, ct);
 
+    /// <summary>Gives up an active battle: the other side wins at once (PvE: no reward, no penalty beyond the loss).</summary>
+    public Task<Result<BattleView>> ForfeitAsync(AccountId accountId, Guid battleId, CancellationToken ct) =>
+        uowFactory.RunAsync<Result<BattleView>>(async uow =>
+        {
+            var now = clock.GetUtcNow();
+            var battle = await LoadAndAdvanceAsync(uow, battleId, now, ct);
+            if (battle is null || battle.SideOf(accountId) is not { } side) return BattleNotFound;
+            if (battle.Status != BattleStatuses.Active) return Error.Conflict("battle_not_active", $"The battle is {battle.Status}.");
+            var outcome = side == 'a' ? Outcomes.BWon : Outcomes.AWon;
+            var finished = await FinishAsync(uow, battle with { State = battle.State! with { Outcome = outcome } }, battle.Version, now, ct);
+            if (finished is null) return Concurrent;
+            await AuditAsync(uow, accountId, "combat.forfeited", battle.Id, new { side = side.ToString() }, now, ct);
+            var view = await ViewAsync(uow, finished, side, ct);
+            await uow.CommitAsync(ct);
+            return view;
+        }, ct);
+
     // ---------------------------------------------------------------- turns
 
     public Task<Result<BattleView>> GetBattleAsync(AccountId accountId, Guid battleId, CancellationToken ct) =>

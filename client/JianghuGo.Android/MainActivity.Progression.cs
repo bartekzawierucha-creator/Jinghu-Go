@@ -35,15 +35,31 @@ namespace JianghuGo.Android
                 var n = npc;
                 if (i++ % 3 == 0) row = _ui.Columns(fights);
                 var look = NpcLooks.For(n.Id);
-                _ui.Tile(n.NamePl, new string('★', Math.Clamp(n.Tier, 1, 5)) + (n.Tameable ? "  🐾" : string.Empty), look.TileArt, () => Run(async () =>
-                {
-                    var combat = new CombatFlow(_api);
-                    await combat.StartPveAsync(c.Id, n.Id, Ct);
-                    ShowBattle(combat, c);
-                }), parent: row, heightDp: 128, pixelArt: true, accent: n.Tier >= 3 ? Ui.Violet : Ui.Cinnabar, titleSp: 12);
+                _ui.Tile(n.NamePl, new string('★', Math.Clamp(n.Tier, 1, 5)) + (n.Tameable ? "  🐾" : string.Empty), look.TileArt, () => Run(() => StartTrainingAsync(c, n.Id)), parent: row, heightDp: 128, pixelArt: true, accent: n.Tier >= 3 ? Ui.Violet : Ui.Cinnabar, titleSp: 12);
             }
 
             _ui.Label("★ = poziom zagrożenia · 🐾 = można oswoić po zwycięstwie. Bossowie czekają w świecie.", 11, Ui.Muted, parent: fights);
+        }
+
+        /// <summary>Starts a training fight; a fight left unfinished earlier is resumed instead (one battle at a time).</summary>
+        private async Task StartTrainingAsync(CharacterDto c, string npcId)
+        {
+            var combat = new CombatFlow(_api);
+            try
+            {
+                await combat.StartPveAsync(c.Id, npcId, Ct);
+            }
+            catch (ApiException e) when (e.Code == "already_in_battle")
+            {
+                var open = (await _api.GetOpenBattlesAsync(c.Id, Ct)).Items.FirstOrDefault(b => b.IsActive);
+                if (open == null) throw;
+                await combat.OpenAsync(open.Id, Ct);
+                ShowBattle(combat, c);
+                SetStatus("Najpierw dokończ trwającą walkę z: " + open.Opponent.Name);
+                return;
+            }
+
+            ShowBattle(combat, c);
         }
 
         /// <summary>Daily check-in banner and the title earned by achievements, under the hero card.</summary>

@@ -135,4 +135,9 @@ namespace JianghuGo.Client.Application
     {
         public List<CombatNpcDto> Npcs { get; set; } = new List<CombatNpcDto>();
     }
+
+    public sealed class OpenBattlesDto
+    {
+        public List<BattleDto> Items { get; set; } = new List<BattleDto>();
+    }
 }

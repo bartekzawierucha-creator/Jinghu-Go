@@ -27,6 +27,9 @@ namespace JianghuGo.Client.Application
 
         public Task RefreshAsync(CancellationToken ct) => OpenAsync(Battle.Id, ct);
 
+        /// <summary>Gives up the battle (the opponent wins).</summary>
+        public async Task ForfeitAsync(CancellationToken ct) => Set(await _api.ForfeitAsync(Battle.Id, ct).ConfigureAwait(false));
+
         /// <summary>
         /// Returns false (after refreshing) when the turn moved on before the action arrived — e.g. the deadline passed
         /// or the action was already submitted from another device.

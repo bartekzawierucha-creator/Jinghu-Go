@@ -220,6 +220,25 @@ public class ProgressionTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Forfeit_ends_the_battle_as_a_loss_and_frees_the_fighter()
+    {
+        var (p, c) = await NewAsync();
+        var id = c.Str("id");
+        var battle = await Ok(await p.PostAsync("/api/v1/combat/battles/pve", new { characterId = id, npcId = "grey_wolf" }, Player.NewKey()), HttpStatusCode.Created);
+        await Problem(await p.PostAsync("/api/v1/combat/battles/pve", new { characterId = id, npcId = "training_dummy" }, Player.NewKey()), HttpStatusCode.Conflict, "already_in_battle");
+        var (stranger, _) = await NewAsync();
+        await Problem(await stranger.PostAsync($"/api/v1/combat/battles/{battle.Str("id")}/forfeit"), HttpStatusCode.NotFound, "battle_not_found");
+
+        var done = await Ok(await p.PostAsync($"/api/v1/combat/battles/{battle.Str("id")}/forfeit"));
+        Assert.Equal("finished", done.Str("status"));
+        Assert.Equal("lost", done.Str("result"));
+        Assert.Equal(0, done.Int("rewardQi"));
+        await Problem(await p.PostAsync($"/api/v1/combat/battles/{battle.Str("id")}/forfeit"), HttpStatusCode.Conflict, "battle_not_active");
+        await Ok(await p.PostAsync("/api/v1/combat/battles/pve", new { characterId = id, npcId = "training_dummy" }, Player.NewKey()), HttpStatusCode.Created);
+        Assert.Null((await Ok(await p.GetAsync($"/api/v1/characters/{id}/combat/pet")))["pet"]);
+    }
+
+    [Fact]
     public async Task Spirit_pet_is_tamed_on_a_lucky_win_and_can_be_released()
     {
         var (p, c) = await NewAsync();

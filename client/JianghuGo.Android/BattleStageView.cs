@@ -176,8 +176,8 @@ namespace JianghuGo.Android
 
                 if (!battle.IsActive)
                 {
-                    var heroLost = battle.Me.Hp <= 0 || battle.Result != null && battle.Result != "draw" && battle.Result != battle.MySide + "_won";
-                    var foeLost = battle.Opponent.Hp <= 0 || battle.Result == battle.MySide + "_won";
+                    var heroLost = battle.Me.Hp <= 0 || battle.Result == "lost";
+                    var foeLost = battle.Opponent.Hp <= 0 || battle.Result == "won";
                     if (heroLost) _cues.Add(new Cue { Hero = true, Anim = _hero["defeat"], At = t });
                     if (foeLost) _cues.Add(new Cue { Hero = false, Anim = _foe["defeat"], At = t });
                     _endAt = t + 1100;
@@ -349,7 +349,7 @@ namespace JianghuGo.Android
 
             if (!Battle.IsActive && _endAt >= 0 && now >= _endAt)
             {
-                var won = Battle.Result == Battle.MySide + "_won";
+                var won = Battle.Result == "won";
                 var draw = Battle.Result == "draw";
                 _p.Color = Color.Argb(150, 0, 0, 0);
                 canvas.DrawRect(0, h * 0.36f, w, h * 0.6f, _p);

@@ -1046,7 +1046,7 @@ namespace JianghuGo.Android
                 if (!rewardShown && !b.IsActive && b.Status == "finished")
                 {
                     rewardShown = true;
-                    var won = b.Result == b.MySide + "_won";
+                    var won = b.Result == "won";
                     var shownGen = _screen;
                     _frame.PostDelayed(() =>
                     {
@@ -1138,6 +1138,25 @@ namespace JianghuGo.Android
                 Render();
             }), secondary: true, parent: Cell(bottom));
             ui.Action("Wróć", () => ShowCharacter(c), secondary: true, parent: Cell(bottom));
+            var confirmForfeit = false;
+            Button forfeit = null;
+            forfeit = ui.Action("🏳 Poddaj się", () =>
+            {
+                if (!combat.Battle.IsActive) return;
+                if (!confirmForfeit)
+                {
+                    confirmForfeit = true;
+                    forfeit.Text = "Na pewno? Dotknij ponownie, by się poddać";
+                    return;
+                }
+
+                Run(async () =>
+                {
+                    await combat.ForfeitAsync(Ct);
+                    if (gen == _screen) Render();
+                });
+            }, secondary: true);
+            buttons.Add(forfeit);
             Render();
         }
 
@@ -1607,8 +1626,8 @@ namespace JianghuGo.Android
         {
             "draw" => "remis",
             null => "-",
-            _ when b.Result == b.MySide + "_won" => "ZWYCIĘSTWO",
-            _ when b.Result.EndsWith("_won", StringComparison.Ordinal) => "porażka",
+            "won" => "ZWYCIĘSTWO",
+            "lost" => "porażka",
             _ => b.Result,
         };
 

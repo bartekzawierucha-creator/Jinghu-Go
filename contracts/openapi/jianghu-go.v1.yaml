@@ -1241,6 +1241,15 @@ paths:
       responses:
         "200": { description: OK }
         "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/combat/battles/{battleId}/forfeit:
+    post:
+      tags: [Combat]
+      summary: Give up an active battle; the opponent wins immediately.
+      parameters: [{ name: battleId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
 components:
   securitySchemes:
     bearer:

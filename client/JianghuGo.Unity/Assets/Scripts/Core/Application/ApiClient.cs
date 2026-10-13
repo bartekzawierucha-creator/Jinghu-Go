@@ -137,6 +137,9 @@ namespace JianghuGo.Client.Application
         public Task<BattleDto> ChallengeAsync(Guid characterId, Guid opponentCharacterId, CancellationToken ct) =>
             SendAsync<BattleDto>("POST", "/api/v1/combat/battles/pvp", new { characterId, opponentCharacterId }, true, NewIdempotencyKey(), ct);
 
+        public Task<BattleDto> ForfeitAsync(Guid battleId, CancellationToken ct) =>
+            SendAsync<BattleDto>("POST", "/api/v1/combat/battles/" + battleId + "/forfeit", null, true, null, ct);
+
         public Task<BattleDto> AcceptChallengeAsync(Guid battleId, CancellationToken ct) =>
             SendAsync<BattleDto>("POST", "/api/v1/combat/battles/" + battleId + "/accept", null, true, null, ct);
 
@@ -215,6 +218,10 @@ namespace JianghuGo.Client.Application
 
         public Task<PetEnvelopeDto> ReleasePetAsync(Guid characterId, CancellationToken ct) =>
             SendAsync<PetEnvelopeDto>("POST", "/api/v1/characters/" + characterId + "/combat/pet/release", null, true, null, ct);
+
+        /// <summary>The character's unfinished battles (active or waiting for the opponent).</summary>
+        public Task<OpenBattlesDto> GetOpenBattlesAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<OpenBattlesDto>("GET", "/api/v1/characters/" + characterId + "/combat/battles", null, true, null, ct);
 
         public Task<CombatCatalogDto> GetCombatCatalogAsync(CancellationToken ct) =>
             SendAsync<CombatCatalogDto>("GET", "/api/v1/combat/catalog", null, true, null, ct);

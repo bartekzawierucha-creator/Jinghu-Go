@@ -48,6 +48,8 @@ public static class CombatEndpoints
             ApiResults.From(await svc.AcceptAsync(http.User.GetAccountId(), battleId, ct), Results.Ok));
         g.MapPost("/{battleId:guid}/decline", async (Guid battleId, HttpContext http, CombatService svc, CancellationToken ct) =>
             ApiResults.From(await svc.DeclineAsync(http.User.GetAccountId(), battleId, ct), Results.Ok));
+        g.MapPost("/{battleId:guid}/forfeit", async (Guid battleId, HttpContext http, CombatService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.ForfeitAsync(http.User.GetAccountId(), battleId, ct), Results.Ok));
         g.MapPost("/{battleId:guid}/actions", async (Guid battleId, ActionCommand body, [FromHeader(Name = "Idempotency-Key")] string? key, HttpContext http, CombatService svc, CancellationToken ct) =>
             await Guard(async () => ApiResults.From(await svc.ActAsync(http.User.GetAccountId(), battleId, key, body, ct), Results.Ok)));
         g.MapGet("/{battleId:guid}/turns", async (Guid battleId, HttpContext http, CombatService svc, CancellationToken ct) =>
