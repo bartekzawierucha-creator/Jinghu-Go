@@ -236,7 +236,8 @@ namespace JianghuGo.Android
                     }
 
                     Glow(canvas, ax, ay, 30 * _d, Color.Rgb(176, 96, 232), 0.6f + 0.4f * pulse);
-                    var m = Icon("flame", Resource.Drawable.map_flame);
+                    var siteRes = Context.Resources.GetIdentifier("site_" + site.Id, "drawable", Context.PackageName);
+                    var m = Icon("site_" + site.Id, siteRes != 0 ? siteRes : Resource.Drawable.map_flame);
                     var sz = inside ? 1f : 0.7f;
                     canvas.DrawBitmap(m, null, new RectF(ax - m.Width * sz / 2, ay - m.Height * sz / 2, ax + m.Width * sz / 2, ay + m.Height * sz / 2), _art);
                     _text.Color = Color.Rgb(214, 170, 250);

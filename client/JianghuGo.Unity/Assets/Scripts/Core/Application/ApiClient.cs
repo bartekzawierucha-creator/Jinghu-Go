@@ -166,6 +166,9 @@ namespace JianghuGo.Client.Application
             return SendAsync<SamplesResultDto>("POST", Exploration(characterId) + "/samples", new { samples }, true, null, ct, retryPost: true);
         }
 
+        public Task<FlameSitesDto> GetFlameSitesAsync(CancellationToken ct) =>
+            SendAsync<FlameSitesDto>("GET", "/api/v1/world/flame-sites", null, true, null, ct);
+
         public Task<NearbyDto> GetNearbyAsync(Guid characterId, CancellationToken ct) =>
             SendAsync<NearbyDto>("GET", "/api/v1/characters/" + characterId + "/world/nearby", null, true, null, ct);
 

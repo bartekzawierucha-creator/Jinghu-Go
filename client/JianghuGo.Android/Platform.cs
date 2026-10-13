@@ -171,3 +171,69 @@ namespace JianghuGo.Android
         }
     }
 }
+
+namespace JianghuGo.Android
+{
+    /// <summary>
+    /// The phone's hardware step counter (steps since boot). The game reports only the difference since the last
+    /// report; the server clips it to what a person can walk and to the daily cap.
+    /// </summary>
+    public sealed class StepCounter : Java.Lang.Object, global::Android.Hardware.ISensorEventListener
+    {
+        public const int PermissionRequestCode = 8;
+        private readonly Activity _activity;
+        private global::Android.Hardware.SensorManager _manager;
+        private bool _listening;
+
+        public StepCounter(Activity activity) => _activity = activity;
+
+        /// <summary>Steps since boot as last reported by the sensor, or -1 when none yet.</summary>
+        public long Total { get; private set; } = -1;
+
+        public bool Available
+        {
+            get
+            {
+                _manager ??= (global::Android.Hardware.SensorManager)_activity.GetSystemService(Context.SensorService);
+                return _manager?.GetDefaultSensor(global::Android.Hardware.SensorType.StepCounter) != null;
+            }
+        }
+
+        public bool HasPermission => Build.VERSION.SdkInt < BuildVersionCodes.Q ||
+                                     _activity.CheckSelfPermission(global::Android.Manifest.Permission.ActivityRecognition) == Permission.Granted;
+
+        public event Action Updated;
+
+        public void Start()
+        {
+            if (_listening || !Available) return;
+            if (!HasPermission)
+            {
+                _activity.RequestPermissions(new[] { global::Android.Manifest.Permission.ActivityRecognition }, PermissionRequestCode);
+                return;
+            }
+
+            var sensor = _manager.GetDefaultSensor(global::Android.Hardware.SensorType.StepCounter);
+            _manager.RegisterListener(this, sensor, global::Android.Hardware.SensorDelay.Normal);
+            _listening = true;
+        }
+
+        public void Stop()
+        {
+            if (!_listening) return;
+            _manager.UnregisterListener(this);
+            _listening = false;
+        }
+
+        public void OnSensorChanged(global::Android.Hardware.SensorEvent e)
+        {
+            if (e?.Values == null || e.Values.Count == 0) return;
+            Total = (long)e.Values[0];
+            Updated?.Invoke();
+        }
+
+        public void OnAccuracyChanged(global::Android.Hardware.Sensor sensor, global::Android.Hardware.SensorStatus accuracy)
+        {
+        }
+    }
+}

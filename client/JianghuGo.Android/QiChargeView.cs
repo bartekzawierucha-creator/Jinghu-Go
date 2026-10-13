@@ -191,3 +191,32 @@ namespace JianghuGo.Android
         }
     }
 }
+
+namespace JianghuGo.Android
+{
+    /// <summary>A one-shot full-screen effect drawn over the UI (dims the screen slightly, plays the strip once).</summary>
+    public sealed class FxOverlayView : global::Android.Views.View
+    {
+        private readonly Anim _anim;
+        private readonly long _start = global::Android.OS.SystemClock.UptimeMillis();
+        private readonly Paint _p = new Paint(PaintFlags.FilterBitmap);
+
+        public FxOverlayView(Context ctx, Anim anim) : base(ctx)
+        {
+            _anim = anim;
+            Clickable = false;
+        }
+
+        protected override void OnDraw(Canvas canvas)
+        {
+            base.OnDraw(canvas);
+            var t = global::Android.OS.SystemClock.UptimeMillis() - _start;
+            var fade = Math.Clamp(1f - (t - _anim.DurationMs) / 700f, 0f, 1f);
+            canvas.DrawColor(Color.Argb((int)(110 * fade), 0, 0, 0));
+            var size = Math.Min(Width, Height) * 1.0f;
+            _p.Alpha = (int)(255 * fade);
+            canvas.DrawBitmap(_anim.Strip, _anim.Frame(Math.Min(t, _anim.DurationMs - 1)), new RectF(Width / 2f - size / 2, Height * 0.42f - size / 2, Width / 2f + size / 2, Height * 0.42f + size / 2), _p);
+            if (fade > 0) PostInvalidateOnAnimation();
+        }
+    }
+}

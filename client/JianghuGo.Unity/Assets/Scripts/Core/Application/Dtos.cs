@@ -256,6 +256,21 @@ namespace JianghuGo.Client.Application
         public DateTimeOffset? AvailableAt { get; set; }
     }
 
+    public sealed class FlameSiteInfoDto
+    {
+        public string Id { get; set; }
+        public string NamePl { get; set; }
+        public double Lat { get; set; }
+        public double Lon { get; set; }
+    }
+
+    public sealed class FlameSitesDto
+    {
+        public List<FlameSiteInfoDto> Items { get; set; } = new List<FlameSiteInfoDto>();
+        public double RadiusM { get; set; }
+        public int CooldownHours { get; set; }
+    }
+
     public sealed class WorldEventDto
     {
         public string Kind { get; set; }

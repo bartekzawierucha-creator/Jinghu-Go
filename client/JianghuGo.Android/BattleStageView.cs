@@ -58,6 +58,7 @@ namespace JianghuGo.Android
         private readonly List<Cue> _cues = new List<Cue>();
         private readonly List<Floater> _floaters = new List<Floater>();
         private readonly float _foeScale;
+        private readonly bool _foeFlip;
         private float _distanceShown = -1;
         private long _endAt = -1;
 
@@ -72,7 +73,7 @@ namespace JianghuGo.Android
                 "training_dummy" => Resource.Drawable.arena_courtyard,
                 "grey_wolf" => Resource.Drawable.arena_bamboo,
                 "mountain_bandit" => Resource.Drawable.arena_mountain,
-                null => Resource.Drawable.arena_temple,
+                null or "pvp" => Resource.Drawable.arena_temple,
                 _ => Resource.Drawable.arena_fortress,
             });
 
@@ -101,6 +102,12 @@ namespace JianghuGo.Android
                     _foe["hit"] = A(Resource.Drawable.anim_wolf_defeat, 10, false, 0, 2);
                     _foe["defeat"] = A(Resource.Drawable.anim_wolf_defeat, 8, false);
                     _foeScale = 1.25f;
+                    break;
+                case "pvp":
+                    // another cultivator: the hero's own animations, mirrored to face left
+                    foreach (var kv in _hero) _foe[kv.Key] = kv.Value;
+                    _foeFlip = true;
+                    _foeScale = 1f;
                     break;
                 default:
                     _foe["idle"] = A(Resource.Drawable.anim_bandit_idle, 7, true);
@@ -178,7 +185,7 @@ namespace JianghuGo.Android
             {
                 case "attack":
                     var tech = e.TechniqueId ?? string.Empty;
-                    var anim = mine && (tech.Contains("palm") || tech.Contains("fist") || tech.Contains("qi")) ? actor["palm"] : actor["attack"];
+                    var anim = actor.ContainsKey("palm") && (tech.Contains("palm") || tech.Contains("fist") || tech.Contains("qi")) ? actor["palm"] : actor["attack"];
                     _cues.Add(new Cue { Hero = mine, Anim = anim, At = at });
                     var impact = at + anim.DurationMs * 55 / 100;
                     if (e.Hit == true)
@@ -199,7 +206,7 @@ namespace JianghuGo.Android
                 case "defend":
                 case "defense":
                 case "counter_stance":
-                    if (mine) _cues.Add(new Cue { Hero = true, Anim = _hero["defend"], At = at });
+                    if (actor.ContainsKey("defend")) _cues.Add(new Cue { Hero = mine, Anim = actor["defend"], At = at });
                     _cues.Add(new Cue { Hero = mine, Fx = true, Anim = _fx["parry"], At = at + 150 });
                     _floaters.Add(new Floater { OnHero = mine, Text = e.Action == "counter_stance" ? "kontra" : "garda", Color = Ui.Gold, Size = 18, At = at + 200 });
                     break;
@@ -209,7 +216,7 @@ namespace JianghuGo.Android
                     break;
                 case "advance":
                 case "retreat":
-                    if (mine) _cues.Add(new Cue { Hero = true, Anim = _hero["dash"], At = at });
+                    if (actor.ContainsKey("dash")) _cues.Add(new Cue { Hero = mine, Anim = actor["dash"], At = at });
                     break;
                 case "out_of_range":
                     _floaters.Add(new Floater { OnHero = mine, Text = "za daleko", Color = Color.Rgb(220, 220, 220), Size = 16, At = at });
@@ -273,7 +280,10 @@ namespace JianghuGo.Android
             canvas.DrawBitmap(ha.Strip, ha.Frame(he), new RectF(heroX - cellW / 2, ground - footInCell, heroX + cellW / 2, ground - footInCell + cellH), _pixel);
             var fw = cellW * _foeScale;
             var fh = cellH * _foeScale;
+            canvas.Save();
+            if (_foeFlip) canvas.Scale(-1, 1, foeX, ground);
             canvas.DrawBitmap(fa.Strip, fa.Frame(fe), new RectF(foeX - fw / 2, ground - footInCell * _foeScale, foeX + fw / 2, ground - footInCell * _foeScale + fh), _pixel);
+            canvas.Restore();
 
             // effects over the fighters
             foreach (var c in _cues)

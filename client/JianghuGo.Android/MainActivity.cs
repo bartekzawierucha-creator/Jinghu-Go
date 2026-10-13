@@ -53,6 +53,8 @@ namespace JianghuGo.Android
         private bool _paused;
         private bool _worldOpen;
         private System.Action _onLocation;
+        private FrameLayout _frame;
+        private StepCounter _steps;
 
         private CancellationToken Ct => _lifetime.Token;
 
@@ -62,6 +64,7 @@ namespace JianghuGo.Android
             _prefs = GetSharedPreferences(Prefs, FileCreationMode.Private);
             _location = new AndroidLocationSource(this);
             _location.Updated += () => RunOnUiThread(() => _onLocation?.Invoke());
+            _steps = new StepCounter(this);
 
             Window.SetStatusBarColor(Ui.Night);
             Window.SetNavigationBarColor(Ui.Night);
@@ -69,7 +72,7 @@ namespace JianghuGo.Android
             int Px(float dp) => (int)(dp * d + 0.5f);
 
             // backdrop art + darkening veil behind every screen
-            var frame = new FrameLayout(this);
+            var frame = _frame = new FrameLayout(this);
             frame.SetBackgroundColor(Ui.Night);
             _backdrop = new ImageView(this);
             _backdrop.SetScaleType(ImageView.ScaleType.CenterCrop);
@@ -181,6 +184,7 @@ namespace JianghuGo.Android
             base.OnPause();
             _paused = true;
             _location.Stop(); // battery: no GPS in the background
+            _steps.Stop();
             EmbeddedServer.Flush(); // offline mode: the app may be killed in the background
         }
 
@@ -202,6 +206,8 @@ namespace JianghuGo.Android
         public override void OnRequestPermissionsResult(int requestCode, string[] permissions, Permission[] grantResults)
         {
             base.OnRequestPermissionsResult(requestCode, permissions, grantResults);
+            if (requestCode == StepCounter.PermissionRequestCode && grantResults.Length > 0 && grantResults[0] == Permission.Granted)
+                _steps.Start();
             if (requestCode == AndroidLocationSource.PermissionRequestCode)
                 _location.OnPermissionResult(grantResults.Length > 0 && grantResults[0] == Permission.Granted);
         }
@@ -502,6 +508,7 @@ namespace JianghuGo.Android
             var info = new LinearLayout(this) { Orientation = Orientation.Vertical };
             top.AddView(info, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
             var realm = ui.Label("…", 18, Ui.Gold, bold: true, parent: info);
+            realm.SetCompoundDrawables(null, null, null, null);
             var traitsText = ui.Label(string.Join(" · ", c.Traits.Select(t => t.NamePl)), 12, Ui.Muted, parent: info);
             var qi = ui.Meter("Qi", Ui.QiBlue, info, 20);
             var charge = new QiChargeView(this);
@@ -509,17 +516,30 @@ namespace JianghuGo.Android
             var details = ui.Label(string.Empty, 13, parent: card);
             var flow = new CultivationFlow(_api, c.Id);
             var actions = ui.Columns(card);
-            var meditate = ui.Action("🧘 Medytuj", () => { }, parent: Cell(actions));
-            var breakthrough = ui.Action("⚡ Przełom", () => { }, secondary: true, parent: Cell(actions));
+            var meditate = ui.WithIcon(ui.Action("Medytuj", () => { }, parent: Cell(actions)), "menu_meditate", 28);
+            var breakthrough = ui.WithIcon(ui.Action("Przełom", () => { }, secondary: true, parent: Cell(actions)), "menu_breakthrough", 28);
+
+            // Body path: steps walked count as cultivation (the server clips implausible counts)
+            TextView stepsInfo = null;
+            if (c.Path == "body")
+            {
+                stepsInfo = ui.Label(string.Empty, 13, Ui.Ink, parent: card);
+                ui.Action("Zbierz kroki", () => Run(() => ReportStepsAsync(c.Id, flow, Render)), secondary: true, parent: card);
+                if (_steps.Available) _steps.Start();
+                else stepsInfo.Text = "Ten telefon nie ma licznika kroków.";
+            }
 
             var statsRow = ui.Flow(card);
-            foreach (var st in c.Stats) ui.Chip(StatName(st.Id) + " " + st.Value, Ui.Ink, statsRow);
+            foreach (var st in c.Stats) ui.WithIcon(ui.Chip(StatName(st.Id) + " " + st.Value, Ui.Ink, statsRow), "icon_" + st.Id, 18);
 
             void Render()
             {
                 var st = flow.State;
                 if (st == null) return;
                 realm.Text = st.RealmNamePl + " · etap " + st.Stage + "/" + st.StagesInRealm;
+                ui.WithIcon(realm, "emblem_" + st.RealmId, 30);
+                if (stepsInfo != null && _steps.Available)
+                    stepsInfo.Text = "Kroki dziś: " + st.DailySteps + " / " + st.DailyStepCap + (_steps.HasPermission ? string.Empty : "  ·  zezwól na liczenie kroków");
                 Ui.SetMeter(qi, "Qi  " + st.Qi + " / " + st.QiRequired, st.Qi, st.QiRequired);
                 charge.State = st;
                 charge.Invalidate();
@@ -528,7 +548,7 @@ namespace JianghuGo.Android
                 details.Text = "Szansa przełomu: " + Math.Round(st.BreakthroughChance * 100) + "%" +
                                (st.IsMeditating ? "   ·   Medytujesz od " + st.MeditationStartedAt.Value.ToLocalTime().ToString("HH:mm") : string.Empty) +
                                "\nDzisiaj z medytacji: " + st.DailyMeditationQi + " / " + st.DailyMeditationQiCap + deviation;
-                meditate.Text = st.IsMeditating ? "🧘 Zakończ medytację" : "🧘 Medytuj";
+                meditate.Text = st.IsMeditating ? "Zakończ medytację" : "Medytuj";
             }
 
             meditate.Click += (_, __) => Run(async () =>
@@ -549,8 +569,9 @@ namespace JianghuGo.Android
             breakthrough.Click += (_, __) => Run(async () =>
             {
                 var r = await flow.BreakthroughAsync(Ct);
+                if (r != null && r.Success) PlayOverlay(Resource.Drawable.fx_breakthrough, 256, 9);
                 Render();
-                SetStatus(r == null ? "Stan zmienił się na innym urządzeniu — odświeżono." : r.Success ? "Przełom udany!" : "Przełom nieudany — odchylenie Qi.");
+                SetStatus(r == null ? "Stan zmienił się na innym urządzeniu — odświeżono." : r.Success ? "Przełom udany! " + flow.State.RealmNamePl + " · etap " + flow.State.Stage : "Przełom nieudany — odchylenie Qi.");
             });
 
             ui.Heading("Wyprawa");
@@ -597,14 +618,10 @@ namespace JianghuGo.Android
                 await sect.LoadAsync(Ct);
                 ShowSect(sect, c);
             }), parent: row2, heightDp: 120);
-            var inboxTile = ui.Tile("✉ Powiadomienia", "Wieści z Jianghu", Resource.Drawable.place_altar, () => { }, parent: row2, heightDp: 120);
-            var inbox = ui.Label(string.Empty, 14);
-            inboxTile.Click += (_, __) => Run(async () =>
-            {
-                var page = await _api.GetNotificationsAsync(true, 10, null, Ct);
-                inbox.Text = page.Items.Count == 0 ? "Brak nowych powiadomień." : string.Join("\n", page.Items.Select(n => "• " + Describe(n)));
-                foreach (var n in page.Items) await _api.MarkNotificationReadAsync(n.Id, Ct);
-            });
+            ui.Tile("✉ Powiadomienia", "Wieści i wyzwania", Resource.Drawable.place_altar, () => Run(() => ShowInboxAsync(c)), parent: row2, heightDp: 120);
+            var row3 = ui.Columns();
+            ui.Tile("⚔ Zestaw technik", "Osiem slotów walki", Resource.Drawable.place_brazier, () => Run(() => ShowLoadoutAsync(c)), parent: row3, heightDp: 110);
+            ui.Tile("🔥 Miejsca Płomienia", "12 świętych miejsc świata", Resource.Drawable.loc_cave, () => ShowFlameSites(c), parent: row3, heightDp: 110);
 
             ui.Action("Wyloguj", () => Run(async () =>
             {
@@ -622,6 +639,177 @@ namespace JianghuGo.Android
                 await flow.LoadAsync(Ct);
                 Render();
             });
+        }
+
+        /// <summary>Body path: reports the steps walked since the last report (hardware counter, kept per character).</summary>
+        private async Task ReportStepsAsync(Guid characterId, CultivationFlow flow, System.Action render)
+        {
+            if (!_steps.Available)
+            {
+                SetStatus("Ten telefon nie ma licznika kroków.");
+                return;
+            }
+
+            _steps.Start();
+            if (!_steps.HasPermission)
+            {
+                SetStatus("Zezwól grze na liczenie kroków (aktywność fizyczna).");
+                return;
+            }
+
+            var total = _steps.Total;
+            if (total < 0)
+            {
+                SetStatus("Licznik kroków jeszcze nie odpowiedział — spróbuj za chwilę.");
+                return;
+            }
+
+            var key = "jianghu.steps_base." + characterId;
+            var last = _prefs.GetLong(key, -1);
+            void Save(long value)
+            {
+                using (var e = _prefs.Edit())
+                {
+                    e.PutLong(key, value);
+                    e.Apply();
+                }
+            }
+
+            if (last < 0)
+            {
+                Save(total);
+                SetStatus("Liczenie kroków rozpoczęte — wróć po spacerze.");
+                return;
+            }
+
+            var delta = total >= last ? total - last : total; // the counter restarts after a reboot
+            if (delta <= 0)
+            {
+                SetStatus("Brak nowych kroków od ostatniego razu.");
+                return;
+            }
+
+            var r = await flow.ReportStepsAsync((int)Math.Min(delta, int.MaxValue), Ct);
+            Save(total);
+            render();
+            SetStatus("+" + r.QiGained + " Qi z " + r.AcceptedSteps + " kroków" + (r.Clipped ? " (część odrzucona jako niemożliwa)" : string.Empty));
+        }
+
+        /// <summary>Plays a full-screen effect (e.g. a breakthrough) over the current screen, then removes it.</summary>
+        private void PlayOverlay(int res, int cellW, float fps)
+        {
+            var anim = new Anim(Ui.Art(this, res), cellW, fps, false);
+            var view = new FxOverlayView(this, anim);
+            _frame.AddView(view, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+            view.PostDelayed(() => _frame.RemoveView(view), anim.DurationMs + 900);
+        }
+
+        private static string PayloadString(NotificationDto n, string key)
+        {
+            if (n.Payload == null) return null;
+            foreach (var kv in n.Payload)
+                if (string.Equals(kv.Key, key, StringComparison.OrdinalIgnoreCase))
+                    return kv.Value is System.Text.Json.JsonElement je ? (je.ValueKind == System.Text.Json.JsonValueKind.String ? je.GetString() : je.ToString()) : kv.Value?.ToString();
+            return null;
+        }
+
+        private async Task ShowInboxAsync(CharacterDto c)
+        {
+            var page = await _api.GetNotificationsAsync(false, 30, null, Ct);
+            var ui = NewScreen("Powiadomienia", () => ShowCharacter(c), Resource.Drawable.place_altar, "WIEŚCI Z JIANGHU");
+            if (page.Items.Count == 0) ui.Label("Cisza w Jianghu — brak wieści.", 15, Ui.Muted);
+            foreach (var item in page.Items)
+            {
+                var n = item;
+                var panel = ui.Panel(padDp: 10);
+                var title = ui.Label(Describe(n), 15, n.ReadAt == null ? Ui.Gold : Ui.Ink, bold: n.ReadAt == null, parent: panel);
+                ui.WithIcon(title, NotificationIcon(n.Type), 26);
+                var who = PayloadString(n, "challengerName");
+                ui.Label((who != null ? who + " · " : string.Empty) + n.CreatedAt.ToLocalTime().ToString("dd.MM HH:mm"), 12, Ui.Muted, parent: panel);
+                if (n.Type == "pvp_challenge" && Guid.TryParse(PayloadString(n, "battleId"), out var battleId))
+                {
+                    ui.Action("Przyjmij wyzwanie", () => Run(async () =>
+                    {
+                        await _api.AcceptChallengeAsync(battleId, Ct);
+                        var combat = new CombatFlow(_api);
+                        await combat.OpenAsync(battleId, Ct);
+                        ShowBattle(combat, c);
+                    }), parent: panel);
+                }
+            }
+
+            foreach (var n in page.Items.Where(x => x.ReadAt == null)) await _api.MarkNotificationReadAsync(n.Id, Ct);
+        }
+
+        private static string NotificationIcon(string type) => type switch
+        {
+            "pvp_challenge" or "battle_won" or "battle_lost" or "battle_draw" => "menu_battle",
+            "breakthrough_succeeded" or "breakthrough_failed" => "menu_breakthrough",
+            "market_sold" => "menu_market",
+            "sect_application_accepted" or "sect_application_rejected" => "menu_sect",
+            "war_declared" or "war_resolved" => "menu_war",
+            _ => "menu_notifications",
+        };
+
+        private async Task ShowLoadoutAsync(CharacterDto c)
+        {
+            var loadout = await _api.GetLoadoutAsync(c.Id, Ct);
+            var ui = NewScreen("Zestaw technik", () => ShowCharacter(c), Resource.Drawable.place_qiarray, "OSIEM SLOTÓW WALKI");
+            ui.Label("Dotknij slotu, by wybrać technikę. Serwer sprawdza, czy zestaw jest dozwolony.", 13, Ui.Muted);
+            foreach (var s in loadout.Slots.OrderBy(x => x.Slot))
+            {
+                var slot = s;
+                var caption = "Slot " + (slot.Slot + 1) + " · " + ActionName(slot.Kind) + ":  " + (slot.NamePl ?? "— pusty —") + (slot.Level > 0 ? "  (poz. " + slot.Level + ")" : string.Empty);
+                ui.WithIcon(ui.Action(caption, () => ShowSlotPicker(c, loadout, slot), secondary: slot.TechniqueId == null),
+                    slot.TechniqueId != null && _ui.ArtId("tech_" + slot.TechniqueId) != 0 ? "tech_" + slot.TechniqueId : "icon_" + slot.Kind, 30);
+            }
+        }
+
+        private void ShowSlotPicker(CharacterDto c, LoadoutDto loadout, LoadoutSlotDto slot)
+        {
+            var ui = NewScreen("Slot " + (slot.Slot + 1), () => Run(() => ShowLoadoutAsync(c)), Resource.Drawable.place_qiarray, ActionName(slot.Kind).ToUpperInvariant());
+            async Task Set(string techniqueId)
+            {
+                var ids = loadout.Slots.OrderBy(x => x.Slot).Select(x => x.Slot == slot.Slot ? techniqueId : x.TechniqueId).ToList();
+                await _api.SetLoadoutAsync(c.Id, loadout.Version, ids, Ct);
+                await ShowLoadoutAsync(c);
+                SetStatus("Zestaw zapisany.");
+            }
+
+            var options = loadout.Known.Where(k => k.Slot == slot.Kind).ToList();
+            if (options.Count == 0) ui.Label("Nie znasz jeszcze technik tego rodzaju — stwórz je w Laboratorium Dao.", 14, Ui.Muted);
+            foreach (var k in options)
+            {
+                var known = k;
+                ui.WithIcon(ui.Action(known.NamePl + "  · poz. " + known.Level + " (" + known.Xp + "/" + known.XpToNextLevel + " XP)", () => Run(() => Set(known.Id)),
+                    secondary: known.Id != slot.TechniqueId),
+                    _ui.ArtId("tech_" + known.Id) != 0 ? "tech_" + known.Id : "tech_custom_" + (slot.Kind == "movement" ? "movement" : slot.Kind == "attack" ? "attack" : "defense"), 30);
+            }
+
+            ui.Action("Opróżnij slot", () => Run(() => Set(null)), secondary: true);
+        }
+
+        private void ShowFlameSites(CharacterDto c) => Run(async () =>
+        {
+            var sites = await _api.GetFlameSitesAsync(Ct);
+            var ui = NewScreen("Miejsca Płomienia", () => ShowCharacter(c), Resource.Drawable.loc_cave, "12 ŚWIĘTYCH MIEJSC");
+            ui.Label("Dostrój się do Płomienia, stojąc w promieniu " + Math.Round(sites.RadiusM) + " m od miejsca. Płomień odnawia się co " + sites.CooldownHours + " h.", 13, Ui.Muted);
+            var here = _location.Last;
+            foreach (var s in sites.Items.OrderBy(x => here == null ? 0 : DistanceKm(here.Lat, here.Lon, x.Lat, x.Lon)))
+            {
+                var panel = ui.Panel(padDp: 10);
+                var title = ui.WithIcon(ui.Label(s.NamePl, 16, Ui.Gold, bold: true, parent: panel), "site_" + s.Id, 56);
+                if (here != null) ui.Label(Math.Round(DistanceKm(here.Lat, here.Lon, s.Lat, s.Lon)).ToString("N0") + " km stąd", 12, Ui.Muted, parent: panel);
+            }
+        });
+
+        private static double DistanceKm(double lat1, double lon1, double lat2, double lon2)
+        {
+            const double R = 6371.0;
+            var dLat = (lat2 - lat1) * Math.PI / 180;
+            var dLon = (lon2 - lon1) * Math.PI / 180;
+            var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2) + Math.Cos(lat1 * Math.PI / 180) * Math.Cos(lat2 * Math.PI / 180) * Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+            return 2 * R * Math.Asin(Math.Sqrt(a));
         }
 
         // ---- world ---------------------------------------------------------------------------------------------
@@ -761,7 +949,7 @@ namespace JianghuGo.Android
         private void ShowBattle(CombatFlow combat, CharacterDto c)
         {
             var ui = NewScreen("Pojedynek", () => ShowCharacter(c), subtitle: combat.Battle.Opponent.Name.ToUpperInvariant());
-            var stage = new BattleStageView(this, combat.Battle.NpcId);
+            var stage = new BattleStageView(this, combat.Battle.Kind == "pvp" ? "pvp" : combat.Battle.NpcId);
             ui.Add(stage, 300);
             var header = ui.Label(string.Empty, 14, Ui.Gold, bold: true);
             var logPanel = ui.Panel(padDp: 10);
@@ -774,7 +962,9 @@ namespace JianghuGo.Android
                 var b = combat.Battle;
                 stage.Show(b);
                 header.Text = "Tura " + b.Turn + "   ·   dystans " + b.Distance + "   ·   Qi " + b.Me.Qi + "/" + b.Me.MaxQi +
-                              (b.IsActive ? (b.MyActionSubmitted ? "\nCzekasz na ruch przeciwnika…" : string.Empty)
+                              (b.Status == "pending_acceptance" ? "\nCzekasz, aż przeciwnik przyjmie wyzwanie…"
+                                  : b.Status == "declined" ? "\nPrzeciwnik odrzucił wyzwanie." : b.Status == "expired" ? "\nWyzwanie wygasło."
+                                  : b.IsActive ? (b.MyActionSubmitted ? "\nCzekasz na ruch przeciwnika…" : string.Empty)
                                   : "\nWYNIK: " + ResultName(b) + (b.RewardQi > 0 ? "  (+" + b.RewardQi + " Qi)" : string.Empty));
                 log.Text = b.LastTurnEvents.Count == 0 ? "Przeciwnicy mierzą się wzrokiem…" : string.Join("\n", b.LastTurnEvents.Select(e =>
                     (b.IsMine(e) ? "Ty" : "Wróg") + ": " + ActionName(e.Action) + (e.TechniqueId != null ? " (" + e.TechniqueId + ")" : string.Empty) +
@@ -785,6 +975,31 @@ namespace JianghuGo.Android
                     button.Alpha = button.Enabled ? 1f : 0.4f;
                 }
             }
+
+            // PvP: the other player acts on their own phone, so poll while waiting
+            async void Poll()
+            {
+                while (gen == _screen && combat.Battle.Kind == "pvp" && (combat.Battle.Status == "pending_acceptance" || combat.Battle.IsActive))
+                {
+                    try
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(3), Ct);
+                        if (gen != _screen || _paused) continue;
+                        await combat.RefreshAsync(Ct);
+                        if (gen == _screen) Render();
+                    }
+                    catch (System.OperationCanceledException)
+                    {
+                        return;
+                    }
+                    catch (ApiException)
+                    {
+                        // keep polling; the next refresh may succeed
+                    }
+                }
+            }
+
+            Poll();
 
             void Act(int? slot, string direction) => Run(async () =>
             {
@@ -875,6 +1090,11 @@ namespace JianghuGo.Android
                         }), parent: list), "item_" + stack.ItemId);
                     else
                         ui.WithIcon(ui.Label(stack.NamePl + " ×" + stack.Quantity, 15, parent: list), "item_" + stack.ItemId);
+                    ui.Action("  Wyrzuć 1 × " + stack.NamePl, () => Run(async () =>
+                    {
+                        await economy.DiscardAsync(stack.ItemId, 1, Ct);
+                        Render();
+                    }), secondary: true, parent: list);
                 }
 
                 foreach (var it in inv.Items)
@@ -1127,7 +1347,49 @@ namespace JianghuGo.Android
             var mine = flow.Mine;
             var ui = NewScreen(mine.Sect.Name, () => ShowCharacter(c), Resource.Drawable.loc_fortress, "TWOJA SEKTA");
             ui.Label("Twoja ranga: " + RoleName(mine.MyRole) + "\nSkarbiec: " + mine.Treasury + " KD   ·   Członkowie: " + mine.Sect.MemberCount + "/" + mine.Sect.MaxMembers, 15, Ui.Ink, bold: true);
-            ui.Label(string.Join("\n", mine.Sect.Members.Select(m => "• " + m.Name + " — " + RoleName(m.Role) + " (wkład " + m.Contribution + ")")), 14);
+            ui.Heading("Członkowie");
+            foreach (var mem in mine.Sect.Members)
+            {
+                var m = mem;
+                var row = ui.Panel(padDp: 10);
+                ui.Label(m.Name + (m.CharacterId == c.Id ? " (ty)" : string.Empty), 16, Ui.Ink, bold: true, parent: row);
+                ui.Label(RoleName(m.Role) + " · wkład " + m.Contribution, 12, Ui.Muted, parent: row);
+                if (m.CharacterId == c.Id) continue;
+                var buttons = ui.Columns(row);
+                ui.WithIcon(ui.Action("Wyzwij", () => Run(async () =>
+                {
+                    var combat = new CombatFlow(_api);
+                    var battle = await _api.ChallengeAsync(c.Id, m.CharacterId, Ct);
+                    await combat.OpenAsync(battle.Id, Ct);
+                    ShowBattle(combat, c);
+                }), parent: Cell(buttons)), "menu_battle", 24);
+                var outranks = mine.MyRole == "leader" || (mine.MyRole == "elder" && m.Role == "member");
+                if (outranks)
+                    ui.Action("Wyrzuć", () => Run(async () =>
+                    {
+                        await _api.KickAsync(c.Id, mine.Sect.Id, m.CharacterId, Ct);
+                        await flow.LoadAsync(Ct);
+                        ShowSect(flow, c);
+                        SetStatus(m.Name + " opuścił sektę.");
+                    }), secondary: true, parent: Cell(buttons));
+                if (mine.MyRole == "leader")
+                {
+                    var roles = ui.Columns(row);
+                    var newRole = m.Role == "elder" ? "member" : "elder";
+                    ui.Action(newRole == "elder" ? "Mianuj starszym" : "Zdegraduj", () => Run(async () =>
+                    {
+                        await _api.SetRoleAsync(c.Id, mine.Sect.Id, m.CharacterId, newRole, Ct);
+                        await flow.LoadAsync(Ct);
+                        ShowSect(flow, c);
+                    }), secondary: true, parent: Cell(roles));
+                    ui.Action("Przekaż przywództwo", () => Run(async () =>
+                    {
+                        await _api.SetRoleAsync(c.Id, mine.Sect.Id, m.CharacterId, "leader", Ct);
+                        await flow.LoadAsync(Ct);
+                        ShowSect(flow, c);
+                    }), secondary: true, parent: Cell(roles));
+                }
+            }
             if (flow.Territories != null)
                 ui.Label("Terytoria: " + flow.Territories.Owned + "/" + flow.Territories.Max +
                          (flow.Territories.Wars.Count > 0 ? "\nWojny: " + string.Join(", ", flow.Territories.Wars.Select(w => w.TerritoryKey + " " + w.Phase + " " + w.AttackerScore + ":" + w.DefenderScore)) : string.Empty), 14);
@@ -1149,6 +1411,14 @@ namespace JianghuGo.Android
             }
 
             ui.Divider();
+            if (mine.MyRole == "leader")
+                ui.WithIcon(ui.Action("Ustaw siedzibę sekty tutaj", () => Run(async () =>
+                {
+                    await _api.SetSeatAsync(c.Id, mine.Sect.Id, Ct);
+                    await flow.LoadAsync(Ct);
+                    ShowSect(flow, c);
+                    SetStatus("Siedziba sekty ustawiona w twojej okolicy.");
+                }), secondary: true), "menu_sect", 26);
             ui.Action("Wpłać 100 KD do skarbca", () => Run(async () =>
             {
                 await flow.DonateAsync(100, Ct);
