@@ -22,7 +22,7 @@ namespace JianghuGo.Android
     /// Flow methods resume on the thread pool (ConfigureAwait(false)) but our own awaits resume on the UI thread,
     /// so screens re-render after each await instead of subscribing to flow events.
     /// </summary>
-    [Activity(Label = "Jianghu Go", MainLauncher = true, Theme = "@android:style/Theme.Material.Light.NoActionBar",
+    [Activity(Label = "Jianghu Go", MainLauncher = true, Theme = "@android:style/Theme.Material.NoActionBar",
         ScreenOrientation = ScreenOrientation.Portrait, ConfigurationChanges = ConfigChanges.Orientation | ConfigChanges.ScreenSize | ConfigChanges.KeyboardHidden)]
     public sealed class MainActivity : Activity
     {
@@ -42,6 +42,9 @@ namespace JianghuGo.Android
         private string _serverUrl;
         private AndroidLocationSource _location;
         private TextView _title;
+        private TextView _subtitle;
+        private TextView _backButton;
+        private ImageView _backdrop;
         private TextView _status;
         private ScrollView _scroll;
         private Ui _ui;
@@ -60,29 +63,87 @@ namespace JianghuGo.Android
             _location = new AndroidLocationSource(this);
             _location.Updated += () => RunOnUiThread(() => _onLocation?.Invoke());
 
+            Window.SetStatusBarColor(Ui.Night);
+            Window.SetNavigationBarColor(Ui.Night);
+            var d = Resources.DisplayMetrics.Density;
+            int Px(float dp) => (int)(dp * d + 0.5f);
+
+            // backdrop art + darkening veil behind every screen
+            var frame = new FrameLayout(this);
+            frame.SetBackgroundColor(Ui.Night);
+            _backdrop = new ImageView(this);
+            _backdrop.SetScaleType(ImageView.ScaleType.CenterCrop);
+            frame.AddView(_backdrop, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+            var veil = new View(this);
+            veil.Background = new global::Android.Graphics.Drawables.GradientDrawable(global::Android.Graphics.Drawables.GradientDrawable.Orientation.TopBottom,
+                new int[] { global::Android.Graphics.Color.Argb(150, 6, 8, 10).ToArgb(), global::Android.Graphics.Color.Argb(205, 8, 10, 12).ToArgb(), global::Android.Graphics.Color.Argb(250, 8, 10, 12).ToArgb() });
+            frame.AddView(veil, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+
             var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
-            root.SetBackgroundColor(Ui.Paper);
-            var pad = (int)(16 * Resources.DisplayMetrics.Density);
-            root.SetPadding(pad, pad, pad, 0);
+            root.SetFitsSystemWindows(true); // Android 15+ draws edge-to-edge
+            root.SetPadding(Px(16), Px(10), Px(16), 0);
+
+            // header: back seal, title in gold, subtitle
+            var header = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            header.SetGravity(GravityFlags.CenterVertical);
+            _backButton = new TextView(this) { Text = "‹" };
+            _backButton.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 30);
+            _backButton.SetTextColor(Ui.Gold);
+            _backButton.Gravity = GravityFlags.Center;
+            _backButton.Background = new FrameDrawable(d, global::Android.Graphics.Color.Argb(200, 14, 18, 22), Ui.GoldDim, Ui.Gold);
+            _backButton.Click += (_, __) => _back?.Invoke();
+            var backLp = new LinearLayout.LayoutParams(Px(44), Px(44)) { RightMargin = Px(12) };
+            header.AddView(_backButton, backLp);
+            var titles = new LinearLayout(this) { Orientation = Orientation.Vertical };
             _title = new TextView(this);
             _title.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 26);
-            _title.SetTextColor(Ui.Cinnabar);
-            _title.SetTypeface(global::Android.Graphics.Typeface.Serif, global::Android.Graphics.TypefaceStyle.Bold);
-            root.AddView(_title);
+            _title.SetTextColor(Ui.Gold);
+            _title.SetTypeface(Ui.Display, global::Android.Graphics.TypefaceStyle.Bold);
+            _title.SetShadowLayer(8, 0, 2, global::Android.Graphics.Color.Black);
+            _title.LetterSpacing = 0.04f;
+            titles.AddView(_title);
+            _subtitle = new TextView(this);
+            _subtitle.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 12);
+            _subtitle.SetTextColor(Ui.Muted);
+            _subtitle.SetTypeface(Ui.Body, global::Android.Graphics.TypefaceStyle.Normal);
+            _subtitle.LetterSpacing = 0.12f;
+            titles.AddView(_subtitle);
+            header.AddView(titles, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
+            var seal = new TextView(this) { Text = "江湖" };
+            seal.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 16);
+            seal.SetTextColor(Ui.Ink);
+            seal.SetTypeface(Ui.Display, global::Android.Graphics.TypefaceStyle.Bold);
+            seal.Gravity = GravityFlags.Center;
+            var sealBg = new global::Android.Graphics.Drawables.GradientDrawable();
+            sealBg.SetColor(Ui.CinnabarDeep);
+            sealBg.SetStroke(Px(1), Ui.Gold);
+            sealBg.SetCornerRadius(Px(4));
+            seal.Background = sealBg;
+            seal.SetPadding(Px(6), Px(4), Px(6), Px(4));
+            header.AddView(seal);
+            root.AddView(header);
+
+            // status: a lacquer ribbon that appears only when there is something to say
             _status = new TextView(this);
             _status.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 14);
-            _status.SetTextColor(Ui.Cinnabar);
-            root.AddView(_status);
-            _scroll = new ScrollView(this);
+            _status.SetTextColor(Ui.Ink);
+            _status.SetTypeface(Ui.Body, global::Android.Graphics.TypefaceStyle.Normal);
+            var statusBg = new global::Android.Graphics.Drawables.GradientDrawable();
+            statusBg.SetColor(global::Android.Graphics.Color.Argb(235, 60, 16, 12));
+            statusBg.SetStroke(Px(1), Ui.Gold);
+            statusBg.SetCornerRadius(Px(6));
+            _status.Background = statusBg;
+            _status.SetPadding(Px(12), Px(8), Px(12), Px(8));
+            _status.Visibility = ViewStates.Gone;
+            var statusLp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Px(8) };
+            root.AddView(_status, statusLp);
+
+            _scroll = new ScrollView(this) { VerticalScrollBarEnabled = false };
             var content = new LinearLayout(this) { Orientation = Orientation.Vertical };
-            content.SetPadding(0, 0, 0, pad * 2);
+            content.SetPadding(0, Px(4), 0, Px(28));
             _scroll.AddView(content);
             root.AddView(_scroll, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0, 1f));
-            // Android 15+ draws edge-to-edge: keep the content clear of the status and navigation bars.
-            var frame = new FrameLayout(this);
-            frame.SetFitsSystemWindows(true);
-            frame.SetBackgroundColor(Ui.Paper);
-            frame.AddView(root);
+            frame.AddView(root, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
             SetContentView(frame);
             _ui = new Ui(this, content);
 
@@ -100,7 +161,7 @@ namespace JianghuGo.Android
                     return;
                 }
 
-                NewScreen("Jianghu Go");
+                NewScreen("Jianghu Go", art: Resource.Drawable.bg_hero);
                 _ui.Label("Łączenie z " + _serverUrl + "…");
                 try
                 {
@@ -184,7 +245,7 @@ namespace JianghuGo.Android
             SetStatus("Sesja wygasła — zaloguj się ponownie.");
         });
 
-        private Ui NewScreen(string title, System.Action back = null)
+        private Ui NewScreen(string title, System.Action back = null, int art = 0, string subtitle = null)
         {
             _screen++;
             _worldOpen = false;
@@ -192,13 +253,43 @@ namespace JianghuGo.Android
             _location.Stop();
             _back = back;
             _title.Text = title;
-            _status.Text = string.Empty;
+            _subtitle.Text = subtitle ?? string.Empty;
+            _subtitle.Visibility = string.IsNullOrEmpty(subtitle) ? ViewStates.Gone : ViewStates.Visible;
+            _backButton.Visibility = back == null ? ViewStates.Gone : ViewStates.Visible;
+            if (art != 0)
+            {
+                _backdrop.SetImageBitmap(Ui.Art(this, art));
+                _backdrop.Visibility = ViewStates.Visible;
+            }
+            else
+            {
+                _backdrop.Visibility = ViewStates.Invisible;
+            }
+
+            SetStatus(string.Empty);
             _ui.Content.RemoveAllViews();
             _scroll.ScrollTo(0, 0);
+            _ui.Content.Alpha = 0f;
+            _ui.Content.TranslationY = _ui.Dp(14);
+            _ui.Content.Animate().Alpha(1f).TranslationY(0).SetDuration(260).Start();
             return _ui;
         }
 
-        private void SetStatus(string text) => _status.Text = text;
+        /// <summary>Shows a message ribbon; "…" (work in progress) keeps it hidden. Messages fade after a while.</summary>
+        private void SetStatus(string text)
+        {
+            _status.Text = text;
+            var visible = !string.IsNullOrEmpty(text) && text != "…";
+            _status.Visibility = visible ? ViewStates.Visible : ViewStates.Gone;
+            if (!visible) return;
+            _status.Alpha = 0f;
+            _status.Animate().Alpha(1f).SetDuration(180).Start();
+            var shown = text;
+            _status.PostDelayed(() =>
+            {
+                if (_status.Text == shown) _status.Visibility = ViewStates.Gone;
+            }, 6000);
+        }
 
         /// <summary>Runs a UI action, turning failures into a readable status line instead of a crash.</summary>
         private async void Run(Func<Task> action)
@@ -227,16 +318,21 @@ namespace JianghuGo.Android
 
         private void ShowLogin()
         {
-            var ui = NewScreen("Jianghu Go");
-            ui.Label("Świat wuxia na ulicach twojego miasta. Kultywuj Qi, zbieraj zioła, walcz i zakładaj sekty.", 15);
-            ui.Action("☯ Graj offline (bez serwera)", () => Run(PlayOfflineAsync));
-            ui.Label("Świat działa w telefonie, postęp zapisuje się w pamięci aplikacji.", 12, global::Android.Graphics.Color.Gray);
-            ui.Divider();
+            var ui = NewScreen("Jianghu Go", art: Resource.Drawable.bg_hero, subtitle: "ŚWIAT WUXIA NA TWOICH ULICACH");
+            var spacer = new View(this);
+            ui.Add(spacer, 200);
+            var hero = ui.Panel();
+            ui.Label("江湖行", 34, Ui.Gold, bold: true, parent: hero).Gravity = GravityFlags.Center;
+            ui.Label("Kultywuj Qi, zbieraj duchowe zioła na ulicach swojego miasta, walcz z bestiami i zakładaj sekty.", 15, parent: hero).Gravity = GravityFlags.Center;
+            ui.Action("☯  Graj offline (bez serwera)", () => Run(PlayOfflineAsync), parent: hero);
+            ui.Label("Świat działa w telefonie, postęp zapisuje się w pamięci aplikacji.", 12, Ui.Muted, parent: hero).Gravity = GravityFlags.Center;
+
             ui.Heading("Gra z serwerem");
-            ui.Label("Adres serwera", 13);
-            var server = ui.Field("http://192.168.1.10:8080", value: _prefs.GetString(ServerUrlKey, DefaultServer));
-            var email = ui.Field("E-mail");
-            var password = ui.Field("Hasło", password: true);
+            var online = ui.Panel();
+            ui.Label("Adres serwera", 12, Ui.Muted, parent: online);
+            var server = ui.Field("http://192.168.1.10:8080", value: _prefs.GetString(ServerUrlKey, DefaultServer), parent: online);
+            var email = ui.Field("E-mail", parent: online);
+            var password = ui.Field("Hasło", password: true, parent: online);
 
             bool Connect()
             {
@@ -245,27 +341,36 @@ namespace JianghuGo.Android
                 return false;
             }
 
+            var buttons = ui.Columns(online);
             ui.Action("Zaloguj", () => Run(async () =>
             {
                 if (!Connect()) return;
                 await _api.LoginAsync(email.Text.Trim(), password.Text, Ct);
                 await ShowHomeAsync();
-            }));
+            }), parent: Cell(buttons));
             ui.Action("Załóż konto", () => Run(async () =>
             {
                 if (!Connect()) return;
                 await _api.RegisterAsync(email.Text.Trim(), password.Text, Ct);
                 await _api.LoginAsync(email.Text.Trim(), password.Text, Ct);
                 await ShowHomeAsync();
-            }), secondary: true);
-            ui.Label("Hasło: co najmniej 10 znaków. Serwer uruchomisz na komputerze: API_BIND=0.0.0.0 docker compose up --build", 12, global::Android.Graphics.Color.Gray);
+            }), secondary: true, parent: Cell(buttons));
+            ui.Label("Hasło: co najmniej 10 znaków. Serwer: API_BIND=0.0.0.0 docker compose up --build", 11, Ui.Muted, parent: online);
+        }
+
+        /// <summary>A vertical cell sharing a row equally with its siblings.</summary>
+        private LinearLayout Cell(LinearLayout row)
+        {
+            var cell = new LinearLayout(this) { Orientation = Orientation.Vertical };
+            Ui.AddCell(row, cell, _ui.Dp(8));
+            return cell;
         }
 
         /// <summary>Starts the in-app server and signs in with the local account (created on first use).</summary>
         private async Task PlayOfflineAsync()
         {
-            NewScreen("Jianghu Go");
-            _ui.Label("Budzę świat Jianghu…", 16);
+            NewScreen("Jianghu Go", art: Resource.Drawable.bg_hero, subtitle: "BUDZĘ ŚWIAT JIANGHU…");
+            _ui.Label("Budzę świat Jianghu…", 16, Ui.Gold);
             var url = await EmbeddedServer.StartAsync(this);
             ConnectTo(url, offline: true);
             if (await _api.TryResumeAsync(Ct))
@@ -304,11 +409,13 @@ namespace JianghuGo.Android
         {
             var flow = new CharacterCreationFlow(_api);
             await flow.StartAsync(Ct);
-            var ui = NewScreen("Narodziny wojownika");
-            ui.Label("Los rzuca cechy. Zablokuj te, które chcesz zachować, i losuj ponownie (kosztuje Żetony Losu).", 14);
+            var ui = NewScreen("Narodziny wojownika", art: Resource.Drawable.bg_hero, subtitle: "LOS RZUCA KOŚCI TWOJEGO PRZEZNACZENIA");
+            ui.Label("Zablokuj cechy, które chcesz zachować, i losuj ponownie. Każde losowanie kosztuje Żetony Losu.", 14, Ui.Muted);
             var traits = ui.Column();
-            var stats = ui.Label(string.Empty, 15);
-            var tokens = ui.Label(string.Empty, 15, Ui.Cinnabar);
+            ui.Heading("Atrybuty");
+            var statsPanel = ui.Panel();
+            var stats = ui.Flow(statsPanel);
+            var tokens = ui.Label(string.Empty, 14, Ui.Gold, bold: true);
 
             void Render()
             {
@@ -318,29 +425,57 @@ namespace JianghuGo.Android
                 {
                     var trait = t;
                     var locked = flow.LockedCategories.Contains(trait.Category);
-                    ui.Action((locked ? "🔒 " : "") + trait.NamePl + "  · " + trait.Category + " · " + trait.Rarity, () =>
+                    var rarity = Ui.RarityOf(trait.Rarity);
+                    var card = new LinearLayout(this) { Orientation = Orientation.Horizontal, Clickable = true };
+                    card.SetGravity(GravityFlags.CenterVertical);
+                    card.Background = new FrameDrawable(Resources.DisplayMetrics.Density, global::Android.Graphics.Color.Argb(230, 14, 18, 22), rarity.Color, rarity.Color);
+                    card.SetPadding(_ui.Dp(14), _ui.Dp(10), _ui.Dp(14), _ui.Dp(10));
+                    var text = new LinearLayout(this) { Orientation = Orientation.Vertical };
+                    ui.Label(trait.NamePl, 17, Ui.Ink, bold: true, parent: text);
+                    ui.Label(CategoryName(trait.Category) + " · " + rarity.Name, 12, rarity.Color, parent: text);
+                    card.AddView(text, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
+                    var lockIcon = new TextView(this) { Text = locked ? "🔒" : "🔓" };
+                    lockIcon.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 20);
+                    lockIcon.Alpha = locked ? 1f : 0.45f;
+                    card.AddView(lockIcon);
+                    card.Click += (_, __) =>
                     {
                         if (!flow.ToggleLock(trait.Category)) SetStatus("Możesz zablokować najwyżej " + flow.Draft.MaxLockedTraits + " cechy.");
                         Render();
-                    }, secondary: !locked, parent: traits);
+                    };
+                    var lp = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = _ui.Dp(8) };
+                    traits.AddView(card, lp);
                 }
 
-                stats.Text = string.Join("   ", d.Stats.Select(st => StatName(st.Id) + " " + st.Value));
-                tokens.Text = "Żetony Losu: " + d.DestinyTokens + "   koszt losowania: " + flow.NextRerollCost + "   pozostało losowań: " + d.RerollsRemaining;
+                stats.RemoveAllViews();
+                foreach (var st in d.Stats) ui.Chip(StatName(st.Id) + "  " + st.Value, Ui.Ink, stats);
+                tokens.Text = "Żetony Losu: " + d.DestinyTokens + "   ·   koszt losowania: " + flow.NextRerollCost + "   ·   pozostało: " + d.RerollsRemaining;
             }
 
-            ui.Action("🎲 Losuj ponownie", () => Run(async () =>
+            ui.Action("🎲  Losuj ponownie", () => Run(async () =>
             {
                 if (!await flow.RerollAsync(Ct)) SetStatus("Szkic zmienił się na innym urządzeniu — odświeżono.");
                 Render();
-            }));
-            ui.Divider();
+            }), secondary: true);
+            ui.Heading("Imię");
             var name = ui.Field("Imię postaci (2–24 litery)");
-            ui.Label("Wybierz ścieżkę kultywacji:", 15, bold: true);
-            foreach (var path in new[] { ("qi", "Qi — równowaga i technika"), ("body", "Ciało — siła i wytrzymałość"), ("flame", "Płomień — moc miejsc Płomienia"), ("poison", "Trucizna — podstęp i osłabienie") })
+            ui.Heading("Ścieżka kultywacji");
+            var paths = new[]
             {
-                var p = path;
-                ui.Action(p.Item2, () => Run(async () => ShowCharacter(await flow.FinalizeAsync(name.Text.Trim(), p.Item1, Ct))));
+                ("qi", "Qi — równowaga i technika", Resource.Drawable.place_qiarray, Ui.QiBlue),
+                ("body", "Ciało — siła i wytrzymałość", Resource.Drawable.loc_fortress, global::Android.Graphics.Color.Rgb(196, 140, 80)),
+                ("flame", "Płomień — moc miejsc Płomienia", Resource.Drawable.place_brazier, Ui.Violet),
+                ("poison", "Trucizna — podstęp i osłabienie", Resource.Drawable.place_rift, Ui.Jade),
+            };
+            for (var i = 0; i < paths.Length; i += 2)
+            {
+                var row = ui.Columns();
+                for (var j = i; j < i + 2; j++)
+                {
+                    var p = paths[j];
+                    ui.Tile(p.Item2, string.Empty, p.Item3, () => Run(async () => ShowCharacter(await flow.FinalizeAsync(name.Text.Trim(), p.Item1, Ct))),
+                        parent: row, heightDp: 118, accent: p.Item4);
+                }
             }
 
             Render();
@@ -350,26 +485,43 @@ namespace JianghuGo.Android
 
         private void ShowCharacter(CharacterDto c)
         {
-            var ui = NewScreen(c.Name);
-            ui.Label("Ścieżka: " + PathName(c.Path) + "\n" + string.Join(" · ", c.Traits.Select(t => t.NamePl)), 14);
-            ui.Label(string.Join("   ", c.Stats.Select(st => StatName(st.Id) + " " + st.Value)), 14);
-            ui.Divider();
-            var realm = ui.Label("…", 18, Ui.Ink, bold: true);
-            var qi = ui.Meter("Qi", Ui.Jade);
-            var details = ui.Label(string.Empty, 14);
+            var ui = NewScreen(c.Name, art: Resource.Drawable.bg_town, subtitle: "ŚCIEŻKA " + PathName(c.Path).ToUpperInvariant());
+
+            // hero card: portrait, realm, Qi, cultivation actions
+            var card = ui.Panel();
+            var top = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            card.AddView(top);
+            var portrait = new ImageView(this);
+            var portraitArt = new global::Android.Graphics.Drawables.BitmapDrawable(Resources, Ui.Art(this, Resource.Drawable.portrait)) { FilterBitmap = false };
+            portrait.SetImageDrawable(portraitArt);
+            portrait.SetScaleType(ImageView.ScaleType.CenterCrop);
+            portrait.Background = new FrameDrawable(Resources.DisplayMetrics.Density, Ui.Night, Ui.Gold, Ui.Gold);
+            portrait.SetPadding(_ui.Dp(3), _ui.Dp(3), _ui.Dp(3), _ui.Dp(3));
+            top.AddView(portrait, new LinearLayout.LayoutParams(_ui.Dp(92), _ui.Dp(100)) { RightMargin = _ui.Dp(14) });
+            var info = new LinearLayout(this) { Orientation = Orientation.Vertical };
+            top.AddView(info, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
+            var realm = ui.Label("…", 18, Ui.Gold, bold: true, parent: info);
+            var traitsText = ui.Label(string.Join(" · ", c.Traits.Select(t => t.NamePl)), 12, Ui.Muted, parent: info);
+            var qi = ui.Meter("Qi", Ui.QiBlue, info, 20);
+            var details = ui.Label(string.Empty, 13, parent: card);
             var flow = new CultivationFlow(_api, c.Id);
-            var meditate = ui.Action("🧘 Medytuj", () => { });
+            var actions = ui.Columns(card);
+            var meditate = ui.Action("🧘 Medytuj", () => { }, parent: Cell(actions));
+            var breakthrough = ui.Action("⚡ Przełom", () => { }, secondary: true, parent: Cell(actions));
+
+            var statsRow = ui.Flow(card);
+            foreach (var st in c.Stats) ui.Chip(StatName(st.Id) + " " + st.Value, Ui.Ink, statsRow);
 
             void Render()
             {
                 var st = flow.State;
                 if (st == null) return;
-                realm.Text = st.RealmNamePl + " — etap " + st.Stage + "/" + st.StagesInRealm;
-                Ui.SetMeter(qi, "Qi: " + st.Qi + " / " + st.QiRequired, st.Qi, st.QiRequired);
+                realm.Text = st.RealmNamePl + " · etap " + st.Stage + "/" + st.StagesInRealm;
+                Ui.SetMeter(qi, "Qi  " + st.Qi + " / " + st.QiRequired, st.Qi, st.QiRequired);
                 var deviation = st.DeviationUntil.HasValue && st.DeviationUntil > DateTimeOffset.UtcNow
                     ? "\nOdchylenie Qi do " + st.DeviationUntil.Value.ToLocalTime().ToString("HH:mm") : string.Empty;
                 details.Text = "Szansa przełomu: " + Math.Round(st.BreakthroughChance * 100) + "%" +
-                               (st.IsMeditating ? "\nMedytujesz od " + st.MeditationStartedAt.Value.ToLocalTime().ToString("HH:mm") : string.Empty) +
+                               (st.IsMeditating ? "   ·   Medytujesz od " + st.MeditationStartedAt.Value.ToLocalTime().ToString("HH:mm") : string.Empty) +
                                "\nDzisiaj z medytacji: " + st.DailyMeditationQi + " / " + st.DailyMeditationQiCap + deviation;
                 meditate.Text = st.IsMeditating ? "🧘 Zakończ medytację" : "🧘 Medytuj";
             }
@@ -389,60 +541,66 @@ namespace JianghuGo.Android
 
                 Render();
             });
-            ui.Action("⚡ Próba przełomu", () => Run(async () =>
+            breakthrough.Click += (_, __) => Run(async () =>
             {
                 var r = await flow.BreakthroughAsync(Ct);
                 Render();
                 SetStatus(r == null ? "Stan zmienił się na innym urządzeniu — odświeżono." : r.Success ? "Przełom udany!" : "Przełom nieudany — odchylenie Qi.");
-            }));
+            });
 
-            ui.Divider();
-            ui.Action("🗺 Eksploruj świat", () => Run(async () =>
+            ui.Heading("Wyprawa");
+            ui.Tile("🗺  Eksploruj świat", "Zioła, źródła Qi i bestie wokół ciebie", Resource.Drawable.loc_mountains, () => Run(async () =>
             {
                 var exploration = new ExplorationFlow(_api, _location, c.Id);
                 await exploration.StartAsync(Ct);
                 ShowWorld(exploration, c);
-            }));
-            ui.Label("Trening walki", 15, bold: true);
-            foreach (var npc in new[] { ("training_dummy", "Manekin treningowy"), ("grey_wolf", "Szary Wilk"), ("mountain_bandit", "Górski Bandyta") })
+            }), heightDp: 130);
+
+            ui.Heading("Trening walki");
+            var fights = ui.Columns();
+            foreach (var npc in new[] { ("training_dummy", "Manekin treningowy", Resource.Drawable.sprite_dummy), ("grey_wolf", "Szary Wilk", Resource.Drawable.sprite_wolf), ("mountain_bandit", "Górski Bandyta", Resource.Drawable.sprite_bandit) })
             {
                 var n = npc;
-                ui.Action("⚔ " + n.Item2, () => Run(async () =>
+                ui.Tile(n.Item2, string.Empty, n.Item3, () => Run(async () =>
                 {
                     var combat = new CombatFlow(_api);
                     await combat.StartPveAsync(c.Id, n.Item1, Ct);
                     ShowBattle(combat, c);
-                }), secondary: true);
+                }), parent: fights, heightDp: 140, pixelArt: true, accent: Ui.Cinnabar);
             }
 
-            ui.Divider();
-            ui.Action("🎒 Sakwa, kuźnia i targ", () => Run(async () =>
+            ui.Heading("Ścieżka mistrza");
+            var row1 = ui.Columns();
+            ui.Tile("🎒 Sakwa, kuźnia i targ", "Ekwipunek i handel", Resource.Drawable.loc_village, () => Run(async () =>
             {
                 var economy = new EconomyFlow(_api, c.Id);
                 await economy.LoadAsync(Ct);
                 ShowBag(economy, c);
-            }));
-            ui.Action("☯ Laboratorium Dao", () => Run(async () =>
+            }), parent: row1, heightDp: 120);
+            ui.Tile("☯ Laboratorium Dao", "Własne techniki", Resource.Drawable.place_qiarray, () => Run(async () =>
             {
                 var lab = new DaoLabFlow(_api, c.Id);
                 await lab.LoadAsync(Ct);
                 var economy = new EconomyFlow(_api, c.Id);
                 await economy.LoadAsync(Ct);
                 ShowDaoLab(lab, economy, c);
-            }));
-            ui.Action("🏯 Sekta i terytoria", () => Run(async () =>
+            }), parent: row1, heightDp: 120);
+            var row2 = ui.Columns();
+            ui.Tile("🏯 Sekta i terytoria", "Bractwo i wojny", Resource.Drawable.loc_temple, () => Run(async () =>
             {
                 var sect = new SectFlow(_api, c.Id);
                 await sect.LoadAsync(Ct);
                 ShowSect(sect, c);
-            }));
+            }), parent: row2, heightDp: 120);
+            var inboxTile = ui.Tile("✉ Powiadomienia", "Wieści z Jianghu", Resource.Drawable.place_altar, () => { }, parent: row2, heightDp: 120);
             var inbox = ui.Label(string.Empty, 14);
-            ui.Action("✉ Powiadomienia", () => Run(async () =>
+            inboxTile.Click += (_, __) => Run(async () =>
             {
                 var page = await _api.GetNotificationsAsync(true, 10, null, Ct);
                 inbox.Text = page.Items.Count == 0 ? "Brak nowych powiadomień." : string.Join("\n", page.Items.Select(n => "• " + Describe(n)));
                 foreach (var n in page.Items) await _api.MarkNotificationReadAsync(n.Id, Ct);
-            }), secondary: true);
+            });
+
             ui.Action("Wyloguj", () => Run(async () =>
             {
                 await _api.LogoutAsync(Ct);
@@ -471,15 +629,16 @@ namespace JianghuGo.Android
                 ShowCharacter(c);
             }
 
-            var ui = NewScreen("Jianghu", () => Run(Leave));
+            var ui = NewScreen("Jianghu", () => Run(Leave), subtitle: "EKSPLORACJA");
             var gen = _screen;
             _worldOpen = true;
             if (!_paused) _location.Start();
 
-            var info = ui.Label("…", 14);
+            var info = ui.Label("…", 13, Ui.Ink);
             var map = new WorldMapView(this);
-            ui.Add(map, 340);
-            ui.Label("Dotknij punktu w zasięgu (czerwony okrąg ~40 m), by go zebrać lub walczyć.", 12, global::Android.Graphics.Color.Gray);
+            ui.Add(map, 380);
+            ui.Label("Dotknij miejsca w czerwonym kręgu (~40 m), by je zebrać lub stoczyć walkę.", 12, Ui.Muted);
+            ui.Heading("W pobliżu");
             var list = ui.Column();
 
             void Interact(NodeDto node) => Run(async () =>
@@ -509,9 +668,9 @@ namespace JianghuGo.Android
                 if (gen != _screen) return;
                 var n = exploration.Nearby;
                 info.Text = (exploration.Problem == null ? "📍 Pozycja potwierdzona" : "📍 " + DescribeProblem(exploration.Problem)) +
-                            (exploration.Session != null ? "   · przebyto " + Math.Round(exploration.Session.DistanceM) + " m" : string.Empty) +
+                            (exploration.Session != null ? "   ·   przebyto " + Math.Round(exploration.Session.DistanceM) + " m" : string.Empty) +
                             (n?.Event != null ? "\n✨ Wydarzenie: " + n.Event.NamePl : string.Empty) +
-                            (n?.NearestFlameSite != null ? "\n🔥 Najbliższe miejsce Płomienia: " + n.NearestFlameSite.NamePl + " (" + (n.NearestFlameSite.DistanceM < 1000 ? n.NearestFlameSite.DistanceM + " m" : n.NearestFlameSite.DistanceM / 1000 + " km") + ")" : string.Empty);
+                            (n?.NearestFlameSite != null ? "\n🔥 Płomień: " + n.NearestFlameSite.NamePl + " (" + (n.NearestFlameSite.DistanceM < 1000 ? n.NearestFlameSite.DistanceM + " m" : n.NearestFlameSite.DistanceM / 1000 + " km") + ")" : string.Empty);
                 map.Player = _location.Last;
                 map.Nearby = n;
                 map.Invalidate();
@@ -520,8 +679,9 @@ namespace JianghuGo.Android
                 foreach (var node in n.Nodes.OrderBy(x => x.DistanceM).Take(8))
                 {
                     var target = node;
-                    ui.Action(target.NamePl + " — " + target.DistanceM + " m" + (target.Harvested ? " (zebrane)" : target.InRange ? "  ✋ zbierz" : string.Empty),
-                        () => Interact(target), secondary: !(target.InRange && !target.Harvested), parent: list);
+                    var ready = target.InRange && !target.Harvested;
+                    ui.Action(NodeGlyph(target.Kind) + "  " + target.NamePl + " — " + target.DistanceM + " m" + (target.Harvested ? "  ✓" : ready ? "  ✋ zbierz" : string.Empty),
+                        () => Interact(target), secondary: !ready, parent: list);
                 }
             }
 
@@ -532,7 +692,8 @@ namespace JianghuGo.Android
                 map.Invalidate();
             };
 
-            ui.Action("🔥 Dostrój się do Płomienia", () => Run(async () =>
+            var buttons = ui.Columns();
+            ui.Action("🔥 Dostrój się", () => Run(async () =>
             {
                 var site = exploration.Nearby?.NearestFlameSite;
                 if (site == null || !site.InRange)
@@ -543,8 +704,8 @@ namespace JianghuGo.Android
 
                 var r = await exploration.AttuneAsync(site.Id, Ct);
                 SetStatus("+" + r.RewardQi + " Qi z Płomienia");
-            }), secondary: true);
-            ui.Action("Zakończ eksplorację", () => Run(Leave), secondary: true);
+            }), secondary: true, parent: Cell(buttons));
+            ui.Action("Zakończ eksplorację", () => Run(Leave), secondary: true, parent: Cell(buttons));
 
             async void Loop()
             {
@@ -582,35 +743,41 @@ namespace JianghuGo.Android
             Loop();
         }
 
+        private static string NodeGlyph(string kind) => kind switch
+        {
+            "qi_spring" => "💧",
+            "spirit_herb" => "🌿",
+            "spirit_beast" => "🐺",
+            _ => "✦",
+        };
+
         // ---- battle -------------------------------------------------------------------------------------------
 
         private void ShowBattle(CombatFlow combat, CharacterDto c)
         {
-            var ui = NewScreen("Pojedynek", () => ShowCharacter(c));
-            var me = ui.Meter("Ty", Ui.Jade);
-            var myQi = ui.Meter("Qi", global::Android.Graphics.Color.Rgb(46, 104, 150));
-            var foe = ui.Meter("Przeciwnik", Ui.Cinnabar);
-            var header = ui.Label(string.Empty, 15, Ui.Ink, bold: true);
-            var log = ui.Label(string.Empty, 14);
+            var ui = NewScreen("Pojedynek", () => ShowCharacter(c), subtitle: combat.Battle.Opponent.Name.ToUpperInvariant());
+            var stage = new BattleStageView(this, combat.Battle.NpcId);
+            ui.Add(stage, 300);
+            var header = ui.Label(string.Empty, 14, Ui.Gold, bold: true);
+            var logPanel = ui.Panel(padDp: 10);
+            var log = ui.Label(string.Empty, 13, parent: logPanel);
             var buttons = new List<Button>();
             var gen = _screen;
 
             void Render()
             {
                 var b = combat.Battle;
-                Ui.SetMeter(me, b.Me.Name + "  HP " + b.Me.Hp + "/" + b.Me.MaxHp, b.Me.Hp, b.Me.MaxHp);
-                Ui.SetMeter(myQi, "Qi " + b.Me.Qi + "/" + b.Me.MaxQi, b.Me.Qi, b.Me.MaxQi);
-                Ui.SetMeter(foe, b.Opponent.Name + "  HP " + b.Opponent.Hp + "/" + b.Opponent.MaxHp, b.Opponent.Hp, b.Opponent.MaxHp);
-                header.Text = "Tura " + b.Turn + "   ·   dystans " + b.Distance +
+                stage.Show(b);
+                header.Text = "Tura " + b.Turn + "   ·   dystans " + b.Distance + "   ·   Qi " + b.Me.Qi + "/" + b.Me.MaxQi +
                               (b.IsActive ? (b.MyActionSubmitted ? "\nCzekasz na ruch przeciwnika…" : string.Empty)
                                   : "\nWYNIK: " + ResultName(b) + (b.RewardQi > 0 ? "  (+" + b.RewardQi + " Qi)" : string.Empty));
-                log.Text = string.Join("\n", b.LastTurnEvents.Select(e =>
+                log.Text = b.LastTurnEvents.Count == 0 ? "Przeciwnicy mierzą się wzrokiem…" : string.Join("\n", b.LastTurnEvents.Select(e =>
                     (b.IsMine(e) ? "Ty" : "Wróg") + ": " + ActionName(e.Action) + (e.TechniqueId != null ? " (" + e.TechniqueId + ")" : string.Empty) +
                     (e.Hit == true ? " → " + e.Damage + " obrażeń" : e.Hit == false ? " → pudło" : string.Empty)));
                 foreach (var button in buttons)
                 {
                     button.Enabled = b.IsActive && !b.MyActionSubmitted;
-                    button.Alpha = button.Enabled ? 1f : 0.45f;
+                    button.Alpha = button.Enabled ? 1f : 0.4f;
                 }
             }
 
@@ -620,37 +787,63 @@ namespace JianghuGo.Android
                 if (gen == _screen) Render();
             });
 
-            ui.Divider();
+            ui.Heading("Techniki");
+            LinearLayout row = null;
+            var count = 0;
+            void AddSkill(string caption, System.Action onClick, bool secondary)
+            {
+                if (count % 2 == 0) row = ui.Columns();
+                buttons.Add(ui.Action(caption, onClick, secondary, Cell(row)));
+                count++;
+            }
+
             foreach (var s in combat.Battle.MySlots.Where(x => x.TechniqueId != null))
             {
                 var slot = s;
-                var cost = slot.QiCost > 0 ? "  · " + slot.QiCost + " Qi" : string.Empty;
+                var cost = slot.QiCost > 0 ? "\n" + slot.QiCost + " Qi" : string.Empty;
                 if (slot.Kind == "movement")
                 {
-                    buttons.Add(ui.Action("➡ " + slot.NamePl + " (naprzód)" + cost, () => Act(slot.Slot, "advance")));
-                    buttons.Add(ui.Action("⬅ " + slot.NamePl + " (odwrót)" + cost, () => Act(slot.Slot, "retreat")));
+                    AddSkill("➡ " + slot.NamePl + cost, () => Act(slot.Slot, "advance"), true);
+                    AddSkill("⬅ " + slot.NamePl + cost, () => Act(slot.Slot, "retreat"), true);
                 }
                 else
                 {
-                    buttons.Add(ui.Action(slot.NamePl + " [" + slot.Kind + "]" + cost, () => Act(slot.Slot, null)));
+                    AddSkill(KindGlyph(slot.Kind) + " " + slot.NamePl + cost, () => Act(slot.Slot, null), slot.Kind != "attack");
                 }
             }
 
-            buttons.Add(ui.Action("Odpoczynek (+Qi)", () => Act(null, null), secondary: true));
+            AddSkill("Odpoczynek\n+Qi", () => Act(null, null), true);
+            var bottom = ui.Columns();
             ui.Action("Odśwież", () => Run(async () =>
             {
                 await combat.RefreshAsync(Ct);
                 Render();
-            }), secondary: true);
-            ui.Action("Wróć", () => ShowCharacter(c), secondary: true);
+            }), secondary: true, parent: Cell(bottom));
+            ui.Action("Wróć", () => ShowCharacter(c), secondary: true, parent: Cell(bottom));
             Render();
         }
+
+        private static string KindGlyph(string kind) => kind switch
+        {
+            "attack" => "⚔",
+            "defense" => "🛡",
+            "counter" => "☯",
+            _ => "✦",
+        };
+
+        private static string CategoryName(string category) => category switch
+        {
+            "background" => "pochodzenie",
+            "bloodline" => "krew",
+            "constitution" => "konstytucja",
+            _ => category,
+        };
 
         // ---- economy ------------------------------------------------------------------------------------------
 
         private void ShowBag(EconomyFlow economy, CharacterDto c)
         {
-            var ui = NewScreen("Sakwa", () => ShowCharacter(c));
+            var ui = NewScreen("Sakwa", () => ShowCharacter(c), Resource.Drawable.loc_village, "EKWIPUNEK");
             var summary = ui.Label("…", 15, Ui.Ink, bold: true);
             var list = ui.Column();
 
@@ -718,7 +911,7 @@ namespace JianghuGo.Android
 
         private void ShowCrafting(EconomyFlow economy, CharacterDto c)
         {
-            var ui = NewScreen("Kuźnia i alchemia", () => ShowBag(economy, c));
+            var ui = NewScreen("Kuźnia i alchemia", () => ShowBag(economy, c), Resource.Drawable.loc_fortress, "RZEMIOSŁO");
             var balance = ui.Label(string.Empty, 15, Ui.Ink, bold: true);
             void Render() => balance.Text = "💎 Kamienie Duchowe: " + economy.Inventory.Balance;
             Render();
@@ -748,7 +941,7 @@ namespace JianghuGo.Android
         {
             var page = await economy.BrowseAsync(null, null, Ct);
             var mine = await economy.MyListingsAsync(Ct);
-            var ui = NewScreen("Targ", () => ShowBag(economy, c));
+            var ui = NewScreen("Targ", () => ShowBag(economy, c), Resource.Drawable.loc_village, "HANDEL");
             var rules = economy.MarketRules;
             ui.Label("Opłata za wystawienie " + rules.ListingFeePermille / 10.0 + "% (min. " + rules.MinListingFee + "), podatek od sprzedaży " +
                      rules.SaleTaxPermille / 10.0 + "%, oferta ważna " + rules.ListingHours + " h", 13);
@@ -817,7 +1010,7 @@ namespace JianghuGo.Android
 
         private void ShowDaoLab(DaoLabFlow lab, EconomyFlow economy, CharacterDto c)
         {
-            var ui = NewScreen("Laboratorium Dao", () => ShowCharacter(c));
+            var ui = NewScreen("Laboratorium Dao", () => ShowCharacter(c), Resource.Drawable.place_qiarray, "TWORZENIE TECHNIK");
             ui.Label("Ułóż własną technikę ataku. Serwer liczy jej moc i pilnuje budżetu twojego poziomu.", 14);
             var name = ui.Field("Nazwa techniki");
             var power = ui.Field("Moc (1–30)", number: true);
@@ -894,7 +1087,7 @@ namespace JianghuGo.Android
         {
             if (flow.Mine == null)
             {
-                var ui0 = NewScreen("Sekty", () => ShowCharacter(c));
+                var ui0 = NewScreen("Sekty", () => ShowCharacter(c), Resource.Drawable.loc_temple, "BRACTWA JIANGHU");
                 ui0.Label("Nie należysz do żadnej sekty. Załóż własną lub poproś o przyjęcie.", 14);
                 var name = ui0.Field("Nazwa nowej sekty");
                 ui0.Action("🏯 Załóż sektę (opłata w KD)", () => Run(async () =>
@@ -923,7 +1116,7 @@ namespace JianghuGo.Android
             }
 
             var mine = flow.Mine;
-            var ui = NewScreen(mine.Sect.Name, () => ShowCharacter(c));
+            var ui = NewScreen(mine.Sect.Name, () => ShowCharacter(c), Resource.Drawable.loc_fortress, "TWOJA SEKTA");
             ui.Label("Twoja ranga: " + RoleName(mine.MyRole) + "\nSkarbiec: " + mine.Treasury + " KD   ·   Członkowie: " + mine.Sect.MemberCount + "/" + mine.Sect.MaxMembers, 15, Ui.Ink, bold: true);
             ui.Label(string.Join("\n", mine.Sect.Members.Select(m => "• " + m.Name + " — " + RoleName(m.Role) + " (wkład " + m.Contribution + ")")), 14);
             if (flow.Territories != null)
