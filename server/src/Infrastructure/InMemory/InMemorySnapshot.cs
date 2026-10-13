@@ -17,6 +17,7 @@ public static class InMemorySnapshot
     {
         IncludeFields = true, // tuple keys (Item1, Item2)
         WriteIndented = false,
+        Converters = { new KeyValuePairConverterFactory() },
     };
 
     private static readonly MethodInfo BuildMethod = typeof(InMemorySnapshot).GetMethod(nameof(Build), BindingFlags.NonPublic | BindingFlags.Static)!;
@@ -177,5 +178,32 @@ internal sealed class InMemorySnapshotWriter : IDisposable
         Flush();
         _stop.Dispose();
         _signal.Dispose();
+    }
+}
+
+/// <summary>
+/// KeyValuePair as {"Key":…,"Value":…} without System.Text.Json's constructor binding, which needs the base library's
+/// parameter names (removed by trimming in the Android build).
+/// </summary>
+internal sealed class KeyValuePairConverterFactory : System.Text.Json.Serialization.JsonConverterFactory
+{
+    public override bool CanConvert(Type typeToConvert) =>
+        typeToConvert.IsGenericType && typeToConvert.GetGenericTypeDefinition() == typeof(KeyValuePair<,>);
+
+    public override System.Text.Json.Serialization.JsonConverter CreateConverter(Type typeToConvert, JsonSerializerOptions options) =>
+        (System.Text.Json.Serialization.JsonConverter)Activator.CreateInstance(
+            typeof(KeyValuePairConverter<,>).MakeGenericType(typeToConvert.GetGenericArguments()))!;
+
+    private sealed class KeyValuePairConverter<TKey, TValue> : System.Text.Json.Serialization.JsonConverter<KeyValuePair<TKey, TValue>>
+    {
+        public override KeyValuePair<TKey, TValue> Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            var row = JsonSerializer.Deserialize<SnapshotRow<TKey, TValue>>(ref reader, options)
+                ?? throw new JsonException("Null key/value pair.");
+            return new KeyValuePair<TKey, TValue>(row.Key, row.Row);
+        }
+
+        public override void Write(Utf8JsonWriter writer, KeyValuePair<TKey, TValue> value, JsonSerializerOptions options) =>
+            JsonSerializer.Serialize(writer, new SnapshotRow<TKey, TValue>(value.Key, value.Value), options);
     }
 }
