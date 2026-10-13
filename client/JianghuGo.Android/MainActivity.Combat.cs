@@ -105,6 +105,7 @@ namespace JianghuGo.Android
             ui.AddWeighted(page, stage, 1f, 0);
             var ticker = ui.Text(string.Empty, page, 12, Ui.Ink, maxLines: 2);
             var buttons = new List<View>();
+            var rewardShown = combat.Battle.Status == "finished";
 
             string TechIcon(CombatSlotDto slot) =>
                 slot.TechniqueId != null && ui.ArtId("tech_" + slot.TechniqueId) != 0 ? "tech_" + slot.TechniqueId
@@ -174,8 +175,6 @@ namespace JianghuGo.Android
             }, controls, secondary: true, sp: 12, heightDp: 42);
             buttons.Add(forfeit);
             ui.Btn("Wyjdź", () => GoTab(TabCombat), controls, secondary: true, sp: 12, heightDp: 42);
-
-            var rewardShown = combat.Battle.Status == "finished";
 
             void Render()
             {
