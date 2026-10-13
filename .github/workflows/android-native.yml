@@ -50,6 +50,50 @@ jobs:
         with:
           name: JianghuGo-dev-apk
           path: dist/JianghuGo-dev.apk
+
+  smoke:
+    # Installs the APK on an emulator and plays through the main screens against a real API (in-memory storage).
+    needs: apk
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: JianghuGo-dev-apk
+          path: dist
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+      - name: Start the API (Development, in-memory storage)
+        run: |
+          dotnet build server/src/Api -c Release --nologo -v q
+          (cd server/src/Api/bin/Release/net10.0 && ASPNETCORE_ENVIRONMENT=Development nohup dotnet JianghuGo.Api.dll --urls http://0.0.0.0:8080 > "$GITHUB_WORKSPACE/api.log" 2>&1 &)
+          for i in $(seq 1 60); do curl -fs http://127.0.0.1:8080/health/ready >/dev/null && break; sleep 1; done
+          curl -fs http://127.0.0.1:8080/health/ready
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Play through the app on an emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: bash tools/android-smoke/smoke.sh dist/JianghuGo-dev.apk
+      - name: Upload screenshots and logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-smoke
+          path: |
+            shots/
+            api.log
       - name: Publish to the android-latest pre-release
         uses: softprops/action-gh-release@v2
         with:
