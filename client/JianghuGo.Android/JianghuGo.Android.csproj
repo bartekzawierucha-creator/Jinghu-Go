@@ -13,8 +13,8 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <RootNamespace>JianghuGo.Android</RootNamespace>
     <ApplicationId>pl.bz.jianghugo</ApplicationId>
-    <ApplicationVersion>1</ApplicationVersion>
-    <ApplicationDisplayVersion>0.9.0</ApplicationDisplayVersion>
+    <ApplicationVersion>2</ApplicationVersion>
+    <ApplicationDisplayVersion>1.0.0-mvp</ApplicationDisplayVersion>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
     <AndroidPackageFormats>apk</AndroidPackageFormats>
     <!-- System.Text.Json, minimal APIs and DI use reflection over the client and the embedded server. -->

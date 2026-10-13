@@ -7,6 +7,7 @@ on:
   push:
     branches: [main]
     paths: ["client/**", "server/src/**", "content/**", "tools/android-smoke/**", ".github/workflows/android-native.yml"]
+    tags: ["v*"]
 
 permissions:
   contents: write
@@ -109,13 +110,13 @@ jobs:
       - name: Publish to the android-latest pre-release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: android-latest
-          name: "Jianghu Go — Android (development build)"
-          prerelease: true
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'android-latest' }}
+          name: ${{ startsWith(github.ref, 'refs/tags/v') && format('Jianghu Go {0}', github.ref_name) || 'Jianghu Go — Android (development build)' }}
+          prerelease: ${{ !startsWith(github.ref, 'refs/tags/v') }}
           files: |
             dist/JianghuGo-dev.apk
             dist/JianghuGo-dev-arm32.apk
           body: |
-            Debug-signed DEVELOPMENT build of the native Android client from ${{ github.sha }}.
+            Debug-signed build of the native Android client from ${{ github.sha }}. Scope and verification: docs/status/mvp.md.
             Install: allow "unknown sources", open the APK. Server: `API_BIND=0.0.0.0 docker compose up --build` on a PC
             in the same Wi-Fi, then enter http://<PC address>:8080 on the login screen.

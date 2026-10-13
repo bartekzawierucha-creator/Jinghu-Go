@@ -18,6 +18,7 @@ Serwer jest jedynym autorytetem — klient wysyła intencje, nigdy wyniki.
 | 6+ | Laboratorium Dao (techniki z komponentów w budżecie mocy), zwoje technik na targu | ✅ ([zasady](docs/game-design/dao-lab.md), ADR 0010) |
 | 7 | Sekty (role, prośby, wkłady, skarbiec, siedziba, historia) i terytoria (zajmowanie, wojny GvG, danina, historia własności) | ✅ ([zasady](docs/game-design/sects-territory.md), ADR 0011) |
 | 8 | Integracja i wydanie: end-to-end, test obciążeniowy, przegląd bezpieczeństwa endpointów, ćwiczenie backup/restore, retencja danych, dokumentacja wdrożenia | ✅ wykonane — **[raport gotowości](docs/status/release-readiness.md): jeszcze nie do publicznego wydania** (klient Unity niezweryfikowany, opóźnienia walki pod obciążeniem) |
+| MVP | **[Wersja 1.0.0-mvp](docs/status/mvp.md)**: natywny klient Android z grafiką i animacjami, tryb offline z wbudowanym serwerem, PvP, edycja technik, zarządzanie sektą, kroki, prognoza medytacji | ✅ przetestowane w CI na emulatorze; telefony fizyczne — następny krok |
 
 Projekt **nie jest gotowy produkcyjnie** (brak testów obciążeniowych, odtwarzania backupu, bezpiecznego magazynu tokenów w kliencie) — patrz [raport weryfikacji](docs/status/verification-report.md).
 

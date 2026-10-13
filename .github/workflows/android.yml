@@ -7,8 +7,6 @@ name: android-apk
 # Run manually (Actions → android-apk → Run workflow) or push a tag v*; tags also attach the APK to a GitHub release.
 on:
   workflow_dispatch:
-  push:
-    tags: ["v*"]
 
 permissions:
   contents: write

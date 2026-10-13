@@ -25,7 +25,7 @@ Przepustowość 101 req/s (realistyczny) i 70 req/s (stres), **0 % błędów**, 
 ## Blokady wydania
 | # | Blokada | Warunek zamknięcia |
 |---|---|---|
-| B1 | Klient Unity nigdy nie był skompilowany ani uruchomiony w Unity; brak testów na urządzeniach, brak profilowania (CPU/GPU/pamięć/bateria/GPS), UI to prototyp list bez grafiki | Build Android/iOS z Unity 6 LTS, testy na ≥ 3 urządzeniach, profil Unity Profiler (klatka < 16 ms, brak alokacji w pętli), zgoda lokalizacji na obu platformach |
+| B1 | (Częściowo zamknięte w MVP 1.0.0: natywny klient Android zbudowany i przechodzi grę na emulatorze w CI — [mvp.md](mvp.md); nadal brak testów na fizycznych urządzeniach.) Klient Unity nigdy nie był skompilowany ani uruchomiony w Unity; brak testów na urządzeniach, brak profilowania (CPU/GPU/pamięć/bateria/GPS), UI to prototyp list bez grafiki | Build Android/iOS z Unity 6 LTS, testy na ≥ 3 urządzeniach, profil Unity Profiler (klatka < 16 ms, brak alokacji w pętli), zgoda lokalizacji na obu platformach |
 | B2 | Opóźnienie walki pod obciążeniem (p95 3,4 s na 2 vCPU) | Test na docelowym sprzęcie (osobna baza, ≥ 4 rdzenie API) z budżetem p95 < 500 ms; jeśli nie: tura walki w READ COMMITTED z jawną blokadą wiersza bitwy (`SELECT … FOR UPDATE`) zamiast SSI, partycjonowanie tabel walk |
 | B3 | Obrazy Docker i compose niezbudowane w tym środowisku (brak rejestrów) | Build obrazów w CI, skan obrazów, uruchomienie compose ze smoke testem |
 | B4 | Token odświeżania w `PlayerPrefs` (tylko DEV) | Android Keystore / iOS Keychain |
