@@ -47,6 +47,15 @@ curl -XPOST localhost:5000/api/v1/characters/drafts -H "Authorization: Bearer jg
 
 Klient Unity: otwórz `client/JianghuGo.Unity` w Unity 6 LTS, utwórz pustą scenę, dodaj obiekt z komponentem `GameBootstrap` i ustaw `serverUrl`.
 
+## Gra na Androida (APK bez Unity)
+
+`client/JianghuGo.Android` — natywny klient .NET for Android, korzysta z tego samego rdzenia klienta (ApiClient + flowy), który testy integracyjne sprawdzają z prawdziwym serwerem. Workflow `android-native-apk` buduje APK, instaluje go na emulatorze i przechodzi grę (rejestracja, postać, eksploracja z GPS, walka, sakwa) — dopiero wtedy publikuje plik w pre-release **android-latest**.
+
+1. Na komputerze: `API_BIND=0.0.0.0 docker compose up --build`.
+2. Na telefonie (ta sama sieć Wi-Fi): zainstaluj `JianghuGo-dev.apk` (zezwól na instalację z nieznanych źródeł), wpisz `http://<adres IP komputera>:8080`, załóż konto.
+
+Wersja deweloperska: podpis debug, ruch http dozwolony w LAN, token w SharedPreferences (nie na produkcję).
+
 ## Struktura
 
 ```
