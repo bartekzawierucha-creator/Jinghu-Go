@@ -455,7 +455,7 @@ namespace JianghuGo.Android
                 info.Text = (exploration.Problem == null ? "📍 Pozycja potwierdzona" : "📍 " + DescribeProblem(exploration.Problem)) +
                             (exploration.Session != null ? "   · przebyto " + Math.Round(exploration.Session.DistanceM) + " m" : string.Empty) +
                             (n?.Event != null ? "\n✨ Wydarzenie: " + n.Event.NamePl : string.Empty) +
-                            (n?.NearestFlameSite != null ? "\n🔥 Najbliższe miejsce Płomienia: " + n.NearestFlameSite.NamePl + " (" + n.NearestFlameSite.DistanceM / 1000 + " km)" : string.Empty);
+                            (n?.NearestFlameSite != null ? "\n🔥 Najbliższe miejsce Płomienia: " + n.NearestFlameSite.NamePl + " (" + (n.NearestFlameSite.DistanceM < 1000 ? n.NearestFlameSite.DistanceM + " m" : n.NearestFlameSite.DistanceM / 1000 + " km") + ")" : string.Empty);
                 map.Player = _location.Last;
                 map.Nearby = n;
                 map.Invalidate();
@@ -946,6 +946,7 @@ namespace JianghuGo.Android
             "willpower" => "Wola",
             "focus" => "Skupienie",
             "fate" => "Los",
+            "elementalAffinity" => "Powinowactwo żywiołów",
             _ => id,
         };
 
@@ -969,7 +970,10 @@ namespace JianghuGo.Android
         private static string ActionName(string action) => action switch
         {
             "attack" => "atak",
-            "defense" => "obrona",
+            "defense" or "defend" => "obrona",
+            "counter" => "kontra",
+            "move" or "advance" => "naprzód",
+            "retreat" => "odwrót",
             "guard" => "garda",
             "movement" => "ruch",
             "rest" => "odpoczynek",

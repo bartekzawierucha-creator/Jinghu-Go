@@ -107,9 +107,19 @@ namespace JianghuGo.Android
                 var site = Nearby.NearestFlameSite;
                 if (site != null)
                 {
-                    var angle = Math.Atan2((site.Lat - Player.Lat) * 110540, (site.Lon - Player.Lon) * Math.Cos(Player.Lat * Math.PI / 180) * 111320);
-                    var ax = cx + (float)Math.Cos(angle) * half;
-                    var ay = cy - (float)Math.Sin(angle) * half;
+                    // inside the map: at its place; farther away: on the rim, pointing the way
+                    float ax, ay;
+                    if (site.DistanceM <= RadiusM)
+                    {
+                        (ax, ay) = Project(site.Lat, site.Lon);
+                    }
+                    else
+                    {
+                        var angle = Math.Atan2((site.Lat - Player.Lat) * 110540, (site.Lon - Player.Lon) * Math.Cos(Player.Lat * Math.PI / 180) * 111320);
+                        ax = cx + (float)Math.Cos(angle) * half;
+                        ay = cy - (float)Math.Sin(angle) * half;
+                    }
+
                     _fill.Color = Color.Rgb(214, 120, 30);
                     _fill.Alpha = 255;
                     canvas.DrawCircle(ax, ay, 7 * _density, _fill);
