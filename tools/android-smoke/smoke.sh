@@ -211,7 +211,7 @@ $UI shot shots/09b-ranking.png
 
 step "news"
 $UI tap "Wieści"
-$UI wait "Witaj w Jianghu" 60
+$UI wait "Z CAŁEGO JIANGHU" 60
 $UI shot shots/10-news.png
 adb shell input keyevent KEYCODE_BACK; sleep 2
 $UI tap "Kultywacja"

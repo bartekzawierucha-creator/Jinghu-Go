@@ -157,7 +157,8 @@ namespace JianghuGo.Android
                     break;
             }
 
-            _foeScale = look.Scale;
+            // the world boss towers over a cultivator
+            _foeScale = npcId == "storm_qilin" ? 1.45f : look.Scale;
             if (look.Tint is { } tint)
                 _foePaint.SetColorFilter(new LightingColorFilter(tint.Mul, tint.Add));
 
