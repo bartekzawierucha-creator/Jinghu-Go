@@ -52,7 +52,7 @@ namespace JianghuGo.Android
                 settings["GameConfig:" + key + "Path"] = target;
             }
 
-            var app = JianghuApi.Create(new[] { "--urls", "http://127.0.0.1:0", "--environment", "Offline" },
+            var app = JianghuApi.Create(new[] { "--urls", "http://127.0.0.1:0", "--environment", "Offline", "--preventHostingStartup", "true" },
                 b => b.Configuration.AddInMemoryCollection(settings), root);
             await app.StartAsync().ConfigureAwait(false);
             _app = app;

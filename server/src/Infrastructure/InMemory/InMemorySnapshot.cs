@@ -20,6 +20,7 @@ public static class InMemorySnapshot
     };
 
     private static readonly MethodInfo BuildMethod = typeof(InMemorySnapshot).GetMethod(nameof(Build), BindingFlags.NonPublic | BindingFlags.Static)!;
+    private static readonly MethodInfo RowsMethod = typeof(InMemorySnapshot).GetMethod(nameof(Rows), BindingFlags.NonPublic | BindingFlags.Static)!;
 
     public static string Serialize(ImmutableDictionary<string, object> tables)
     {
@@ -28,8 +29,8 @@ public static class InMemorySnapshot
         foreach (var (name, table) in tables.OrderBy(t => t.Key, StringComparer.Ordinal))
         {
             var args = table.GetType().GetGenericArguments();
-            var pairsType = typeof(List<>).MakeGenericType(typeof(KeyValuePair<,>).MakeGenericType(args));
-            var pairs = Activator.CreateInstance(pairsType, table)!;
+            var pairsType = typeof(List<>).MakeGenericType(typeof(SnapshotRow<,>).MakeGenericType(args));
+            var pairs = RowsMethod.MakeGenericMethod(args).Invoke(null, [table])!;
             list.Add(new JsonObject
             {
                 ["name"] = name,
@@ -56,7 +57,7 @@ public static class InMemorySnapshot
         {
             var key = Type.GetType((string)node!["key"]!, throwOnError: true)!;
             var row = Type.GetType((string)node["row"]!, throwOnError: true)!;
-            var pairsType = typeof(List<>).MakeGenericType(typeof(KeyValuePair<,>).MakeGenericType(key, row));
+            var pairsType = typeof(List<>).MakeGenericType(typeof(SnapshotRow<,>).MakeGenericType(key, row));
             var pairs = node["rows"].Deserialize(pairsType, Options)!;
             tables[(string)node["name"]!] = BuildMethod.MakeGenericMethod(key, row).Invoke(null, [pairs])!;
         }
@@ -64,9 +65,18 @@ public static class InMemorySnapshot
         return tables.ToImmutable();
     }
 
-    private static ImmutableDictionary<TKey, TRow> Build<TKey, TRow>(List<KeyValuePair<TKey, TRow>> pairs)
-        where TKey : notnull => ImmutableDictionary.CreateRange(pairs);
+    private static List<SnapshotRow<TKey, TRow>> Rows<TKey, TRow>(ImmutableDictionary<TKey, TRow> table)
+        where TKey : notnull => table.Select(kv => new SnapshotRow<TKey, TRow>(kv.Key, kv.Value)).ToList();
+
+    private static ImmutableDictionary<TKey, TRow> Build<TKey, TRow>(List<SnapshotRow<TKey, TRow>> rows)
+        where TKey : notnull => ImmutableDictionary.CreateRange(rows.Select(r => new KeyValuePair<TKey, TRow>(r.Key, r.Row)));
 }
+
+/// <summary>
+/// One stored row. Our own type rather than KeyValuePair: on a trimmed runtime (the Android build) the base library's
+/// constructor parameter names are gone, which System.Text.Json needs for KeyValuePair.
+/// </summary>
+public sealed record SnapshotRow<TKey, TRow>(TKey Key, TRow Row);
 
 /// <summary>Writes the newest committed state in the background (coalescing bursts of commits), atomically.</summary>
 internal sealed class InMemorySnapshotWriter : IDisposable
