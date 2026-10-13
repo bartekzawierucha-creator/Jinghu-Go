@@ -50,7 +50,7 @@ jobs:
         run: |
           find out -name '*-Signed.apk' | sort
           mkdir -p dist
-          pick() { f=$(find out -name "*$1*-Signed.apk" | head -n1); test -n "$f" || { echo "no APK for $1"; exit 1; }; cp "$f" "dist/$2"; }
+          pick() { f=$(find out -name "*$1*-Signed.apk" | head -n1); test -n "$f" || { echo "::error::no APK for $1; produced: $(find out -name '*.apk' | tr '\n' ' ')"; exit 1; }; cp "$f" "dist/$2"; }
           pick arm64-v8a JianghuGo-dev.apk          # phones (ARM64)
           pick armeabi-v7a JianghuGo-dev-arm32.apk  # older 32-bit phones
           pick x86_64 JianghuGo-dev-x86_64.apk      # emulators (smoke test)
