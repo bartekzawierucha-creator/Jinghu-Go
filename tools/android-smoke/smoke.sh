@@ -70,6 +70,28 @@ $UI tap "Sakwa, kuźnia"
 $UI wait "Kamienie Duchowe" 60
 $UI shot shots/07-bag.png
 
+step "loadout, Flame sites, notifications"
+adb shell input keyevent KEYCODE_BACK; sleep 2
+$UI wait "Szansa przełomu" 60
+$UI tap "Zestaw technik"
+$UI wait "Slot 1" 60
+$UI shot shots/09-loadout.png
+$UI tap "Slot 2"
+$UI wait "Opróżnij slot" 30
+$UI shot shots/10-slot-picker.png
+adb shell input keyevent KEYCODE_BACK; sleep 2
+$UI wait "Slot 1" 30
+adb shell input keyevent KEYCODE_BACK; sleep 2
+$UI tap "Miejsca Płomienia"
+$UI wait "Góry Wudang" 60
+$UI shot shots/11-flame-sites.png
+adb shell input keyevent KEYCODE_BACK; sleep 2
+$UI tap "Powiadomienia"
+$UI wait "Witaj w Jianghu" 60
+$UI shot shots/12-inbox.png
+adb shell input keyevent KEYCODE_BACK; sleep 2
+$UI wait "Szansa przełomu" 60
+
 step "restart: progress must survive"
 sleep 2
 adb shell input keyevent KEYCODE_HOME
