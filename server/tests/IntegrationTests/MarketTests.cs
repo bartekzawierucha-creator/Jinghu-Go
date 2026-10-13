@@ -165,7 +165,7 @@ public class MarketTests : IAsyncLifetime
         foreach (var qty in new long[] { 0, -1, 1000 })
             await Problem(await ListStack(seller, s, "jade", qty, 10), HttpStatusCode.BadRequest, "quantity_invalid");
         await Problem(await ListStack(seller, s, "jade", 4, 10), (HttpStatusCode)422, "insufficient_items");
-        await Problem(await ListStack(seller, s, "dragon_scale", 1, 10), HttpStatusCode.BadRequest, "item_unknown");
+        await Problem(await ListStack(seller, s, "no_such_item", 1, 10), HttpStatusCode.BadRequest, "item_unknown");
         await Problem(await ListStack(other, s, "jade", 1, 10), HttpStatusCode.NotFound, "character_not_found");
         await Problem(await seller.PostAsync("/api/v1/market/listings", new { characterId = s.Str("id"), price = 10 }, Player.NewKey()),
             HttpStatusCode.BadRequest, "listing_target_invalid");

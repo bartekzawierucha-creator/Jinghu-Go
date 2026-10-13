@@ -64,7 +64,7 @@ public class ClientWorldTests : IAsyncLifetime
         var config = _host.Service<WorldConfig>();
         var seed = _host.Service<WorldSecret>().Seed;
         var start = new GeoPoint(52.2297, 21.0122);
-        var node = WorldGenerator.Nearby(config, seed, start, _host.Clock.GetUtcNow()).First(n => n.Kind != "spirit_beast");
+        var node = WorldGenerator.Nearby(config, seed, start, _host.Clock.GetUtcNow()).First(n => config.NodeKinds.Single(k => k.Id == n.Kind).NpcId is null);
 
         var (api, c) = await PlayerAsync("spacer@gps.dev");
         var gps = new FakeLocation(_host.Clock);

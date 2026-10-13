@@ -109,6 +109,11 @@ public sealed class CultivationService(
                     if (!await SaveAsync(uow, state, loaded.StoredVersion, now, ct)) return Concurrent;
                     await AuditAsync(uow, accountId, "cultivation.meditation_finished", characterId,
                         new { started, minutes, raw, gained, dailyTotal = state.DailyMeditationQi }, now, ct);
+                    if (minutes > 0)
+                    {
+                        await outbox.EnqueueAsync(uow, OutboxMessage.Create(CultivationEvents.MeditationFinished,
+                            new CultivationEvents.MeditationFinishedV1(accountId.Value, characterId, minutes, gained), now, correlation.CorrelationId), ct);
+                    }
                     return new MeditationResult(gained, minutes, gained < raw, View(loaded.Character, state with { Version = loaded.StoredVersion + 1 }));
                 }, ct);
             if (result.IsSuccess) await uow.CommitAsync(ct);

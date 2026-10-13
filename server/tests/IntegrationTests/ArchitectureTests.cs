@@ -23,6 +23,7 @@ public class ArchitectureTests
         ["JianghuGo.Modules.Geolocation"] = ["JianghuGo.Modules.Characters", "JianghuGo.Modules.Identity", "JianghuGo.Infrastructure", "JianghuGo.Application", "JianghuGo.Domain"],
         ["JianghuGo.Modules.World"] = ["JianghuGo.Modules.Geolocation", "JianghuGo.Modules.Combat", "JianghuGo.Modules.Inventory", "JianghuGo.Modules.Characters", "JianghuGo.Modules.Identity", "JianghuGo.Infrastructure", "JianghuGo.Application", "JianghuGo.Domain"],
         ["JianghuGo.Modules.Cultivation"] = ["JianghuGo.Modules.Inventory", "JianghuGo.Modules.World", "JianghuGo.Modules.Combat", "JianghuGo.Modules.Characters", "JianghuGo.Modules.Identity", "JianghuGo.Infrastructure", "JianghuGo.Application", "JianghuGo.Domain"],
+        ["JianghuGo.Modules.Quests"] = ["JianghuGo.Modules.Cultivation", "JianghuGo.Modules.World", "JianghuGo.Modules.Combat", "JianghuGo.Modules.Market", "JianghuGo.Modules.Crafting", "JianghuGo.Modules.Geolocation", "JianghuGo.Modules.Inventory", "JianghuGo.Modules.Characters", "JianghuGo.Modules.Identity", "JianghuGo.Infrastructure", "JianghuGo.Application", "JianghuGo.Domain"],
         ["JianghuGo.Modules.Notifications"] = ["JianghuGo.Modules.Sects", "JianghuGo.Modules.Territory", "JianghuGo.Modules.Geolocation", "JianghuGo.Modules.Market", "JianghuGo.Modules.Inventory", "JianghuGo.Modules.Combat", "JianghuGo.Modules.Cultivation", "JianghuGo.Modules.Characters", "JianghuGo.Modules.Identity", "JianghuGo.Infrastructure", "JianghuGo.Application", "JianghuGo.Domain"],
     };
 
@@ -44,7 +45,7 @@ public class ArchitectureTests
     [Fact]
     public void Cross_module_usage_goes_through_published_contracts()
     {
-        foreach (var consumer in new[] { "JianghuGo.Modules.Cultivation", "JianghuGo.Modules.Notifications", "JianghuGo.Modules.Combat", "JianghuGo.Modules.World", "JianghuGo.Modules.Geolocation", "JianghuGo.Modules.Inventory", "JianghuGo.Modules.Crafting", "JianghuGo.Modules.Market", "JianghuGo.Modules.Sects", "JianghuGo.Modules.Territory" })
+        foreach (var consumer in new[] { "JianghuGo.Modules.Cultivation", "JianghuGo.Modules.Notifications", "JianghuGo.Modules.Combat", "JianghuGo.Modules.World", "JianghuGo.Modules.Geolocation", "JianghuGo.Modules.Inventory", "JianghuGo.Modules.Crafting", "JianghuGo.Modules.Market", "JianghuGo.Modules.Sects", "JianghuGo.Modules.Territory", "JianghuGo.Modules.Quests" })
         {
             var asm = Assembly.Load(consumer);
             var used = asm.GetTypes()

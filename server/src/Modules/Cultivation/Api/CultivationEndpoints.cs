@@ -43,6 +43,18 @@ public static class CultivationEndpoints
                 }),
             })));
 
+        g.MapGet("/meridians", async (Guid characterId, HttpContext http, MeridianService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.GetAsync(http.User.GetAccountId(), characterId, ct), Results.Ok));
+
+        g.MapPost("/meridians", async (Guid characterId, MeridianCommand body, HttpContext http, MeridianService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.OpenAsync(http.User.GetAccountId(), characterId, body, ct), Results.Ok));
+
+        g.MapPost("/meridians/reset", async (Guid characterId, HttpContext http, MeridianService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.ResetAsync(http.User.GetAccountId(), characterId, ct), Results.Ok));
+
+        g.MapGet("/ranking", async (Guid characterId, int? limit, HttpContext http, RankingService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.GetAsync(http.User.GetAccountId(), characterId, limit ?? 50, ct), Results.Ok));
+
         return app;
     }
 

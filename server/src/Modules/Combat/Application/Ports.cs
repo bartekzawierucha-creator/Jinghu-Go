@@ -32,6 +32,11 @@ public interface ICombatRepository
     Task AddTurnAsync(IUnitOfWork uow, TurnRecord turn, CancellationToken ct);
     Task<IReadOnlyList<TurnRecord>> ListTurnsAsync(IUnitOfWork uow, Guid battleId, CancellationToken ct);
 
+    // ---- spirit pets
+    Task<SpiritPet?> FindPetAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct);
+    Task SavePetAsync(IUnitOfWork uow, SpiritPet pet, CancellationToken ct);
+    Task DeletePetAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct);
+
     // ---- Dao Lab
     Task AddCustomTechniqueAsync(IUnitOfWork uow, CustomTechnique technique, CancellationToken ct);
     Task<CustomTechnique?> FindCustomTechniqueAsync(IUnitOfWork uow, string id, CancellationToken ct);

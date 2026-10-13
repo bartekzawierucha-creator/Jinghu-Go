@@ -53,6 +53,42 @@ internal sealed class InMemoryCultivationRepository : ICultivationRepository
             .Where(a => a.CharacterId == characterId).OrderBy(a => a.Id)];
         return Task.FromResult(list);
     }
+
+    private const string Meridians = "cultivation.meridians";
+
+    public Task<IReadOnlyDictionary<string, int>> ListMeridiansAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct)
+    {
+        IReadOnlyDictionary<string, int> map = InMemoryUnitOfWork.From(uow).Table<(CharacterId, string), int>(Meridians)
+            .Where(kv => kv.Key.Item1 == characterId).ToDictionary(kv => kv.Key.Item2, kv => kv.Value);
+        return Task.FromResult(map);
+    }
+
+    public Task SaveMeridianAsync(IUnitOfWork uow, CharacterId characterId, string stat, int points, CancellationToken ct)
+    {
+        var u = InMemoryUnitOfWork.From(uow);
+        var t = u.Table<(CharacterId, string), int>(Meridians);
+        u.SetTable(Meridians, points > 0 ? t.SetItem((characterId, stat), points) : t.Remove((characterId, stat)));
+        return Task.CompletedTask;
+    }
+
+    public Task ClearMeridiansAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct)
+    {
+        var u = InMemoryUnitOfWork.From(uow);
+        var t = u.Table<(CharacterId, string), int>(Meridians);
+        u.SetTable(Meridians, t.RemoveRange(t.Keys.Where(k => k.Item1 == characterId)));
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<CultivationState>> ListTopAsync(IUnitOfWork uow, int limit, CancellationToken ct)
+    {
+        IReadOnlyList<CultivationState> list = [.. InMemoryUnitOfWork.From(uow).Table<CharacterId, CultivationState>(States).Values
+            .OrderByDescending(s => s.RealmIndex).ThenByDescending(s => s.Stage).ThenByDescending(s => s.Qi).ThenBy(s => s.UpdatedAt).Take(limit)];
+        return Task.FromResult(list);
+    }
+
+    public Task<int> CountAheadAsync(IUnitOfWork uow, CultivationState me, CancellationToken ct) =>
+        Task.FromResult(InMemoryUnitOfWork.From(uow).Table<CharacterId, CultivationState>(States).Values
+            .Count(s => (s.RealmIndex, s.Stage, s.Qi).CompareTo((me.RealmIndex, me.Stage, me.Qi)) > 0));
 }
 
 internal sealed class PostgresCultivationRepository : ICultivationRepository
@@ -113,4 +149,24 @@ internal sealed class PostgresCultivationRepository : ICultivationRepository
             r => new BreakthroughAttempt(r.GetGuid(0), characterId, new AccountId(r.GetGuid(1)), r.GetInt32(2), r.GetInt32(3), r.GetInt32(4), r.GetInt32(5),
                 r.GetBoolean(6), r.GetInt32(7), r.GetInt32(8), (ulong)r.GetDecimal(9), r.GetInt64(10), r.GetString(11), r.GetFieldValue<DateTimeOffset>(12)),
             ct, characterId.Value);
+    public async Task<IReadOnlyDictionary<string, int>> ListMeridiansAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
+        (await PostgresUnitOfWork.From(uow).QueryAsync("SELECT stat, points FROM cultivation.meridians WHERE character_id = $1",
+            r => (r.GetString(0), r.GetInt32(1)), ct, characterId.Value)).ToDictionary(x => x.Item1, x => x.Item2);
+
+    public Task SaveMeridianAsync(IUnitOfWork uow, CharacterId characterId, string stat, int points, CancellationToken ct) =>
+        points > 0
+            ? PostgresUnitOfWork.From(uow).ExecuteAsync(
+                "INSERT INTO cultivation.meridians (character_id, stat, points) VALUES ($1, $2, $3) ON CONFLICT (character_id, stat) DO UPDATE SET points = EXCLUDED.points",
+                ct, characterId.Value, stat, points)
+            : PostgresUnitOfWork.From(uow).ExecuteAsync("DELETE FROM cultivation.meridians WHERE character_id = $1 AND stat = $2", ct, characterId.Value, stat);
+
+    public Task ClearMeridiansAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
+        PostgresUnitOfWork.From(uow).ExecuteAsync("DELETE FROM cultivation.meridians WHERE character_id = $1", ct, characterId.Value);
+    public async Task<IReadOnlyList<CultivationState>> ListTopAsync(IUnitOfWork uow, int limit, CancellationToken ct) =>
+        await PostgresUnitOfWork.From(uow).QueryAsync(
+            $"SELECT {Columns} FROM cultivation.states ORDER BY realm_index DESC, stage DESC, qi DESC, updated_at LIMIT $1", Map, ct, limit);
+
+    public async Task<int> CountAheadAsync(IUnitOfWork uow, CultivationState me, CancellationToken ct) =>
+        (int)(await PostgresUnitOfWork.From(uow).QueryAsync(
+            "SELECT count(*) FROM cultivation.states WHERE (realm_index, stage, qi) > ($1, $2, $3)", r => r.GetInt64(0), ct, me.RealmIndex, me.Stage, me.Qi))[0];
 }

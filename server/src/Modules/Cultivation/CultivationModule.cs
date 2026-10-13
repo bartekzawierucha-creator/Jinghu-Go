@@ -34,6 +34,9 @@ public static class CultivationModule
         }
 
         services.AddScoped<CultivationService>();
+        services.AddScoped<MeridianService>();
+        services.AddScoped<RankingService>();
+        services.AddSingleton<JianghuGo.Modules.Combat.Contracts.ICombatStatBonuses, CultivationCombatBonuses>();
         services.AddSingleton<JianghuGo.Application.IOutboxHandler, CombatRewardHandler>();
         services.AddSingleton<JianghuGo.Application.IOutboxHandler, WorldRewardHandler>();
         services.AddSingleton<JianghuGo.Application.IOutboxHandler, ConsumableQiHandler>();

@@ -1,45 +1,40 @@
 {
-  "rulesVersion": "world-2",
+  "rulesVersion": "world-3",
   "cellSizeDegrees": 0.005,
   "nodeEpochHours": 6,
-  "nodesPerCell": { "min": 0, "max": 3 },
+  "nodesPerCell": {"min": 0, "max": 3},
   "nearbyRadiusM": 600,
   "interactionRadiusM": 40,
   "interactionsPerHour": 60,
   "nodeKinds": [
-    { "id": "qi_spring",    "namePl": "Źródło Qi",       "nameEn": "Qi Spring",    "weight": 50, "rewardQi": 15, "npcId": null,
-      "yields": [ { "item": "iron_ore", "chancePermille": 400, "min": 1, "max": 2 } ] },
-    { "id": "spirit_herb",  "namePl": "Duchowe Zioło",   "nameEn": "Spirit Herb",  "weight": 35, "rewardQi": 10, "npcId": null,
-      "yields": [ { "item": "spirit_herb", "chancePermille": 1000, "min": 1, "max": 3 } ] },
-    { "id": "spirit_beast", "namePl": "Duchowa Bestia",  "nameEn": "Spirit Beast", "weight": 15, "rewardQi": 0,  "npcId": "grey_wolf" }
+    {"id": "qi_spring", "namePl": "Źródło Qi", "nameEn": "Qi Spring", "weight": 50, "rewardQi": 15, "npcId": null, "yields": [{"item": "iron_ore", "chancePermille": 400, "min": 1, "max": 2}]},
+    {"id": "spirit_herb", "namePl": "Duchowe Zioło", "nameEn": "Spirit Herb", "weight": 35, "rewardQi": 10, "npcId": null, "yields": [{"item": "spirit_herb", "chancePermille": 1000, "min": 1, "max": 3}]},
+    {"id": "spirit_beast", "namePl": "Duchowa Bestia", "nameEn": "Spirit Beast", "weight": 15, "rewardQi": 0, "npcId": "grey_wolf"},
+    {"id": "ore_vein", "namePl": "Żyła Rudy", "nameEn": "Ore Vein", "weight": 18, "rewardQi": 8, "npcId": null, "yields": [{"item": "iron_ore", "chancePermille": 900, "min": 2, "max": 4}, {"item": "refining_stone", "chancePermille": 250, "min": 1, "max": 1}, {"item": "star_iron", "chancePermille": 15, "min": 1, "max": 1}]},
+    {"id": "jade_outcrop", "namePl": "Jadeitowa Skała", "nameEn": "Jade Outcrop", "weight": 8, "rewardQi": 10, "npcId": null, "yields": [{"item": "jade", "chancePermille": 800, "min": 1, "max": 2}, {"item": "soul_jade", "chancePermille": 20, "min": 1, "max": 1}]},
+    {"id": "bamboo_grove", "namePl": "Bambusowy Gaj", "nameEn": "Bamboo Grove", "weight": 14, "rewardQi": 8, "npcId": null, "yields": [{"item": "bamboo_essence", "chancePermille": 900, "min": 1, "max": 3}, {"item": "spirit_silk", "chancePermille": 200, "min": 1, "max": 1}]},
+    {"id": "lotus_pond", "namePl": "Staw Lotosów", "nameEn": "Lotus Pond", "weight": 6, "rewardQi": 20, "npcId": null, "yields": [{"item": "lotus_seed", "chancePermille": 500, "min": 1, "max": 1}, {"item": "heaven_dew", "chancePermille": 150, "min": 1, "max": 1}]},
+    {"id": "ancient_ruins", "namePl": "Starożytne Ruiny", "nameEn": "Ancient Ruins", "weight": 4, "rewardQi": 30, "npcId": null, "yields": [{"item": "technique_scroll", "chancePermille": 60, "min": 1, "max": 1}, {"item": "ancient_compass", "chancePermille": 25, "min": 1, "max": 1}, {"item": "jade", "chancePermille": 400, "min": 1, "max": 2}, {"item": "fire_crystal", "chancePermille": 200, "min": 1, "max": 1}]},
+    {"id": "shrine", "namePl": "Przydrożna Kapliczka", "nameEn": "Wayside Shrine", "weight": 6, "rewardQi": 60, "npcId": null, "yields": [{"item": "heaven_dew", "chancePermille": 300, "min": 1, "max": 1}]},
+    {"id": "boar_den", "namePl": "Legowisko Dzika", "nameEn": "Boar Den", "weight": 10, "rewardQi": 0, "npcId": "wild_boar"},
+    {"id": "viper_nest", "namePl": "Gniazdo Żmij", "nameEn": "Viper Nest", "weight": 8, "rewardQi": 0, "npcId": "bamboo_viper"},
+    {"id": "fox_den", "namePl": "Nora Ognistego Lisa", "nameEn": "Fire Fox Den", "weight": 5, "rewardQi": 0, "npcId": "fire_fox"},
+    {"id": "golem_ruin", "namePl": "Ruina Golema", "nameEn": "Golem Ruin", "weight": 4, "rewardQi": 0, "npcId": "stone_golem"},
+    {"id": "spider_cave", "namePl": "Jaskinia Pajęczycy", "nameEn": "Spider Cave", "weight": 3, "rewardQi": 0, "npcId": "frost_spider"},
+    {"id": "demon_altar", "namePl": "Ołtarz Demonów", "nameEn": "Demon Altar", "weight": 3, "rewardQi": 0, "npcId": "demonic_cultivator"},
+    {"id": "traitor_camp", "namePl": "Obóz Zdrajcy", "nameEn": "Traitor's Camp", "weight": 3, "rewardQi": 0, "npcId": "sect_traitor"},
+    {"id": "eagle_peak", "namePl": "Szczyt Orła", "nameEn": "Eagle Peak", "weight": 2, "rewardQi": 0, "npcId": "thunder_eagle"},
+    {"id": "cursed_grave", "namePl": "Przeklęty Grobowiec", "nameEn": "Cursed Tomb", "weight": 2, "rewardQi": 0, "npcId": "corpse_puppet"},
+    {"id": "bandit_fortress", "namePl": "Twierdza Bandytów (boss)", "nameEn": "Bandit Fortress (boss)", "weight": 2, "rewardQi": 0, "npcId": "bandit_chief"},
+    {"id": "tortoise_lake", "namePl": "Jezioro Prastarego Żółwia (boss)", "nameEn": "Ancient Tortoise Lake (boss)", "weight": 1, "rewardQi": 0, "npcId": "ancient_tortoise"},
+    {"id": "dragon_abyss", "namePl": "Otchłań Smoka Jiao (boss)", "nameEn": "Jiao Dragon Abyss (boss)", "weight": 1, "rewardQi": 0, "npcId": "jiao_dragon"},
+    {"id": "blood_gate", "namePl": "Wrota Krwawego Demona (boss)", "nameEn": "Blood Demon Gate (boss)", "weight": 1, "rewardQi": 0, "npcId": "blood_demon_lord"}
   ],
-  "flame": {
-    "radiusM": 150,
-    "cooldownHours": 20,
-    "rewardQiFlamePath": 250,
-    "rewardQiOtherPaths": 40,
-    "sites": [
-      { "id": "wudang",  "namePl": "Góry Wudang",            "lat": 32.4000,  "lon": 111.0040 },
-      { "id": "shaolin", "namePl": "Klasztor Shaolin",       "lat": 34.5076,  "lon": 112.9355 },
-      { "id": "emei",    "namePl": "Góra Emei",              "lat": 29.5199,  "lon": 103.3328 },
-      { "id": "huashan", "namePl": "Góra Hua",               "lat": 34.4778,  "lon": 110.0889 },
-      { "id": "taishan", "namePl": "Góra Tai",               "lat": 36.2561,  "lon": 117.1004 },
-      { "id": "kailash", "namePl": "Góra Kajlas",            "lat": 31.0675,  "lon": 81.3119 },
-      { "id": "fuji",    "namePl": "Góra Fudżi",             "lat": 35.3606,  "lon": 138.7274 },
-      { "id": "wawel",   "namePl": "Smocza Jama, Wawel",     "lat": 50.0533,  "lon": 19.9332 },
-      { "id": "etna",    "namePl": "Etna",                   "lat": 37.7510,  "lon": 14.9934 },
-      { "id": "teide",   "namePl": "Teide",                  "lat": 28.2724,  "lon": -16.6425 },
-      { "id": "kilauea", "namePl": "Kīlauea",                "lat": 19.4069,  "lon": -155.2834 },
-      { "id": "uluru",   "namePl": "Uluru",                  "lat": -25.3444, "lon": 131.0369 }
-    ]
-  },
+  "flame": {"radiusM": 150, "cooldownHours": 20, "rewardQiFlamePath": 250, "rewardQiOtherPaths": 40, "sites": [{"id": "wudang", "namePl": "Góry Wudang", "lat": 32.4, "lon": 111.004}, {"id": "shaolin", "namePl": "Klasztor Shaolin", "lat": 34.5076, "lon": 112.9355}, {"id": "emei", "namePl": "Góra Emei", "lat": 29.5199, "lon": 103.3328}, {"id": "huashan", "namePl": "Góra Hua", "lat": 34.4778, "lon": 110.0889}, {"id": "taishan", "namePl": "Góra Tai", "lat": 36.2561, "lon": 117.1004}, {"id": "kailash", "namePl": "Góra Kajlas", "lat": 31.0675, "lon": 81.3119}, {"id": "fuji", "namePl": "Góra Fudżi", "lat": 35.3606, "lon": 138.7274}, {"id": "wawel", "namePl": "Smocza Jama, Wawel", "lat": 50.0533, "lon": 19.9332}, {"id": "etna", "namePl": "Etna", "lat": 37.751, "lon": 14.9934}, {"id": "teide", "namePl": "Teide", "lat": 28.2724, "lon": -16.6425}, {"id": "kilauea", "namePl": "Kīlauea", "lat": 19.4069, "lon": -155.2834}, {"id": "uluru", "namePl": "Uluru", "lat": -25.3444, "lon": 131.0369}]},
   "events": {
     "regionSizeDegrees": 0.05,
     "epochHours": 2,
     "chancePermille": 150,
-    "kinds": [
-      { "id": "qi_storm",        "namePl": "Burza Qi",          "nameEn": "Qi Storm",        "weight": 1, "rewardMultiplierPermille": 2000 },
-      { "id": "spirit_blessing", "namePl": "Błogosławieństwo",  "nameEn": "Spirit Blessing", "weight": 2, "rewardMultiplierPermille": 1500 }
-    ]
+    "kinds": [{"id": "qi_storm", "namePl": "Burza Qi", "nameEn": "Qi Storm", "weight": 1, "rewardMultiplierPermille": 2000}, {"id": "spirit_blessing", "namePl": "Błogosławieństwo", "nameEn": "Spirit Blessing", "weight": 2, "rewardMultiplierPermille": 1500}, {"id": "full_moon", "namePl": "Pełnia Księżyca", "nameEn": "Full Moon", "weight": 2, "rewardMultiplierPermille": 1500}, {"id": "spring_festival", "namePl": "Święto Wiosny", "nameEn": "Spring Festival", "weight": 2, "rewardMultiplierPermille": 1300}, {"id": "lantern_festival", "namePl": "Święto Lampionów", "nameEn": "Lantern Festival", "weight": 2, "rewardMultiplierPermille": 1400}, {"id": "heavenly_rain", "namePl": "Niebiański Deszcz", "nameEn": "Heavenly Rain", "weight": 2, "rewardMultiplierPermille": 1600}, {"id": "meteor_shower", "namePl": "Deszcz Meteorów", "nameEn": "Meteor Shower", "weight": 1, "rewardMultiplierPermille": 2200}, {"id": "demon_invasion", "namePl": "Inwazja Demonów", "nameEn": "Demon Invasion", "weight": 1, "rewardMultiplierPermille": 2500}, {"id": "ancestor_blessing", "namePl": "Błogosławieństwo Przodków", "nameEn": "Ancestors' Blessing", "weight": 1, "rewardMultiplierPermille": 1800}, {"id": "qi_tide", "namePl": "Przypływ Qi", "nameEn": "Qi Tide", "weight": 2, "rewardMultiplierPermille": 1700}]
   }
 }

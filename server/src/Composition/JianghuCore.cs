@@ -16,6 +16,7 @@ using JianghuGo.Modules.Territory;
 using JianghuGo.Modules.World;
 using JianghuGo.Modules.Identity;
 using JianghuGo.Modules.Notifications;
+using JianghuGo.Modules.Quests;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -49,6 +50,7 @@ public static class JianghuCore
         services.AddSectsModule(configuration);
         services.AddTerritoryModule(configuration);
         services.AddNotificationsModule(configuration);
+        services.AddQuestsModule(configuration);
         return services;
     }
 

@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>JianghuGo.Modules.Quests</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../../Infrastructure/JianghuGo.Infrastructure.csproj" />
+    <!-- Consumes other modules' published events (outbox) and Inventory's wallet contract for rewards. -->
+    <ProjectReference Include="../Identity/JianghuGo.Modules.Identity.csproj" />
+    <ProjectReference Include="../Characters/JianghuGo.Modules.Characters.csproj" />
+    <ProjectReference Include="../Inventory/JianghuGo.Modules.Inventory.csproj" />
+    <ProjectReference Include="../Crafting/JianghuGo.Modules.Crafting.csproj" />
+    <ProjectReference Include="../Market/JianghuGo.Modules.Market.csproj" />
+    <ProjectReference Include="../Combat/JianghuGo.Modules.Combat.csproj" />
+    <ProjectReference Include="../World/JianghuGo.Modules.World.csproj" />
+    <ProjectReference Include="../Cultivation/JianghuGo.Modules.Cultivation.csproj" />
+  </ItemGroup>
+</Project>

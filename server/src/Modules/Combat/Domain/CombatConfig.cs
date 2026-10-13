@@ -73,7 +73,11 @@ public sealed record NpcDefinition(
     int? HpOverride,
     int RewardQi,
     IReadOnlyDictionary<string, int> Stats,
-    IReadOnlyList<NpcSlot?> Loadout);
+    IReadOnlyList<NpcSlot?> Loadout,
+    int Tier = 1,
+    bool Boss = false,
+    bool WorldOnly = false,
+    bool Tameable = false);
 
 public sealed record NpcSlot(string Id, int Level);
 
@@ -189,6 +193,7 @@ public static class CombatConfigValidator
 
             if (!n.Loadout.Take(4).Any(s => s is not null)) e.Add($"npc {n.Id}: needs at least one attack.");
             if (n.RewardQi < 0) e.Add($"npc {n.Id}: rewardQi >= 0.");
+            if (n.Tier is < 1 or > 9) e.Add($"npc {n.Id}: tier 1-9.");
         }
 
         return e;

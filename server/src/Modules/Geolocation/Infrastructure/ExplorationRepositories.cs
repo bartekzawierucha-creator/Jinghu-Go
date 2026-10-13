@@ -34,6 +34,15 @@ internal sealed class InMemoryExplorationRepository : IExplorationRepository
         u.SetTable(Sessions, t.SetItem(session.Id, session));
         return Task.FromResult(true);
     }
+
+    public Task<IReadOnlyList<(CharacterId CharacterId, double DistanceM)>> ListNearbyAsync(IUnitOfWork uow, CharacterId exclude, GeoPoint center, double radiusM, DateTimeOffset seenAfter, int limit, CancellationToken ct)
+    {
+        IReadOnlyList<(CharacterId, double)> list = [.. InMemoryUnitOfWork.From(uow).Table<Guid, ExplorationSession>(Sessions).Values
+            .Where(s => s.Status == SessionStatuses.Active && !s.Flagged && s.CharacterId != exclude && s.LastPosition is not null && s.LastSeenAt > seenAfter)
+            .Select(s => (s.CharacterId, GeoMath.DistanceM(center, s.LastPosition!.Value)))
+            .Where(x => x.Item2 <= radiusM).OrderBy(x => x.Item2).Take(limit)];
+        return Task.FromResult(list);
+    }
 }
 
 /// <summary>Last position stored as PostGIS geography (SRID 4326) — the only location the server keeps.</summary>
@@ -70,4 +79,11 @@ internal sealed class PostgresExplorationRepository : IExplorationRepository
             ct, s.Id, s.Status, s.LastSeenAt, s.EndedAt, s.LastPosition?.Lat, s.LastPosition?.Lon, s.LastAccuracyM, s.LastCapturedAt, s.LastReceivedAt,
             s.LastSpeedMps, s.RelocationUntil, s.DistanceM, s.AcceptedSamples, s.DroppedSamples, s.Anomalies, s.Flagged, s.RateWindowStart, s.RateWindowCount,
             s.Version, expectedVersion) == 1;
+
+    public async Task<IReadOnlyList<(CharacterId CharacterId, double DistanceM)>> ListNearbyAsync(IUnitOfWork uow, CharacterId exclude, GeoPoint center, double radiusM, DateTimeOffset seenAfter, int limit, CancellationToken ct) =>
+        await PostgresUnitOfWork.From(uow).QueryAsync(
+            "SELECT character_id, ST_Distance(last_position, ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography, false) AS d FROM geolocation.sessions " +
+            "WHERE status = 'active' AND NOT flagged AND character_id <> $3 AND last_position IS NOT NULL AND last_seen_at > $4 " +
+            "AND ST_DWithin(last_position, ST_SetSRID(ST_MakePoint($2, $1), 4326)::geography, $5, false) ORDER BY d LIMIT $6",
+            r => (new CharacterId(r.GetGuid(0)), r.GetDouble(1)), ct, center.Lat, center.Lon, exclude.Value, seenAfter, radiusM, limit);
 }

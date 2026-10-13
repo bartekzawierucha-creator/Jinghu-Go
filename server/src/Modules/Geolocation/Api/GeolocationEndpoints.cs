@@ -20,6 +20,8 @@ public static class GeolocationEndpoints
             ApiResults.From(await svc.StopAsync(http.User.GetAccountId(), characterId, ct), Results.Ok));
         g.MapPost("/samples", async (Guid characterId, SamplesCommand body, HttpContext http, GeolocationService svc, CancellationToken ct) =>
             ApiResults.From(await svc.SubmitAsync(http.User.GetAccountId(), characterId, body, ct), Results.Ok));
+        app.MapGet("/api/v1/characters/{characterId:guid}/nearby", async (Guid characterId, HttpContext http, GeolocationService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.NearbyAsync(http.User.GetAccountId(), characterId, ct), list => Results.Ok(new { items = list }))).WithTags("Exploration").RequireAuthorization();
         return app;
     }
 }

@@ -22,7 +22,7 @@ public static class CombatEndpoints
             c.TurnDeadlineSeconds,
             c.Distance,
             techniques = c.Techniques,
-            npcs = c.Npcs.Select(n => new { n.Id, n.NamePl, n.NameEn, n.RewardQi }),
+            npcs = c.Npcs.Select(n => new { n.Id, n.NamePl, n.NameEn, n.RewardQi, n.Tier, n.Boss, n.WorldOnly, n.Tameable }),
         })).WithTags("Combat").RequireAuthorization();
 
         var character = app.MapGroup("/api/v1/characters/{characterId:guid}/combat").WithTags("Combat").RequireAuthorization();
@@ -30,6 +30,10 @@ public static class CombatEndpoints
             ApiResults.From(await svc.GetLoadoutAsync(http.User.GetAccountId(), characterId, ct), Results.Ok));
         character.MapPut("/loadout", async (Guid characterId, SetLoadoutCommand body, HttpContext http, CombatService svc, CancellationToken ct) =>
             ApiResults.From(await svc.SetLoadoutAsync(http.User.GetAccountId(), characterId, body, ct), Results.Ok));
+        character.MapGet("/pet", async (Guid characterId, HttpContext http, CombatService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.GetPetAsync(http.User.GetAccountId(), characterId, ct), pet => Results.Ok(new { pet })));
+        character.MapPost("/pet/release", async (Guid characterId, HttpContext http, CombatService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.ReleasePetAsync(http.User.GetAccountId(), characterId, ct), _ => Results.Ok(new { pet = (PetView?)null })));
         character.MapGet("/battles", async (Guid characterId, HttpContext http, CombatService svc, CancellationToken ct) =>
             ApiResults.From(await svc.ListOpenAsync(http.User.GetAccountId(), characterId, ct), list => Results.Ok(new { items = list })));
 

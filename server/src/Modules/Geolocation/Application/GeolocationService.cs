@@ -12,7 +12,13 @@ public interface IExplorationRepository
     Task<ExplorationSession?> FindActiveAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct);
     Task AddAsync(IUnitOfWork uow, ExplorationSession session, CancellationToken ct);
     Task<bool> TryUpdateAsync(IUnitOfWork uow, ExplorationSession session, int expectedVersion, CancellationToken ct);
+
+    /// <summary>Other unflagged active sessions with a position seen after <paramref name="seenAfter"/> within the radius (nearest first).</summary>
+    Task<IReadOnlyList<(CharacterId CharacterId, double DistanceM)>> ListNearbyAsync(IUnitOfWork uow, CharacterId exclude, GeoPoint center, double radiusM, DateTimeOffset seenAfter, int limit, CancellationToken ct);
 }
+
+/// <summary>Another cultivator nearby. Only a coarse distance band is shared — never coordinates.</summary>
+public sealed record NearbyCultivator(Guid CharacterId, string Name, string Path, string DistanceBand);
 
 public sealed record SampleDto(double Lat, double Lon, double AccuracyM, DateTimeOffset CapturedAt);
 
@@ -131,6 +137,31 @@ public sealed class GeolocationService(
             problem is null ? new VerifiedPosition(s!.LastPosition!.Value, s.LastAccuracyM!.Value, s.Id) : null,
             s?.LastPosition, problem);
     }
+
+    public const double NearbyRadiusM = 2000;
+
+    /// <summary>Cultivators exploring near me right now (requires my own fresh, verified-ish position).</summary>
+    public Task<Result<IReadOnlyList<NearbyCultivator>>> NearbyAsync(AccountId accountId, Guid characterId, CancellationToken ct) =>
+        uowFactory.RunAsync<Result<IReadOnlyList<NearbyCultivator>>>(async uow =>
+        {
+            var now = clock.GetUtcNow();
+            var c = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
+            if (c is null) return CharacterNotFound;
+            var me = await repo.FindActiveAsync(uow, c.Id, ct);
+            if (me?.LastPosition is not { } here || SampleProcessor.IsExpired(config, me, now)) return NoSession;
+            var near = await repo.ListNearbyAsync(uow, c.Id, here, NearbyRadiusM, now.AddMinutes(-config.SessionIdleMinutes), 20, ct);
+            var list = new List<NearbyCultivator>();
+            foreach (var (id, d) in near)
+            {
+                var other = await characters.FindAsync(uow, id.Value, ct);
+                if (other is null || other.AccountId == accountId) continue;
+                list.Add(new NearbyCultivator(id.Value, other.Name, other.Path, Band(d)));
+            }
+
+            return Result<IReadOnlyList<NearbyCultivator>>.Success(list);
+        }, ct);
+
+    public static string Band(double m) => m < 250 ? "<250m" : m < 500 ? "<500m" : m < 1000 ? "<1km" : "<2km";
 
     private async Task<ExplorationSession?> ActiveAsync(IUnitOfWork uow, CharacterId characterId, DateTimeOffset now, CancellationToken ct)
     {

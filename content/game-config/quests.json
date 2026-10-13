@@ -1,0 +1,32 @@
+{
+  "rulesVersion": "quests-1",
+  "worldTimeZone": "Europe/Warsaw",
+  "dailyCount": 3,
+  "daily": [
+    {"id": "d_win_3", "namePl": "Ścieżka miecza", "descriptionPl": "Wygraj 3 pojedynki.", "metric": "battles_won", "target": 3, "stones": 60},
+    {"id": "d_meditate_30", "namePl": "Cisza umysłu", "descriptionPl": "Medytuj łącznie 30 minut.", "metric": "meditation_minutes", "target": 30, "stones": 50},
+    {"id": "d_gather_10", "namePl": "Dary gór", "descriptionPl": "Zbierz 10 materiałów w świecie.", "metric": "items_gathered", "target": 10, "stones": 50},
+    {"id": "d_world_qi_3", "namePl": "Źródła Qi", "descriptionPl": "Zaczerpnij Qi z 3 miejsc mocy (źródła, zioła, płomienie).", "metric": "world_qi", "target": 3, "stones": 50},
+    {"id": "d_craft_2", "namePl": "Ręka rzemieślnika", "descriptionPl": "Udanie wytwórz 2 przedmioty.", "metric": "crafts", "target": 2, "stones": 45},
+    {"id": "d_upgrade_1", "namePl": "Hartowanie", "descriptionPl": "Spróbuj ulepszyć ekwipunek.", "metric": "upgrades", "target": 1, "stones": 40},
+    {"id": "d_pill_1", "namePl": "Alchemiczna próba", "descriptionPl": "Użyj pigułki lub eliksiru.", "metric": "pills_used", "target": 1, "stones": 30},
+    {"id": "d_pvp_1", "namePl": "Wyzwanie rzucone", "descriptionPl": "Wygraj pojedynek z innym kultywatorem.", "metric": "pvp_won", "target": 1, "stones": 80},
+    {"id": "d_boss_1", "namePl": "Łowca bestii", "descriptionPl": "Pokonaj bossa w świecie.", "metric": "bosses_won", "target": 1, "stones": 120}
+  ],
+  "achievements": [
+    {"id": "a_win_10", "namePl": "Pierwsza krew", "descriptionPl": "Wygraj 10 pojedynków.", "metric": "battles_won", "target": 10, "stones": 100, "titlePl": "Wojownik"},
+    {"id": "a_win_100", "namePl": "Sto zwycięstw", "descriptionPl": "Wygraj 100 pojedynków.", "metric": "battles_won", "target": 100, "stones": 600, "titlePl": "Mistrz Miecza"},
+    {"id": "a_pvp_10", "namePl": "Postrach Jianghu", "descriptionPl": "Wygraj 10 pojedynków z kultywatorami.", "metric": "pvp_won", "target": 10, "stones": 500, "titlePl": "Postrach Jianghu"},
+    {"id": "a_boss_1", "namePl": "Pogromca", "descriptionPl": "Pokonaj pierwszego bossa.", "metric": "bosses_won", "target": 1, "stones": 200, "titlePl": "Pogromca Bestii"},
+    {"id": "a_boss_10", "namePl": "Łowca legend", "descriptionPl": "Pokonaj 10 bossów.", "metric": "bosses_won", "target": 10, "stones": 1000, "titlePl": "Łowca Legend"},
+    {"id": "a_meditate_600", "namePl": "Dziesięć godzin ciszy", "descriptionPl": "Medytuj łącznie 600 minut.", "metric": "meditation_minutes", "target": 600, "stones": 300, "titlePl": "Pustelnik"},
+    {"id": "a_break_5", "namePl": "Przez bramy", "descriptionPl": "Dokonaj 5 przełomów.", "metric": "breakthroughs", "target": 5, "stones": 250, "titlePl": "Przebudzony"},
+    {"id": "a_break_20", "namePl": "Niebiańska ścieżka", "descriptionPl": "Dokonaj 20 przełomów.", "metric": "breakthroughs", "target": 20, "stones": 1200, "titlePl": "Nieśmiertelny Adept"},
+    {"id": "a_gather_200", "namePl": "Zielarz", "descriptionPl": "Zbierz 200 materiałów.", "metric": "items_gathered", "target": 200, "stones": 300, "titlePl": "Zielarz"},
+    {"id": "a_craft_25", "namePl": "Mistrz kuźni", "descriptionPl": "Udanie wytwórz 25 przedmiotów.", "metric": "crafts", "target": 25, "stones": 400, "titlePl": "Mistrz Kuźni"},
+    {"id": "a_sell_10", "namePl": "Kupiec", "descriptionPl": "Sprzedaj 10 ofert na targu.", "metric": "market_sales", "target": 10, "stones": 200, "titlePl": "Kupiec"},
+    {"id": "a_checkin_7", "namePl": "Wytrwałość", "descriptionPl": "Zamelduj się 7 dni.", "metric": "checkins", "target": 7, "stones": 150, "titlePl": "Wytrwały"},
+    {"id": "a_checkin_30", "namePl": "Miesiąc drogi", "descriptionPl": "Zamelduj się 30 dni.", "metric": "checkins", "target": 30, "stones": 800, "titlePl": "Strażnik Drogi"}
+  ],
+  "checkin": {"baseStones": 20, "perDayStones": 10, "maxBonusDays": 7}
+}

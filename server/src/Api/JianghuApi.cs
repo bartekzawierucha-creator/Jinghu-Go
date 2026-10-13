@@ -17,6 +17,7 @@ using JianghuGo.Modules.Territory.Api;
 using JianghuGo.Modules.World.Api;
 using JianghuGo.Modules.Identity.Api;
 using JianghuGo.Modules.Notifications;
+using JianghuGo.Modules.Quests;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -105,6 +106,7 @@ public static class JianghuApi
         app.MapSectEndpoints();
         app.MapTerritoryEndpoints();
         app.MapNotificationEndpoints();
+        app.MapQuestEndpoints();
         return app;
     }
 

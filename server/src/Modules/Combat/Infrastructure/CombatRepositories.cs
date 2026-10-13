@@ -56,6 +56,23 @@ internal sealed class InMemoryCombatRepository : ICombatRepository
 
     private static InMemoryUnitOfWork U(IUnitOfWork uow) => InMemoryUnitOfWork.From(uow);
 
+    private const string Pets = "combat.spirit_pets";
+
+    public Task<SpiritPet?> FindPetAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
+        Task.FromResult(U(uow).Table<CharacterId, SpiritPet>(Pets).GetValueOrDefault(characterId));
+
+    public Task SavePetAsync(IUnitOfWork uow, SpiritPet pet, CancellationToken ct)
+    {
+        U(uow).SetTable(Pets, U(uow).Table<CharacterId, SpiritPet>(Pets).SetItem(pet.CharacterId, pet));
+        return Task.CompletedTask;
+    }
+
+    public Task DeletePetAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct)
+    {
+        U(uow).SetTable(Pets, U(uow).Table<CharacterId, SpiritPet>(Pets).Remove(characterId));
+        return Task.CompletedTask;
+    }
+
     public Task<Loadout?> FindLoadoutAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
         Task.FromResult(U(uow).Table<CharacterId, Loadout>(Loadouts).GetValueOrDefault(characterId));
 
@@ -175,6 +192,19 @@ internal sealed class PostgresCombatRepository : ICombatRepository
         "version, deadline, timeouts_a, timeouts_b, reward_qi, created_at, updated_at, finished_at";
 
     private static PostgresUnitOfWork Pg(IUnitOfWork uow) => PostgresUnitOfWork.From(uow);
+
+    public Task<SpiritPet?> FindPetAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
+        Pg(uow).QuerySingleOrDefaultAsync("SELECT npc_id, xp, tamed_in_battle, tamed_at FROM combat.spirit_pets WHERE character_id = $1",
+            r => new SpiritPet(characterId, r.GetString(0), r.GetInt32(1), r.GetGuid(2), r.GetFieldValue<DateTimeOffset>(3)), ct, characterId.Value);
+
+    public Task SavePetAsync(IUnitOfWork uow, SpiritPet p, CancellationToken ct) =>
+        Pg(uow).ExecuteAsync(
+            "INSERT INTO combat.spirit_pets (character_id, npc_id, xp, tamed_in_battle, tamed_at) VALUES ($1, $2, $3, $4, $5) " +
+            "ON CONFLICT (character_id) DO UPDATE SET npc_id = EXCLUDED.npc_id, xp = EXCLUDED.xp, tamed_in_battle = EXCLUDED.tamed_in_battle, tamed_at = EXCLUDED.tamed_at",
+            ct, p.CharacterId.Value, p.NpcId, p.Xp, p.TamedInBattle, p.TamedAt);
+
+    public Task DeletePetAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
+        Pg(uow).ExecuteAsync("DELETE FROM combat.spirit_pets WHERE character_id = $1", ct, characterId.Value);
 
     private static Battle MapBattle(NpgsqlDataReader r) => new(
         r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetString(3), (ulong)r.GetDecimal(4), r.GetString(5),

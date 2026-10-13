@@ -48,6 +48,7 @@ public sealed class CraftingService(
     IItemCatalog catalog,
     IIdempotencyStore idempotency,
     IAuditLog audit,
+    IOutbox outbox,
     ICorrelationContext correlation,
     IRandomSeedSource seeds,
     CraftingConfig config,
@@ -113,6 +114,8 @@ public sealed class CraftingService(
                     null, null, config.RulesVersion, now), ct);
                 await AuditAsync(uow, accountId, "crafting.crafted", c.Id,
                     new { logId, recipe = recipe.Id, cmd.Times, successes, chance, seed = seed.ToString(CultureInfo.InvariantCulture), stones }, now, ct);
+                await outbox.EnqueueAsync(uow, OutboxMessage.Create(JianghuGo.Modules.Crafting.Contracts.CraftingEvents.Crafted,
+                    new JianghuGo.Modules.Crafting.Contracts.CraftingEvents.CraftedV1(accountId.Value, c.Id.Value, "craft", recipe.Id, cmd.Times, successes), now, correlation.CorrelationId), ct);
                 return new CraftResult(logId, recipe.Id, cmd.Times, successes, chance, recipe.Output.Item, outputQty, created, stones, balance);
             }, ct);
             if (result.IsSuccess) await uow.CommitAsync(ct);
@@ -160,6 +163,8 @@ public sealed class CraftingService(
                     item.UpgradeLevel, level, config.RulesVersion, now), ct);
                 await AuditAsync(uow, accountId, "crafting.upgraded", c.Id,
                     new { logId, instanceId = item.Id, item.ItemId, from = item.UpgradeLevel, to = level, success, chance, seed = seed.ToString(CultureInfo.InvariantCulture), stones }, now, ct);
+                await outbox.EnqueueAsync(uow, OutboxMessage.Create(JianghuGo.Modules.Crafting.Contracts.CraftingEvents.Crafted,
+                    new JianghuGo.Modules.Crafting.Contracts.CraftingEvents.CraftedV1(accountId.Value, c.Id.Value, "upgrade", item.ItemId, 1, success ? 1 : 0), now, correlation.CorrelationId), ct);
                 return new UpgradeResult(logId, item.Id, success, chance, item.UpgradeLevel, level, version, stones, debited.Value);
             }, ct);
             if (result.IsSuccess) await uow.CommitAsync(ct);

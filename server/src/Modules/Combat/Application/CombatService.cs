@@ -42,7 +42,10 @@ public sealed record BattleView(
     Guid? OpponentCharacterId,
     string SeedHash,
     string? Seed,
-    long RewardQi);
+    long RewardQi,
+    string? TamedPetNpcId = null);
+
+public sealed record PetView(string NpcId, string NamePl, int Level, int Xp, int XpToNextLevel, IReadOnlyDictionary<string, int> Bonuses, DateTimeOffset TamedAt);
 
 public sealed record SetLoadoutCommand(int ExpectedVersion, IReadOnlyList<string?>? Slots);
 
@@ -59,6 +62,7 @@ public sealed class CombatService(
     ICombatRepository repo,
     ICharacterDirectory characters,
     IEquipmentStats equipment,
+    IEnumerable<ICombatStatBonuses> statBonuses,
     IIdempotencyStore idempotency,
     IAuditLog audit,
     IOutbox outbox,
@@ -137,7 +141,17 @@ public sealed class CombatService(
         var mastery = (await repo.ListMasteryAsync(uow, c.Id, ct)).ToDictionary(m => m.TechniqueId, m => m.Level);
         var dao = await DaoTechniquesAsync(uow, c, ct);
         // Equipment bonuses are frozen into the snapshot: changing gear mid-battle has no effect.
-        var bonuses = await equipment.BonusesAsync(uow, c.Id, ct);
+        var bonuses = new Dictionary<string, int>(await equipment.BonusesAsync(uow, c.Id, ct));
+        foreach (var provider in statBonuses)
+        {
+            foreach (var (stat, value) in await provider.BonusesAsync(uow, c.Id.Value, ct)) bonuses[stat] = bonuses.GetValueOrDefault(stat) + value;
+        }
+
+        if (await repo.FindPetAsync(uow, c.Id, ct) is { } pet && config.Npc(pet.NpcId) is { } species)
+        {
+            foreach (var (stat, value) in SpiritPetRules.Bonuses(species, pet.Level)) bonuses[stat] = bonuses.GetValueOrDefault(stat) + value;
+        }
+
         var stats = c.Stats.ToDictionary(s => s.Key, s => s.Value + bonuses.GetValueOrDefault(s.Key));
         return new Combatant(c.Name, stats, [.. slots.Select(id => id is null ? null : new EquippedTechnique(id, mastery.GetValueOrDefault(id, 1), dao.GetValueOrDefault(id)))],
             null, config.PathHpBonusPermille[c.Path]);
@@ -153,6 +167,8 @@ public sealed class CombatService(
         {
             var result = await Idempotency.ExecuteAsync(idempotency, uow, clock, accountId, "combat.pve.start", key, cmd, async Task<Result<BattleView>> () =>
             {
+                if (cmd.NpcId is not null && config.Npc(cmd.NpcId) is { WorldOnly: true })
+                    return Error.Validation("npc_world_only", "This opponent can only be found in the world.");
                 var started = await StartPveCoreAsync(uow, accountId, cmd.CharacterId, cmd.NpcId, ct);
                 return started.IsSuccess ? await ViewAsync(uow, started.Value, 'a', ct) : started.Error!;
             }, ct);
@@ -439,6 +455,21 @@ public sealed class CombatService(
         };
         if (!await repo.TryUpdateBattleAsync(uow, finished, expectedVersion, ct)) return null;
 
+        // Spirit pets: a won PvE battle may tame a tameable beast (if the cultivator has none) or train the current pet.
+        if (battle.Kind == BattleKinds.Pve && outcome == Outcomes.AWon && config.Npc(battle.NpcId!) is { } foe)
+        {
+            var pet = await repo.FindPetAsync(uow, battle.CharacterA, ct);
+            if (pet is null)
+            {
+                if (foe.Tameable && SpiritPetRules.Tamed(battle.Seed, SpiritPetRules.TameChancePermille(battle.CombatantA!.Stats.GetValueOrDefault("fate"))))
+                    await repo.SavePetAsync(uow, new SpiritPet(battle.CharacterA, foe.Id, 0, battle.Id, at), ct);
+            }
+            else
+            {
+                await repo.SavePetAsync(uow, pet with { Xp = pet.Xp + SpiritPetRules.XpForWin(foe) }, ct);
+            }
+        }
+
         // Technique mastery: every executed (non-forced) use of an equipped technique earns XP.
         var turns = await repo.ListTurnsAsync(uow, battle.Id, ct);
         await GrantXpAsync(uow, battle.CharacterA, battle.CombatantA!, turns.Where(t => !t.ForcedA).Select(t => t.IntentA), ct);
@@ -455,7 +486,7 @@ public sealed class CombatService(
             participants.Add(new(battle.AccountB!.Value.Value, battle.CharacterB!.Value.Value, "b", ResultFor('b', outcome), 0));
 
         await outbox.EnqueueAsync(uow, OutboxMessage.Create(CombatEvents.BattleFinished,
-            new CombatEvents.BattleFinishedV1(battle.Id, battle.Kind, outcome, battle.NpcId, participants), at, correlation.CorrelationId), ct);
+            new CombatEvents.BattleFinishedV1(battle.Id, battle.Kind, outcome, battle.NpcId, participants, battle.NpcId is { } nid && config.Npc(nid)?.Boss == true), at, correlation.CorrelationId), ct);
         await AuditAsync(uow, battle.AccountA, "combat.battle_finished", battle.Id,
             new { outcome, battle.State.Turn, reward, seed = battle.Seed.ToString(CultureInfo.InvariantCulture) }, at, ct);
         return finished;
@@ -541,8 +572,36 @@ public sealed class CombatService(
             intents.Any(i => i.Side == side), intents.Any(i => i.Side != side),
             lastTurn?.Events ?? [], result, b.NpcId,
             side == 'a' ? b.CharacterB?.Value : b.CharacterA.Value,
-            b.SeedHash, finished ? b.Seed.ToString(CultureInfo.InvariantCulture) : null, b.RewardQi);
+            b.SeedHash, finished ? b.Seed.ToString(CultureInfo.InvariantCulture) : null, b.RewardQi,
+            finished && side == 'a' && b.Kind == BattleKinds.Pve && await repo.FindPetAsync(uow, b.CharacterA, ct) is { } tamed && tamed.TamedInBattle == b.Id ? tamed.NpcId : null);
     }
+
+    // ---------------------------------------------------------------- spirit pet
+
+    public Task<Result<PetView?>> GetPetAsync(AccountId accountId, Guid characterId, CancellationToken ct) =>
+        uowFactory.RunAsync<Result<PetView?>>(async uow =>
+        {
+            var c = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
+            if (c is null) return CharacterNotFound;
+            var pet = await repo.FindPetAsync(uow, c.Id, ct);
+            return pet is null || config.Npc(pet.NpcId) is not { } species ? (PetView?)null : PetViewOf(pet, species);
+        }, ct);
+
+    public Task<Result<PetView?>> ReleasePetAsync(AccountId accountId, Guid characterId, CancellationToken ct) =>
+        uowFactory.RunAsync<Result<PetView?>>(async uow =>
+        {
+            var c = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
+            if (c is null) return CharacterNotFound;
+            if (await repo.FindPetAsync(uow, c.Id, ct) is null) return Error.NotFound("pet_not_found", "No spirit pet to release.");
+            await repo.DeletePetAsync(uow, c.Id, ct);
+            await AuditAsync(uow, accountId, "combat.pet_released", characterId, new { characterId }, clock.GetUtcNow(), ct);
+            await uow.CommitAsync(ct);
+            return (PetView?)null;
+        }, ct);
+
+    private static PetView PetViewOf(SpiritPet pet, NpcDefinition species) =>
+        new(pet.NpcId, species.NamePl, pet.Level, pet.Xp, pet.Level >= SpiritPetRules.MaxLevel ? 0 : pet.Level * SpiritPetRules.XpPerLevel,
+            SpiritPetRules.Bonuses(species, pet.Level), pet.TamedAt);
 
     private async Task<TurnRecord?> LastTurnAsync(IUnitOfWork uow, Guid battleId, CancellationToken ct)
     {

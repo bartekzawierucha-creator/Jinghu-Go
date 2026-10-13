@@ -1138,6 +1138,109 @@ paths:
       responses:
         "200": { description: OK }
         "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/combat/pet:
+    get:
+      tags: [Combat]
+      summary: Spirit pet (tamed beast) with level and stat bonuses; null when none.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/combat/pet/release:
+    post:
+      tags: [Combat]
+      summary: Release the spirit pet (frees the slot for taming another beast).
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/cultivation/meridians:
+    get:
+      tags: [Cultivation]
+      summary: Meridian tree - points earned (one per stage climbed), opened per stat, realm bonus.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+    post:
+      tags: [Cultivation]
+      summary: Open one meridian point in a stat (expectedSpent guards retries).
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [stat, expectedSpent]
+              properties:
+                stat: { type: string }
+                expectedSpent: { type: integer }
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/cultivation/meridians/reset:
+    post:
+      tags: [Cultivation]
+      summary: Close all meridians for a Qi price.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/cultivation/ranking:
+    get:
+      tags: [Cultivation]
+      summary: Leaderboard of cultivators (realm, stage, Qi) and my rank.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/nearby:
+    get:
+      tags: [Exploration]
+      summary: Cultivators exploring within 2 km - names and a coarse distance band only, never coordinates.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/quests:
+    get:
+      tags: [Quests]
+      summary: Daily quests (3 per world day), achievements with titles, and check-in streak.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/quests/{questId}/claim:
+    post:
+      tags: [Quests]
+      summary: Claim a completed quest's reward (once).
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }, { name: questId, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/quests/checkin:
+    post:
+      tags: [Quests]
+      summary: Daily check-in (once per world day; streak grows the reward).
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/quests/leaders/{metric}:
+    get:
+      tags: [Quests]
+      summary: Lifetime leaderboard of one metric (pvp_won, bosses_won, ...).
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }, { name: metric, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
 components:
   securitySchemes:
     bearer:

@@ -1,36 +1,16 @@
 {
-  "rulesVersion": "cultivation-1",
+  "rulesVersion": "cultivation-2",
   "worldTimeZone": "Europe/Warsaw",
   "realms": [
-    { "id": "qi_condensation",          "namePl": "Kondensacja Qi",          "nameEn": "Qi Condensation",          "stages": 9 },
-    { "id": "foundation_establishment", "namePl": "Ustanowienie Fundamentu", "nameEn": "Foundation Establishment", "stages": 9 },
-    { "id": "core_formation",           "namePl": "Formowanie Rdzenia",      "nameEn": "Core Formation",           "stages": 9 }
+    {"id": "qi_condensation", "namePl": "Kondensacja Qi", "nameEn": "Qi Condensation", "stages": 9},
+    {"id": "foundation_establishment", "namePl": "Ustanowienie Fundamentu", "nameEn": "Foundation Establishment", "stages": 9},
+    {"id": "core_formation", "namePl": "Formowanie Rdzenia", "nameEn": "Core Formation", "stages": 9},
+    {"id": "nascent_soul", "namePl": "Narodziny Duszy", "nameEn": "Nascent Soul", "stages": 9},
+    {"id": "soul_transformation", "namePl": "Przemiana Duszy", "nameEn": "Soul Transformation", "stages": 9},
+    {"id": "void_refinement", "namePl": "Rafinacja Pustki", "nameEn": "Void Refinement", "stages": 9}
   ],
-  "qiRequired": { "base": 100, "growth": 1.2, "majorMultiplier": 3 },
-  "breakthrough": {
-    "minorBaseChance": 0.92,
-    "minorDecayPerStage": 0.01,
-    "majorBaseChance": 0.55,
-    "insightWeight": 0.004,
-    "willpowerWeight": 0.003,
-    "fateWeight": 0.002,
-    "minChance": 0.05,
-    "maxChance": 0.97,
-    "failureQiLossFraction": 0.3,
-    "deviationMinutes": 30
-  },
-  "meditation": {
-    "baseQiPerMinute": 2,
-    "spiritBonusPerPoint": 0.02,
-    "minMinutes": 1,
-    "maxMinutes": 120,
-    "dailyQiCap": 1500,
-    "deviationMultiplier": 0.5
-  },
-  "paths": {
-    "qi":     { "meditationMultiplier": 1.5 },
-    "body":   { "meditationMultiplier": 0.75, "stepsPerQi": 20, "maxStepsPerMinute": 220, "dailyStepCap": 30000 },
-    "flame":  { "meditationMultiplier": 1.0 },
-    "poison": { "meditationMultiplier": 1.0, "nightMultiplier": 2.0, "nightStartHour": 21, "nightEndHour": 5 }
-  }
+  "qiRequired": {"base": 100, "growth": 1.1, "majorMultiplier": 3},
+  "breakthrough": {"minorBaseChance": 0.92, "minorDecayPerStage": 0.01, "majorBaseChance": 0.55, "insightWeight": 0.004, "willpowerWeight": 0.003, "fateWeight": 0.002, "minChance": 0.05, "maxChance": 0.97, "failureQiLossFraction": 0.3, "deviationMinutes": 30},
+  "meditation": {"baseQiPerMinute": 2, "spiritBonusPerPoint": 0.02, "minMinutes": 1, "maxMinutes": 120, "dailyQiCap": 1500, "deviationMultiplier": 0.5},
+  "paths": {"qi": {"meditationMultiplier": 1.5}, "body": {"meditationMultiplier": 0.75, "stepsPerQi": 20, "maxStepsPerMinute": 220, "dailyStepCap": 30000}, "flame": {"meditationMultiplier": 1.0}, "poison": {"meditationMultiplier": 1.0, "nightMultiplier": 2.0, "nightStartHour": 21, "nightEndHour": 5}}
 }
