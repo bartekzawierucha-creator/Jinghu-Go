@@ -9,85 +9,238 @@ using JianghuGo.Client.Application;
 
 namespace JianghuGo.Android
 {
+    /// <summary>A horizontal strip of equally sized animation frames (pixel art, drawn without filtering).</summary>
+    public sealed class Anim
+    {
+        public Anim(Bitmap strip, int cellW, float fps, bool loop, int first = 0, int count = -1)
+        {
+            Strip = strip;
+            CellW = cellW;
+            Fps = fps;
+            Loop = loop;
+            First = first;
+            Count = count < 0 ? strip.Width / cellW - first : count;
+        }
+
+        public Bitmap Strip { get; }
+        public int CellW { get; }
+        public float Fps { get; }
+        public bool Loop { get; }
+        public int First { get; }
+        public int Count { get; }
+        public long DurationMs => (long)(Count * 1000 / Fps);
+
+        public Rect Frame(long elapsedMs)
+        {
+            var i = (int)(elapsedMs * Fps / 1000);
+            i = Loop ? i % Count : Math.Min(i, Count - 1);
+            var x = (First + i) * CellW;
+            return new Rect(x, 0, x + CellW, Strip.Height);
+        }
+    }
+
     /// <summary>
-    /// Side-view duel stage: location backdrop, the two fighters as pixel-art sprites spaced by the battle distance,
-    /// name plates with HP/Qi, and the server's turn timeline played back as lunges, impact effects, shakes and
-    /// floating numbers. Purely presentational: every number shown comes from the server's battle state.
+    /// Side-view duel stage: location backdrop, the two fighters as animated pixel-art sprites spaced by the battle
+    /// distance, name plates with HP/Qi, and the server's turn timeline played back as attack, guard, hit and defeat
+    /// animations with impact effects and floating numbers. Purely presentational: every number comes from the server.
     /// </summary>
     public sealed class BattleStageView : View
     {
-        private const long StepMs = 520;
+        private const long StepMs = 760;
         private readonly float _d;
         private readonly Paint _p = new Paint(PaintFlags.AntiAlias);
-        private readonly Paint _pixel = new Paint();
+        private readonly Paint _pixel = new Paint(PaintFlags.FilterBitmap);
         private readonly Paint _text = new Paint(PaintFlags.AntiAlias);
-        private readonly Bitmap _backdrop, _hero, _enemy, _fxBlue, _fxRed, _fxGold;
-        private readonly bool _enemyFacesRight;
-        private readonly List<Beat> _beats = new List<Beat>();
+        private readonly Bitmap _backdrop;
+        private readonly Dictionary<string, Anim> _hero = new Dictionary<string, Anim>();
+        private readonly Dictionary<string, Anim> _foe = new Dictionary<string, Anim>();
+        private readonly Dictionary<string, Anim> _fx = new Dictionary<string, Anim>();
+        private readonly List<Cue> _cues = new List<Cue>();
+        private readonly List<Floater> _floaters = new List<Floater>();
+        private readonly float _foeScale;
         private float _distanceShown = -1;
+        private long _endAt = -1;
 
         public BattleStageView(Context ctx, string npcId) : base(ctx)
         {
             _d = ctx.Resources.DisplayMetrics.Density;
-            _pixel.FilterBitmap = false;
             _text.SetTypeface(Ui.Display);
             _text.TextAlign = Paint.Align.Center;
             _text.SetShadowLayer(4, 0, 2, Color.Black);
             _backdrop = Ui.Art(ctx, npcId switch
             {
-                "training_dummy" => Resource.Drawable.loc_village,
-                "grey_wolf" => Resource.Drawable.loc_bamboo,
-                "mountain_bandit" => Resource.Drawable.loc_mountains,
-                null => Resource.Drawable.loc_temple,
-                _ => Resource.Drawable.loc_fortress,
+                "training_dummy" => Resource.Drawable.arena_courtyard,
+                "grey_wolf" => Resource.Drawable.arena_bamboo,
+                "mountain_bandit" => Resource.Drawable.arena_mountain,
+                null => Resource.Drawable.arena_temple,
+                _ => Resource.Drawable.arena_fortress,
             });
-            _hero = Ui.Art(ctx, Resource.Drawable.sprite_hero);
-            _enemy = Ui.Art(ctx, npcId switch
+
+            Anim A(int res, float fps, bool loop, int first = 0, int count = -1) => new Anim(Ui.Art(ctx, res), 320, fps, loop, first, count);
+            _hero["idle"] = A(Resource.Drawable.anim_hero_idle, 7, true);
+            _hero["attack"] = A(Resource.Drawable.anim_hero_attack, 13, false);
+            _hero["palm"] = A(Resource.Drawable.anim_hero_palm, 13, false);
+            _hero["defend"] = A(Resource.Drawable.anim_hero_defend, 11, false);
+            _hero["hit"] = A(Resource.Drawable.anim_hero_hit, 12, false, 0, 6);
+            _hero["dash"] = A(Resource.Drawable.anim_hero_dash, 13, false);
+            _hero["defeat"] = A(Resource.Drawable.anim_hero_defeat, 9, false);
+            _hero["rest"] = A(Resource.Drawable.anim_hero_meditate, 8, false);
+
+            switch (npcId)
             {
-                "training_dummy" => Resource.Drawable.sprite_dummy,
-                "grey_wolf" => Resource.Drawable.sprite_wolf,
-                "mountain_bandit" => Resource.Drawable.sprite_bandit,
-                _ => Resource.Drawable.sprite_brute,
-            });
-            _enemyFacesRight = npcId == "grey_wolf";
-            _fxBlue = Ui.Art(ctx, Resource.Drawable.fx_blue);
-            _fxRed = Ui.Art(ctx, Resource.Drawable.fx_red);
-            _fxGold = Ui.Art(ctx, Resource.Drawable.fx_gold);
+                case "training_dummy":
+                    _foe["idle"] = A(Resource.Drawable.anim_dummy_idle, 6, true);
+                    _foe["attack"] = A(Resource.Drawable.anim_dummy_attack, 14, false, 3, 6);
+                    _foe["hit"] = A(Resource.Drawable.anim_dummy_defeat, 12, false, 0, 3);
+                    _foe["defeat"] = A(Resource.Drawable.anim_dummy_defeat, 9, false);
+                    _foeScale = 1f;
+                    break;
+                case "grey_wolf":
+                    _foe["idle"] = A(Resource.Drawable.anim_wolf_idle, 8, true);
+                    _foe["attack"] = A(Resource.Drawable.anim_wolf_attack, 10, false);
+                    _foe["hit"] = A(Resource.Drawable.anim_wolf_defeat, 10, false, 0, 2);
+                    _foe["defeat"] = A(Resource.Drawable.anim_wolf_defeat, 8, false);
+                    _foeScale = 1.25f;
+                    break;
+                default:
+                    _foe["idle"] = A(Resource.Drawable.anim_bandit_idle, 7, true);
+                    _foe["attack"] = A(Resource.Drawable.anim_bandit_attack, 12, false);
+                    _foe["hit"] = A(Resource.Drawable.anim_bandit_defeat, 12, false, 0, 4);
+                    _foe["defeat"] = A(Resource.Drawable.anim_bandit_defeat, 9, false);
+                    _foeScale = 1f;
+                    break;
+            }
+
+            Anim F(int res, float fps) => new Anim(Ui.Art(ctx, res), 256, fps, false);
+            _fx["qi"] = F(Resource.Drawable.fx_qi_hit, 14);
+            _fx["slash"] = F(Resource.Drawable.fx_enemy_slash, 14);
+            _fx["parry"] = F(Resource.Drawable.fx_parry, 13);
+            _fx["flame"] = F(Resource.Drawable.fx_flame, 13);
+            _fx["poison"] = F(Resource.Drawable.fx_poison, 12);
+            _fx["gather"] = F(Resource.Drawable.fx_qi_gather, 10);
         }
 
         public BattleDto Battle { get; private set; }
+
+        /// <summary>An animation (or effect) a fighter starts at a given time.</summary>
+        private sealed class Cue
+        {
+            public bool Hero;
+            public bool Fx;
+            public Anim Anim;
+            public long At;
+        }
+
+        private sealed class Floater
+        {
+            public bool OnHero;
+            public string Text;
+            public Color Color;
+            public float Size;
+            public long At;
+        }
 
         /// <summary>Shows a new battle state; when the turn advanced, plays back what happened in it.</summary>
         public void Show(BattleDto battle)
         {
             var previous = Battle;
             Battle = battle;
-            if (previous != null && battle.Turn != previous.Turn || previous != null && previous.IsActive && !battle.IsActive)
+            if (previous != null && (battle.Turn != previous.Turn || previous.IsActive && !battle.IsActive))
             {
-                var start = SystemClock.UptimeMillis();
-                var i = 0;
+                var t = SystemClock.UptimeMillis();
                 foreach (var e in battle.LastTurnEvents)
                 {
-                    _beats.Add(new Beat(e, battle.IsMine(e), start + i * StepMs));
-                    i++;
+                    Schedule(e, battle.IsMine(e), t);
+                    t += StepMs;
                 }
+
+                if (!battle.IsActive)
+                {
+                    var heroLost = battle.Me.Hp <= 0 || battle.Result != null && battle.Result != "draw" && battle.Result != battle.MySide + "_won";
+                    var foeLost = battle.Opponent.Hp <= 0 || battle.Result == battle.MySide + "_won";
+                    if (heroLost) _cues.Add(new Cue { Hero = true, Anim = _hero["defeat"], At = t });
+                    if (foeLost) _cues.Add(new Cue { Hero = false, Anim = _foe["defeat"], At = t });
+                    _endAt = t + 1100;
+                }
+            }
+            else if (previous == null && !battle.IsActive)
+            {
+                _endAt = 0;
             }
 
             PostInvalidateOnAnimation();
         }
 
-        private sealed class Beat
+        private void Schedule(TurnEventDto e, bool mine, long at)
         {
-            public Beat(TurnEventDto e, bool mine, long at)
+            var actor = mine ? _hero : _foe;
+            switch (e.Action)
             {
-                Event = e;
-                Mine = mine;
-                At = at;
+                case "attack":
+                    var tech = e.TechniqueId ?? string.Empty;
+                    var anim = mine && (tech.Contains("palm") || tech.Contains("fist") || tech.Contains("qi")) ? actor["palm"] : actor["attack"];
+                    _cues.Add(new Cue { Hero = mine, Anim = anim, At = at });
+                    var impact = at + anim.DurationMs * 55 / 100;
+                    if (e.Hit == true)
+                    {
+                        var target = mine ? _foe : _hero;
+                        _cues.Add(new Cue { Hero = !mine, Anim = target["hit"], At = impact });
+                        var fx = !mine ? "slash" : tech.Contains("flame") ? "flame" : tech.Contains("venom") || tech.Contains("poison") ? "poison" : "qi";
+                        _cues.Add(new Cue { Hero = !mine, Fx = true, Anim = _fx[fx], At = impact });
+                        _floaters.Add(new Floater { OnHero = !mine, Text = "-" + e.Damage, Color = mine ? Color.Rgb(255, 230, 140) : Color.Rgb(255, 110, 90), Size = 26, At = impact });
+                    }
+                    else if (e.Hit == false)
+                    {
+                        if (!mine) _cues.Add(new Cue { Hero = true, Anim = _hero["dash"], At = impact - 120 });
+                        _floaters.Add(new Floater { OnHero = !mine, Text = "unik", Color = Color.Rgb(220, 220, 220), Size = 18, At = impact });
+                    }
+
+                    break;
+                case "defend":
+                case "defense":
+                case "counter_stance":
+                    if (mine) _cues.Add(new Cue { Hero = true, Anim = _hero["defend"], At = at });
+                    _cues.Add(new Cue { Hero = mine, Fx = true, Anim = _fx["parry"], At = at + 150 });
+                    _floaters.Add(new Floater { OnHero = mine, Text = e.Action == "counter_stance" ? "kontra" : "garda", Color = Ui.Gold, Size = 18, At = at + 200 });
+                    break;
+                case "rest":
+                    _cues.Add(new Cue { Hero = mine, Fx = true, Anim = _fx["gather"], At = at });
+                    _floaters.Add(new Floater { OnHero = mine, Text = "+Qi", Color = Ui.QiBlue, Size = 18, At = at + 200 });
+                    break;
+                case "advance":
+                case "retreat":
+                    if (mine) _cues.Add(new Cue { Hero = true, Anim = _hero["dash"], At = at });
+                    break;
+                case "out_of_range":
+                    _floaters.Add(new Floater { OnHero = mine, Text = "za daleko", Color = Color.Rgb(220, 220, 220), Size = 16, At = at });
+                    break;
+                case "stunned":
+                    _floaters.Add(new Floater { OnHero = mine, Text = "ogłuszony", Color = Ui.Violet, Size = 16, At = at });
+                    break;
+                case "bleed":
+                    _floaters.Add(new Floater { OnHero = mine, Text = "-" + e.Damage, Color = Color.Rgb(200, 60, 60), Size = 18, At = at });
+                    break;
+            }
+        }
+
+        /// <summary>The body animation a fighter shows now: the latest started cue, else idle (or the held defeat pose).</summary>
+        private (Anim Anim, long Elapsed) Current(bool hero, long now)
+        {
+            Cue best = null;
+            foreach (var c in _cues)
+            {
+                if (c.Fx || c.Hero != hero || c.At > now) continue;
+                var done = !c.Anim.Loop && now - c.At >= c.Anim.DurationMs;
+                var isDefeat = c.Anim == (hero ? _hero : _foe)["defeat"];
+                if (done && !isDefeat) continue;
+                if (best == null || c.At >= best.At) best = c;
             }
 
-            public TurnEventDto Event { get; }
-            public bool Mine { get; }
-            public long At { get; }
+            if (best != null) return (best.Anim, now - best.At);
+            var fighter = hero ? Battle.Me : Battle.Opponent;
+            var set = hero ? _hero : _foe;
+            if (!Battle.IsActive && fighter.Hp <= 0 && _cues.Count == 0) return (set["defeat"], 100000);
+            return (set["idle"], now);
         }
 
         protected override void OnDraw(Canvas canvas)
@@ -97,91 +250,59 @@ namespace JianghuGo.Android
             var now = SystemClock.UptimeMillis();
             float w = Width, h = Height;
 
-            // backdrop: cover-crop the location art, darken towards the ground
             var src = CoverRect(_backdrop.Width, _backdrop.Height, w, h);
             canvas.DrawBitmap(_backdrop, src, new RectF(0, 0, w, h), new Paint(PaintFlags.FilterBitmap));
-            _p.SetShader(new LinearGradient(0, 0, 0, h, new int[] { Color.Argb(40, 0, 0, 0).ToArgb(), Color.Argb(90, 0, 0, 0).ToArgb(), Color.Argb(230, 6, 8, 10).ToArgb() }, new float[] { 0, 0.55f, 1 }, Shader.TileMode.Clamp));
+            _p.SetShader(new LinearGradient(0, 0, 0, h, new int[] { Color.Argb(30, 0, 0, 0).ToArgb(), Color.Argb(70, 0, 0, 0).ToArgb(), Color.Argb(210, 6, 8, 10).ToArgb() }, new float[] { 0, 0.55f, 1 }, Shader.TileMode.Clamp));
             canvas.DrawRect(0, 0, w, h, _p);
             _p.SetShader(null);
 
-            // positions from the battle distance (1..3), eased
             var target = Math.Clamp(Battle.Distance, 1, 4);
             _distanceShown = _distanceShown < 0 ? target : _distanceShown + (target - _distanceShown) * 0.12f;
-            var gap = w * (0.14f + 0.1f * _distanceShown);
-            var ground = h * 0.86f;
+            var gap = w * (0.13f + 0.08f * _distanceShown);
+            var ground = h * 0.9f;
+            var cellH = h * 0.78f;               // the 320x256 cell; characters fill ~70% of it
+            var cellW = cellH * 320f / 256f;
+            var footInCell = cellH * 246f / 256f;
             var heroX = w / 2 - gap;
             var foeX = w / 2 + gap;
 
-            float heroDx = 0, foeDx = 0, heroShake = 0, foeShake = 0;
-            float heroFlash = 0, foeFlash = 0;
-            foreach (var b in _beats)
+            DrawShadow(canvas, heroX, ground, cellW * 0.16f);
+            DrawShadow(canvas, foeX, ground, cellW * 0.2f * _foeScale);
+            var (ha, he) = Current(true, now);
+            var (fa, fe) = Current(false, now);
+            canvas.DrawBitmap(ha.Strip, ha.Frame(he), new RectF(heroX - cellW / 2, ground - footInCell, heroX + cellW / 2, ground - footInCell + cellH), _pixel);
+            var fw = cellW * _foeScale;
+            var fh = cellH * _foeScale;
+            canvas.DrawBitmap(fa.Strip, fa.Frame(fe), new RectF(foeX - fw / 2, ground - footInCell * _foeScale, foeX + fw / 2, ground - footInCell * _foeScale + fh), _pixel);
+
+            // effects over the fighters
+            foreach (var c in _cues)
             {
-                var k = (now - b.At) / (float)StepMs;
-                if (k < 0 || k > 1.6f) continue;
-                var lunge = k < 0.5f ? (float)Math.Sin(k / 0.5f * Math.PI) : 0f;
-                var attacking = b.Event.Action == "attack";
-                var hit = b.Event.Hit == true;
-                var shake = hit && k > 0.25f && k < 0.75f ? (float)Math.Sin(k * 60) * 5 * _d : 0;
-                var flash = hit && k > 0.25f && k < 0.6f ? 1f : 0f;
-                if (b.Mine)
-                {
-                    if (attacking) heroDx += lunge * gap * 0.5f;
-                    foeShake += shake;
-                    foeFlash = Math.Max(foeFlash, flash);
-                }
-                else
-                {
-                    if (attacking) foeDx -= lunge * gap * 0.5f;
-                    heroShake += shake;
-                    heroFlash = Math.Max(heroFlash, flash);
-                }
+                if (!c.Fx || c.At > now || now - c.At >= c.Anim.DurationMs) continue;
+                var x = c.Hero ? heroX : foeX;
+                var y = ground - cellH * 0.42f;
+                var size = cellH * 0.62f;
+                canvas.DrawBitmap(c.Anim.Strip, c.Anim.Frame(now - c.At), new RectF(x - size / 2, y - size / 2, x + size / 2, y + size / 2), _pixel);
             }
 
-            var spriteH = h * 0.5f;
-            DrawShadow(canvas, heroX + heroDx, ground, spriteH * 0.3f);
-            DrawShadow(canvas, foeX + foeDx, ground, spriteH * 0.34f);
-            DrawSprite(canvas, _hero, heroX + heroDx + heroShake, ground, spriteH, flip: false, heroFlash, Battle.Me.Hp <= 0);
-            DrawSprite(canvas, _enemy, foeX + foeDx + foeShake, ground, _enemyFacesRight ? spriteH * 0.62f : spriteH * 0.92f, flip: _enemyFacesRight, foeFlash, Battle.Opponent.Hp <= 0);
-
-            // impact effects and floating numbers
-            foreach (var b in _beats)
+            foreach (var f in _floaters)
             {
-                var k = (now - b.At) / (float)StepMs;
-                if (k < 0.2f || k > 1.8f) continue;
-                var e = b.Event;
-                var tx = b.Mine ? foeX : heroX;
-                var ty = ground - spriteH * 0.55f;
-                if (e.Action == "attack" && k < 0.9f)
-                {
-                    var fx = e.Hit == true ? (b.Mine ? _fxBlue : _fxRed) : _fxGold;
-                    var a = (int)(255 * Math.Clamp(1 - (k - 0.2f) / 0.7f, 0, 1));
-                    var size = spriteH * (0.55f + 0.3f * k);
-                    var paint = new Paint { FilterBitmap = false, Alpha = a };
-                    canvas.DrawBitmap(fx, null, new RectF(tx - size / 2, ty - size / 2, tx + size / 2, ty + size / 2), paint);
-                }
-
-                var label = Floating(e);
-                if (label != null)
-                {
-                    var rise = (k - 0.2f) * 46 * _d;
-                    _text.TextSize = (e.Hit == true ? 26 : 18) * _d;
-                    _text.Color = e.Hit == true ? (b.Mine ? Color.Rgb(255, 230, 140) : Color.Rgb(255, 110, 90)) : Color.Rgb(220, 220, 220);
-                    _text.Alpha = (int)(255 * Math.Clamp(1.8f - k, 0, 1));
-                    canvas.DrawText(label, tx, ty - spriteH * 0.35f - rise, _text);
-                    _text.Alpha = 255;
-                }
+                var k = (now - f.At) / 1000f;
+                if (k < 0 || k > 1.2f) continue;
+                _text.TextSize = f.Size * _d;
+                _text.Color = f.Color;
+                _text.Alpha = (int)(255 * Math.Clamp(1.2f - k, 0, 1));
+                canvas.DrawText(f.Text, f.OnHero ? heroX : foeX, ground - cellH * 0.78f - k * 40 * _d, _text);
+                _text.Alpha = 255;
             }
 
-            // name plates
             Plate(canvas, Battle.Me, 10 * _d, 10 * _d, Ui.Jade, left: true);
             Plate(canvas, Battle.Opponent, w - 10 * _d, 10 * _d, Ui.Cinnabar, left: false);
-
-            // turn seal
             _text.TextSize = 13 * _d;
             _text.Color = Ui.Gold;
-            canvas.DrawText("TURA " + Battle.Turn + "  ·  DYSTANS " + Battle.Distance, w / 2, h - 10 * _d, _text);
+            canvas.DrawText("TURA " + Battle.Turn + "  ·  DYSTANS " + Battle.Distance, w / 2, h - 8 * _d, _text);
 
-            if (!Battle.IsActive && _beats.All(b => now - b.At > StepMs * 1.8f))
+            if (!Battle.IsActive && _endAt >= 0 && now >= _endAt)
             {
                 var won = Battle.Result == Battle.MySide + "_won";
                 var draw = Battle.Result == "draw";
@@ -198,21 +319,9 @@ namespace JianghuGo.Android
                 }
             }
 
-            _beats.RemoveAll(b => now - b.At > StepMs * 2);
-            if (_beats.Count > 0 || Math.Abs(_distanceShown - target) > 0.01f) PostInvalidateOnAnimation();
-        }
-
-        private static string Floating(TurnEventDto e)
-        {
-            if (e.Action == "attack") return e.Hit == true ? "-" + e.Damage : e.Hit == false ? "unik" : null;
-            return e.Action switch
-            {
-                "defend" or "defense" => "garda",
-                "rest" => "+Qi",
-                "out_of_range" => "za daleko",
-                "stunned" => "ogłuszony",
-                _ => null,
-            };
+            _cues.RemoveAll(c => !c.Anim.Loop && now - c.At > c.Anim.DurationMs + 4000 && c.Anim != _hero["defeat"] && c.Anim != _foe["defeat"]);
+            _floaters.RemoveAll(f => now - f.At > 1300);
+            PostInvalidateDelayed(33); // ~30 fps: idle loops always move
         }
 
         private static Rect CoverRect(int bw, int bh, float w, float h)
@@ -233,24 +342,6 @@ namespace JianghuGo.Android
             canvas.DrawCircle(x, ground, rx, _p);
             canvas.Restore();
             _p.SetShader(null);
-        }
-
-        private void DrawSprite(Canvas canvas, Bitmap bmp, float cx, float ground, float height, bool flip, float flash, bool fallen)
-        {
-            var width = height * bmp.Width / bmp.Height;
-            var dst = new RectF(cx - width / 2, ground - height, cx + width / 2, ground);
-            canvas.Save();
-            if (flip) canvas.Scale(-1, 1, cx, ground);
-            if (fallen) canvas.Rotate(flip ? -80 : 80, cx, ground);
-            canvas.DrawBitmap(bmp, null, dst, _pixel);
-            if (flash > 0)
-            {
-                var tint = new Paint { FilterBitmap = false };
-                tint.SetColorFilter(new PorterDuffColorFilter(Color.Argb(170, 255, 255, 255), PorterDuff.Mode.SrcAtop));
-                canvas.DrawBitmap(bmp, null, dst, tint);
-            }
-
-            canvas.Restore();
         }
 
         private void Plate(Canvas canvas, FighterDto f, float x, float y, Color hpColor, bool left)

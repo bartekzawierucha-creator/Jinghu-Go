@@ -297,6 +297,22 @@ namespace JianghuGo.Android
             return tile;
         }
 
+        /// <summary>Drawable id by name ("item_jade"), or 0 when the art is missing.</summary>
+        public int ArtId(string name) => string.IsNullOrEmpty(name) ? 0 : _ctx.Resources.GetIdentifier(name, "drawable", _ctx.PackageName);
+
+        /// <summary>Puts an icon on the left of a label or button (no-op when the art is missing).</summary>
+        public T WithIcon<T>(T view, string artName, float sizeDp = 34) where T : TextView
+        {
+            var id = ArtId(artName);
+            if (id == 0) return view;
+            var d = new BitmapDrawable(_ctx.Resources, Art(_ctx, id));
+            d.SetBounds(0, 0, Dp(sizeDp), Dp(sizeDp));
+            view.SetCompoundDrawables(d, null, null, null);
+            view.CompoundDrawablePadding = Dp(10);
+            view.Gravity = GravityFlags.CenterVertical | GravityFlags.Start;
+            return view;
+        }
+
         /// <summary>A small rounded tag (stat values, costs, rarities).</summary>
         public TextView Chip(string text, Color color, ViewGroup parent)
         {

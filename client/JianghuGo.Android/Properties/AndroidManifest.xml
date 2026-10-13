@@ -5,5 +5,5 @@
   <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
   <uses-feature android:name="android.hardware.location.gps" android:required="false" />
   <!-- usesCleartextTraffic: DEVELOPMENT build, so the app can reach a test server on the LAN over http://. -->
-  <application android:label="Jianghu Go" android:icon="@drawable/icon" android:usesCleartextTraffic="true" android:allowBackup="false" />
+  <application android:label="Jianghu Go" android:icon="@drawable/app_icon" android:usesCleartextTraffic="true" android:allowBackup="false" />
 </manifest>

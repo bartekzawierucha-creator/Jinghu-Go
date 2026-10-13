@@ -22,7 +22,7 @@ namespace JianghuGo.Android
         private readonly Paint _text = new Paint(PaintFlags.AntiAlias);
         private readonly float _d;
         private readonly Dictionary<string, Bitmap> _medallions = new Dictionary<string, Bitmap>();
-        private readonly Bitmap _lotus, _grove, _wolf, _brazier;
+        private readonly Bitmap _lotus, _grove, _wolf, _brazier, _texture, _playerToken;
         private Bitmap _terrain;
 
         public WorldMapView(Context context) : base(context)
@@ -36,6 +36,8 @@ namespace JianghuGo.Android
             _grove = Ui.Art(context, Resource.Drawable.place_grove);
             _wolf = Ui.Art(context, Resource.Drawable.sprite_wolf);
             _brazier = Ui.Art(context, Resource.Drawable.place_brazier);
+            _texture = Ui.Art(context, Resource.Drawable.map_texture);
+            _playerToken = Scaled(Ui.Art(context, Resource.Drawable.map_player), 44);
         }
 
         public LocationFix Player { get; set; }
@@ -97,12 +99,31 @@ namespace JianghuGo.Android
             return m;
         }
 
+        /// <summary>A painted medallion scaled once to the map's size (dp).</summary>
+        private Bitmap Scaled(Bitmap art, float sizeDp)
+        {
+            var w = (int)(sizeDp * _d);
+            var h = Math.Max(1, w * art.Height / art.Width);
+            return Bitmap.CreateScaledBitmap(art, w, h, true);
+        }
+
+        private Bitmap Icon(string key, int res, float sizeDp = 50)
+        {
+            if (!_medallions.TryGetValue(key, out var m))
+            {
+                m = Scaled(Ui.Art(Context, res), sizeDp);
+                _medallions[key] = m;
+            }
+
+            return m;
+        }
+
         private (Bitmap Art, Color Glow) Look(string kind) => kind switch
         {
-            "qi_spring" => (Medallion("qi", _lotus, Ui.QiBlue), Ui.QiBlue),
-            "spirit_herb" => (Medallion("herb", _grove, Ui.Jade), Ui.Jade),
-            "spirit_beast" => (Medallion("beast", _wolf, Ui.Cinnabar, flip: true), Ui.Cinnabar),
-            _ => (Medallion("other", _lotus, Ui.Gold), Ui.Gold),
+            "qi_spring" => (Icon("qi", Resource.Drawable.map_qi), Ui.QiBlue),
+            "spirit_herb" => (Icon("herb", Resource.Drawable.map_herb), Ui.Jade),
+            "spirit_beast" => (Icon("beast", Resource.Drawable.map_beast), Ui.Cinnabar),
+            _ => (Icon("other", Resource.Drawable.map_event), Ui.Gold),
         };
 
         /// <summary>Night parchment with faint survey lines, drawn once per size.</summary>
@@ -116,12 +137,17 @@ namespace JianghuGo.Android
                 new int[] { Color.Rgb(28, 40, 44).ToArgb(), Color.Rgb(14, 20, 24).ToArgb(), Color.Rgb(6, 8, 10).ToArgb() }, new float[] { 0f, 0.55f, 1f }, Shader.TileMode.Clamp));
             c.DrawRect(0, 0, Width, Height, p);
             p.SetShader(null);
+            // painted ink map, cover-cropped, under the vignette
+            var scale = Math.Max(Width / (float)_texture.Width, Height / (float)_texture.Height);
+            var sw = (int)(Width / scale);
+            var sh = (int)(Height / scale);
+            var tx = (_texture.Width - sw) / 2;
+            var ty = (_texture.Height - sh) / 2;
+            c.DrawBitmap(_texture, new Rect(tx, ty, tx + sw, ty + sh), new Rect(0, 0, Width, Height), new Paint(PaintFlags.FilterBitmap) { Alpha = 235 });
             var rnd = new Random(7);
             p.Color = Color.Argb(26, 120, 170, 160);
             p.StrokeWidth = 1;
-            var step = 22 * _d;
-            for (var x = 0f; x < Width; x += step) c.DrawLine(x, 0, x, Height, p);
-            for (var y = 0f; y < Height; y += step) c.DrawLine(0, y, Width, y, p);
+
             // drifting mist blotches
             for (var i = 0; i < 26; i++)
             {
@@ -210,7 +236,7 @@ namespace JianghuGo.Android
                     }
 
                     Glow(canvas, ax, ay, 30 * _d, Color.Rgb(176, 96, 232), 0.6f + 0.4f * pulse);
-                    var m = Medallion("flame", _brazier, Color.Rgb(176, 96, 232));
+                    var m = Icon("flame", Resource.Drawable.map_flame);
                     var sz = inside ? 1f : 0.7f;
                     canvas.DrawBitmap(m, null, new RectF(ax - m.Width * sz / 2, ay - m.Height * sz / 2, ax + m.Width * sz / 2, ay + m.Height * sz / 2), _art);
                     _text.Color = Color.Rgb(214, 170, 250);
@@ -233,16 +259,8 @@ namespace JianghuGo.Android
             }
 
             // the player: a gold seal with a breathing ring
-            Glow(canvas, cx, cy, (18 + 10 * pulse) * _d, Ui.Gold, 0.7f);
-            _p.SetStyle(Paint.Style.Fill);
-            _p.Color = Color.Rgb(16, 18, 20);
-            canvas.DrawCircle(cx, cy, 9 * _d, _p);
-            _p.SetStyle(Paint.Style.Stroke);
-            _p.StrokeWidth = 2.4f * _d;
-            _p.Color = Ui.Gold;
-            canvas.DrawCircle(cx, cy, 9 * _d, _p);
-            _p.SetStyle(Paint.Style.Fill);
-            canvas.DrawCircle(cx, cy, 3.5f * _d, _p);
+            Glow(canvas, cx, cy, (22 + 10 * pulse) * _d, Ui.Gold, 0.7f);
+            canvas.DrawBitmap(_playerToken, cx - _playerToken.Width / 2f, cy - _playerToken.Height * 0.6f, _art);
             PostInvalidateDelayed(40); // ~25 fps while the map is on screen
         }
 

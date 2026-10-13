@@ -161,7 +161,7 @@ namespace JianghuGo.Android
                     return;
                 }
 
-                NewScreen("Jianghu Go", art: Resource.Drawable.bg_hero);
+                NewScreen("Jianghu Go", art: Resource.Drawable.key_art);
                 _ui.Label("Łączenie z " + _serverUrl + "…");
                 try
                 {
@@ -318,7 +318,7 @@ namespace JianghuGo.Android
 
         private void ShowLogin()
         {
-            var ui = NewScreen("Jianghu Go", art: Resource.Drawable.bg_hero, subtitle: "ŚWIAT WUXIA NA TWOICH ULICACH");
+            var ui = NewScreen("Jianghu Go", art: Resource.Drawable.key_art, subtitle: "ŚWIAT WUXIA NA TWOICH ULICACH");
             var spacer = new View(this);
             ui.Add(spacer, 200);
             var hero = ui.Panel();
@@ -369,7 +369,7 @@ namespace JianghuGo.Android
         /// <summary>Starts the in-app server and signs in with the local account (created on first use).</summary>
         private async Task PlayOfflineAsync()
         {
-            NewScreen("Jianghu Go", art: Resource.Drawable.bg_hero, subtitle: "BUDZĘ ŚWIAT JIANGHU…");
+            NewScreen("Jianghu Go", art: Resource.Drawable.key_art, subtitle: "BUDZĘ ŚWIAT JIANGHU…");
             _ui.Label("Budzę świat Jianghu…", 16, Ui.Gold);
             var url = await EmbeddedServer.StartAsync(this);
             ConnectTo(url, offline: true);
@@ -409,7 +409,7 @@ namespace JianghuGo.Android
         {
             var flow = new CharacterCreationFlow(_api);
             await flow.StartAsync(Ct);
-            var ui = NewScreen("Narodziny wojownika", art: Resource.Drawable.bg_hero, subtitle: "LOS RZUCA KOŚCI TWOJEGO PRZEZNACZENIA");
+            var ui = NewScreen("Narodziny wojownika", art: Resource.Drawable.key_art, subtitle: "LOS RZUCA KOŚCI TWOJEGO PRZEZNACZENIA");
             ui.Label("Zablokuj cechy, które chcesz zachować, i losuj ponownie. Każde losowanie kosztuje Żetony Losu.", 14, Ui.Muted);
             var traits = ui.Column();
             ui.Heading("Atrybuty");
@@ -492,7 +492,7 @@ namespace JianghuGo.Android
             var top = new LinearLayout(this) { Orientation = Orientation.Horizontal };
             card.AddView(top);
             var portrait = new ImageView(this);
-            var portraitArt = new global::Android.Graphics.Drawables.BitmapDrawable(Resources, Ui.Art(this, Resource.Drawable.portrait));
+            var portraitArt = new global::Android.Graphics.Drawables.BitmapDrawable(Resources, Ui.Art(this, _ui.ArtId("portrait_" + c.Path) != 0 ? _ui.ArtId("portrait_" + c.Path) : Resource.Drawable.portrait));
             portraitArt.SetFilterBitmap(false);
             portrait.SetImageDrawable(portraitArt);
             portrait.SetScaleType(ImageView.ScaleType.CenterCrop);
@@ -559,7 +559,7 @@ namespace JianghuGo.Android
 
             ui.Heading("Trening walki");
             var fights = ui.Columns();
-            foreach (var npc in new[] { ("training_dummy", "Manekin treningowy", Resource.Drawable.sprite_dummy), ("grey_wolf", "Szary Wilk", Resource.Drawable.sprite_wolf), ("mountain_bandit", "Górski Bandyta", Resource.Drawable.sprite_bandit) })
+            foreach (var npc in new[] { ("training_dummy", "Manekin treningowy", Resource.Drawable.tile_dummy), ("grey_wolf", "Szary Wilk", Resource.Drawable.tile_wolf), ("mountain_bandit", "Górski Bandyta", Resource.Drawable.tile_bandit) })
             {
                 var n = npc;
                 ui.Tile(n.Item2, string.Empty, n.Item3, () => Run(async () =>
@@ -791,12 +791,16 @@ namespace JianghuGo.Android
             ui.Heading("Techniki");
             LinearLayout row = null;
             var count = 0;
-            void AddSkill(string caption, System.Action onClick, bool secondary)
+            void AddSkill(string caption, System.Action onClick, bool secondary, string icon = null)
             {
                 if (count % 2 == 0) row = ui.Columns();
-                buttons.Add(ui.Action(caption, onClick, secondary, Cell(row)));
+                buttons.Add(ui.WithIcon(ui.Action(caption, onClick, secondary, Cell(row)), icon, 30));
                 count++;
             }
+
+            string TechIcon(CombatSlotDto slot) =>
+                slot.TechniqueId != null && _ui.ArtId("tech_" + slot.TechniqueId) != 0 ? "tech_" + slot.TechniqueId
+                : slot.Kind == "attack" ? "tech_custom_attack" : slot.Kind == "movement" ? "tech_custom_movement" : "tech_custom_defense";
 
             foreach (var s in combat.Battle.MySlots.Where(x => x.TechniqueId != null))
             {
@@ -804,12 +808,12 @@ namespace JianghuGo.Android
                 var cost = slot.QiCost > 0 ? "\n" + slot.QiCost + " Qi" : string.Empty;
                 if (slot.Kind == "movement")
                 {
-                    AddSkill("➡ " + slot.NamePl + cost, () => Act(slot.Slot, "advance"), true);
-                    AddSkill("⬅ " + slot.NamePl + cost, () => Act(slot.Slot, "retreat"), true);
+                    AddSkill("➡ " + slot.NamePl + cost, () => Act(slot.Slot, "advance"), true, TechIcon(slot));
+                    AddSkill("⬅ " + slot.NamePl + cost, () => Act(slot.Slot, "retreat"), true, TechIcon(slot));
                 }
                 else
                 {
-                    AddSkill(KindGlyph(slot.Kind) + " " + slot.NamePl + cost, () => Act(slot.Slot, null), slot.Kind != "attack");
+                    AddSkill(slot.NamePl + cost, () => Act(slot.Slot, null), slot.Kind != "attack", TechIcon(slot));
                 }
             }
 
@@ -859,14 +863,14 @@ namespace JianghuGo.Android
                 {
                     var stack = st;
                     if (stack.Type == "consumable")
-                        ui.Action("Użyj: " + stack.NamePl + " ×" + stack.Quantity, () => Run(async () =>
+                        ui.WithIcon(ui.Action("Użyj: " + stack.NamePl + " ×" + stack.Quantity, () => Run(async () =>
                         {
                             var r = await economy.UseAsync(stack.ItemId, 1, Ct);
                             Render();
                             SetStatus("+" + r.QiGranted + " Qi (wkrótce na koncie kultywacji)");
-                        }), parent: list);
+                        }), parent: list), "item_" + stack.ItemId);
                     else
-                        ui.Label("• " + stack.NamePl + " ×" + stack.Quantity, 15, parent: list);
+                        ui.WithIcon(ui.Label(stack.NamePl + " ×" + stack.Quantity, 15, parent: list), "item_" + stack.ItemId);
                 }
 
                 foreach (var it in inv.Items)
@@ -877,16 +881,16 @@ namespace JianghuGo.Android
                                   "  " + string.Join(" ", item.Stats.Select(x => x.Key + "+" + x.Value));
                     if (item.State == "listed")
                     {
-                        ui.Label(caption, 15, parent: list);
+                        ui.WithIcon(ui.Label(caption, 15, parent: list), "item_" + item.ItemId);
                         continue;
                     }
 
-                    ui.Action((item.IsEquipped ? "Zdejmij: " : "Załóż: ") + caption, () => Run(async () =>
+                    ui.WithIcon(ui.Action((item.IsEquipped ? "Zdejmij: " : "Załóż: ") + caption, () => Run(async () =>
                     {
                         var ok = await economy.ToggleEquipAsync(item, Ct);
                         Render();
                         if (!ok) SetStatus("Przedmiot zmienił się na innym urządzeniu — odświeżono.");
-                    }), secondary: !item.IsEquipped, parent: list);
+                    }), secondary: !item.IsEquipped, parent: list), "item_" + item.ItemId);
                     var next = economy.NextUpgrade(item);
                     if (next != null)
                         ui.Action("  ⚒ Ulepsz do +" + next.Level + " (" + next.Stones + " KD, " + next.SuccessPermille / 10 + "%)", () => Run(async () =>
