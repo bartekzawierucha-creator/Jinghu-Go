@@ -285,7 +285,7 @@ namespace JianghuGo.Android
             var f = max <= 0 ? 0 : Math.Clamp(value / (float)max, 0, 1);
             if (f <= 0) return;
             var fill = new RectF(r.Left, r.Top, r.Left + r.Width() * f, r.Bottom);
-            _p.SetShader(new LinearGradient(0, r.Top, 0, r.Bottom, Color.Argb(255, Math.Min(255, color.R + 70), Math.Min(255, color.G + 70), Math.Min(255, color.B + 70)).ToArgb(), color.ToArgb(), Shader.TileMode.Clamp));
+            _p.SetShader(new LinearGradient(0, r.Top, 0, r.Bottom, Color.Argb(255, Math.Min(255, color.R + 70), Math.Min(255, color.G + 70), Math.Min(255, color.B + 70)), color, Shader.TileMode.Clamp));
             canvas.DrawRoundRect(fill, r.Height() / 2, r.Height() / 2, _p);
             _p.SetShader(null);
         }

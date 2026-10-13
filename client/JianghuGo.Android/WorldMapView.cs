@@ -126,7 +126,7 @@ namespace JianghuGo.Android
             for (var i = 0; i < 26; i++)
             {
                 p.SetShader(new RadialGradient((float)rnd.NextDouble() * Width, (float)rnd.NextDouble() * Height, (30 + (float)rnd.NextDouble() * 60) * _d,
-                    Color.Argb(28, 110, 160, 150).ToArgb(), Color.Transparent.ToArgb(), Shader.TileMode.Clamp));
+                    Color.Argb(28, 110, 160, 150), Color.Transparent, Shader.TileMode.Clamp));
                 c.DrawRect(0, 0, Width, Height, p);
             }
 
