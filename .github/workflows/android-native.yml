@@ -44,7 +44,7 @@ jobs:
           mkdir -p dist
           for pair in android-arm64:JianghuGo-dev.apk android-arm:JianghuGo-dev-arm32.apk android-x64:JianghuGo-dev-x86_64.apk; do
             rid=${pair%%:*}; name=${pair#*:}
-            dotnet publish client/JianghuGo.Android/JianghuGo.Android.csproj -f net10.0-android -c Release -r $rid -p:RuntimeIdentifiers=$rid -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT" $SERVER_PROPS -o out/$rid --nologo 2>&1 | tee build-$rid.log
+            dotnet publish client/JianghuGo.Android/JianghuGo.Android.csproj -f net10.0-android -c Release -p:Abi=$rid -p:AndroidSdkDirectory="$ANDROID_SDK_ROOT" $SERVER_PROPS -o out/$rid --nologo 2>&1 | tee build-$rid.log
             status=${PIPESTATUS[0]}
             if [ $status -ne 0 ]; then
               grep -E ": error |error [A-Z]+[0-9]+" build-$rid.log | sort -u | head -20 | sed 's/^/::error::/'

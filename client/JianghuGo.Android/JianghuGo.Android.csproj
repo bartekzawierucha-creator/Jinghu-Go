@@ -24,7 +24,9 @@
     <TrimMode>partial</TrimMode>
     <RunAOTCompilation>false</RunAOTCompilation>
     <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
-    <RuntimeIdentifiers>android-arm64;android-arm;android-x64</RuntimeIdentifiers>
+    <!-- -p:Abi=android-arm64 builds an APK for one CPU type only (CI builds one per type) -->
+    <RuntimeIdentifiers Condition="'$(Abi)' == ''">android-arm64;android-arm;android-x64</RuntimeIdentifiers>
+    <RuntimeIdentifiers Condition="'$(Abi)' != ''">$(Abi)</RuntimeIdentifiers>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../JianghuGo.Client.Core.csproj" />
