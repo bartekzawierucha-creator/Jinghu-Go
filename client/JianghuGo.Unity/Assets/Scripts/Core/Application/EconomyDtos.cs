@@ -96,6 +96,27 @@ namespace JianghuGo.Client.Application
         public long Stones { get; set; }
         public ItemAmountDto Output { get; set; }
         public int SuccessPermille { get; set; }
+        public int MinLevel { get; set; } = 1;
+
+        /// <summary>"alchemy" for alchemy recipes, otherwise "smithing".</summary>
+        public string Profession => Kind == "alchemy" ? "alchemy" : "smithing";
+    }
+
+    public sealed class ProfessionDto
+    {
+        public string Id { get; set; }
+        public int Level { get; set; }
+        public long Xp { get; set; }
+        public long XpForLevel { get; set; }
+        public long? XpForNextLevel { get; set; }
+        public int SuccessBonusPermille { get; set; }
+        public int StoneDiscountPermille { get; set; }
+        public int MaxLevel { get; set; }
+    }
+
+    public sealed class ProfessionsDto
+    {
+        public List<ProfessionDto> Items { get; set; } = new List<ProfessionDto>();
     }
 
     public sealed class UpgradeLevelDto

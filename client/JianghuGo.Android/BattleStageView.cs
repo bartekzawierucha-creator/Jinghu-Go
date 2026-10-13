@@ -61,7 +61,6 @@ namespace JianghuGo.Android
         private readonly bool _foeFlip;
         private readonly Paint _foePaint = new Paint(PaintFlags.FilterBitmap);
         private readonly NpcLooks.Look _look;
-        private float _distanceShown = -1;
         private long _endAt = -1;
         private bool _endSoundPlayed;
 
@@ -228,9 +227,27 @@ namespace JianghuGo.Android
                     _cues.Add(new Cue { Hero = mine, Fx = true, Anim = _fx["gather"], At = at });
                     _floaters.Add(new Floater { OnHero = mine, Text = "+Qi", Color = Ui.QiBlue, Size = 18, At = at + 200 });
                     break;
-                case "advance":
-                case "retreat":
-                    if (actor.ContainsKey("dash")) _cues.Add(new Cue { Hero = mine, Anim = actor["dash"], At = at });
+                case "special":
+                    // a special skill: a burst of golden light, a strike if it has one, healing as a green number
+                    _cues.Add(new Cue { Hero = mine, Fx = true, Anim = _fx["gold"], At = at });
+                    var sAnim = actor.ContainsKey("palm") ? actor["palm"] : actor["attack"];
+                    if (e.Hit != null) _cues.Add(new Cue { Hero = mine, Anim = sAnim, At = at + 120 });
+                    else if (actor.ContainsKey("dash")) _cues.Add(new Cue { Hero = mine, Anim = actor["dash"], At = at });
+                    var sImpact = at + 120 + sAnim.DurationMs * 55 / 100;
+                    if (e.Hit == true)
+                    {
+                        _cues.Add(new Cue { Hero = !mine, Anim = (mine ? _foe : _hero)["hit"], At = sImpact });
+                        _cues.Add(new Cue { Hero = !mine, Fx = true, Anim = _fx[mine ? TechniqueFx(e.TechniqueId ?? string.Empty) : _look.AttackFx], At = sImpact });
+                        _floaters.Add(new Floater { OnHero = !mine, Text = "-" + e.Damage, Color = Color.Rgb(255, 210, 90), Size = 30, At = sImpact });
+                        Sfx.Play(mine ? Sfx.Hit : Sfx.Hurt);
+                    }
+                    else if (e.Hit == false)
+                    {
+                        _floaters.Add(new Floater { OnHero = !mine, Text = "unik", Color = Color.Rgb(220, 220, 220), Size = 18, At = sImpact });
+                    }
+
+                    if (e.Healed > 0) _floaters.Add(new Floater { OnHero = mine, Text = "+" + e.Healed, Color = Ui.Jade, Size = 24, At = at + 250 });
+                    else if (e.Hit == null) _floaters.Add(new Floater { OnHero = mine, Text = "★", Color = Ui.Gold, Size = 22, At = at + 200 });
                     break;
                 case "out_of_range":
                     _floaters.Add(new Floater { OnHero = mine, Text = "za daleko", Color = Color.Rgb(220, 220, 220), Size = 16, At = at });
@@ -288,9 +305,7 @@ namespace JianghuGo.Android
             canvas.DrawRect(0, 0, w, h, _p);
             _p.SetShader(null);
 
-            var target = Math.Clamp(Battle.Distance, 1, 4);
-            _distanceShown = _distanceShown < 0 ? target : _distanceShown + (target - _distanceShown) * 0.12f;
-            var gap = w * (0.13f + 0.08f * _distanceShown);
+            var gap = w * 0.25f; // no distance any more: the fighters keep a fixed duel spacing
             var ground = h * 0.9f;
             var cellH = h * 0.78f;               // the 320x256 cell; characters fill ~70% of it
             var cellW = cellH * 320f / 256f;
@@ -345,7 +360,7 @@ namespace JianghuGo.Android
             Plate(canvas, Battle.Opponent, w - 10 * _d, 10 * _d, Ui.Cinnabar, left: false);
             _text.TextSize = 13 * _d;
             _text.Color = Ui.Gold;
-            canvas.DrawText("TURA " + Battle.Turn + "  ·  DYSTANS " + Battle.Distance, w / 2, h - 8 * _d, _text);
+            canvas.DrawText("TURA " + Battle.Turn, w / 2, h - 8 * _d, _text);
 
             if (!Battle.IsActive && _endAt >= 0 && now >= _endAt)
             {

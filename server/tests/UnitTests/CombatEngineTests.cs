@@ -88,11 +88,10 @@ public class CombatEngineTests
         var p = Player("qi");
         var f = CombatEngine.Start(Config, p, p).A;
         Assert.Null(CombatEngine.Validate(Config, p, f, 2, Intent.Rest));
-        Assert.Equal("out_of_range", CombatEngine.Validate(Config, p, f, 2, new Intent(SlotOf(p, "palm_strike"), null)));
-        Assert.Null(CombatEngine.Validate(Config, p, f, 1, new Intent(SlotOf(p, "palm_strike"), null)));
-        Assert.Equal("direction_required", CombatEngine.Validate(Config, p, f, 2, new Intent(6, null)));
-        Assert.Equal("cannot_advance", CombatEngine.Validate(Config, p, f, 1, new Intent(6, "advance")));
-        Assert.Equal("direction_only_for_movement", CombatEngine.Validate(Config, p, f, 2, new Intent(4, "advance")));
+        // no distance any more: every attack reaches, and the obsolete direction is ignored
+        Assert.Null(CombatEngine.Validate(Config, p, f, 3, new Intent(SlotOf(p, "palm_strike"), null)));
+        Assert.Null(CombatEngine.Validate(Config, p, f, 1, new Intent(SlotOf(p, "palm_strike"), "retreat")));
+        Assert.Null(CombatEngine.Validate(Config, p, f, 2, new Intent(6, null)));                // the special skill
         Assert.Equal("slot_invalid", CombatEngine.Validate(Config, p, f, 2, new Intent(8, null)));
         Assert.Equal("insufficient_qi", CombatEngine.Validate(Config, p, f with { Qi = 1 }, 2, new Intent(SlotOf(p, "qi_blast"), null)));
         Assert.Equal("on_cooldown", CombatEngine.Validate(Config, p, f with { Cooldowns = [0, 0, 1, 0, 0, 0, 0, 0] }, 2, new Intent(2, null)));
@@ -141,15 +140,36 @@ public class CombatEngineTests
     }
 
     [Fact]
-    public void Movement_changes_distance_before_attacks_resolve()
+    public void Special_skill_heals_and_guards_before_the_strike_lands_with_path_perks()
     {
         var a = Player("qi");
-        var b = Player("qi");
-        var s = CombatEngine.Start(Exact, a, b) with { Distance = 1 };
-        // A tries a melee palm strike, B steps back first: the strike whiffs at distance 2.
-        var (s1, ev) = Resolve(Exact, a, b, s, new Intent(SlotOf(a, "palm_strike"), null), new Intent(6, "retreat"));
-        Assert.Equal(2, s1.Distance);
-        Assert.Equal("out_of_range", ev.Single(e => e.Actor == "a").Action);
+        var body = Player("body") with { Perks = Config.Perks("body") };            // Vajra Body: heal 25% (+5% body perk), guard 50% (+10)
+        var s = CombatEngine.Start(Exact, a, body);
+        s = s with { B = s.B with { Hp = 100 } };
+        var (s1, ev) = Resolve(Exact, a, body, s, new Intent(SlotOf(a, "palm_strike"), null), new Intent(6, null));
+        var special = ev.Single(e => e.Actor == "b");
+        Assert.Equal("special", special.Action);
+        Assert.Equal("vajra_body", special.TechniqueId);
+        Assert.Equal(s.B.MaxHp * 300 / 1000, special.Healed);
+        var strike = ev.Single(e => e.Actor == "a");
+        Assert.Equal(6, strike.Damage);                                            // 12 × 1.3 = 15 → × (1 − 0.6 guard) = 6
+        Assert.Equal(100 + special.Healed - 6, s1.B.Hp);
+        Assert.Equal(s.Distance, s1.Distance);                                    // nobody moves: there is no distance
+    }
+
+    [Fact]
+    public void Path_perks_shape_qi_damage_and_effects()
+    {
+        var qi = Player("qi") with { Perks = Config.Perks("qi") };
+        var plain = Player("qi");
+        Assert.Equal(CombatEngine.Start(Exact, plain, plain).A.MaxQi * 1250 / 1000, CombatEngine.Start(Exact, qi, plain).A.MaxQi);
+        var (s1, _) = Resolve(Exact, qi, plain, CombatEngine.Start(Exact, qi, plain), Intent.Rest, Intent.Rest);
+        Assert.Equal(CombatEngine.Start(Exact, qi, plain).A.Qi, s1.A.Qi);          // already full: regen is capped
+        var blast = SlotOf(qi, "qi_blast");
+        var (h1, e1) = Resolve(Exact, qi, plain, CombatEngine.Start(Exact, qi, plain), new Intent(blast, null), Intent.Rest);
+        var (h2, e2) = Resolve(Exact, plain, plain, CombatEngine.Start(Exact, plain, plain), new Intent(blast, null), Intent.Rest);
+        Assert.True(e1.Single(e => e.Action == "attack").Damage > e2.Single(e => e.Action == "attack").Damage, "Qi path: spirit techniques hit harder");
+        foreach (var path in new[] { "qi", "body", "flame", "poison" }) Assert.NotNull(Config.Perks(path)!.DescriptionPl);
     }
 
     [Fact]
@@ -196,8 +216,9 @@ public class CombatEngineTests
     {
         var a = Player("qi");
         var b = Player("qi");
-        var s = CombatEngine.Start(Exact, a, b);                      // distance 2: palm strike out of range
-        var (_, ev) = Resolve(Exact, a, b, s, new Intent(SlotOf(a, "palm_strike"), null), new Intent(42, null));
+        var s = CombatEngine.Start(Exact, a, b);
+        s = s with { A = s.A with { Qi = 0 } };                              // A can no longer pay for Qi Blast
+        var (_, ev) = Resolve(Exact, a, b, s, new Intent(SlotOf(a, "qi_blast"), null), new Intent(42, null));
         Assert.SequenceEqual(["rest", "rest"], ev.Select(e => e.Action));
     }
 
@@ -247,15 +268,15 @@ public class CombatEngineTests
     /// deliberate rules-version bump (then update this hash). Replays of stored battles depend on it.
     /// </summary>
     [Fact]
-    public void Golden_battle_is_unchanged_for_rules_combat_1()
+    public void Golden_battle_is_unchanged_for_rules_combat_2()
     {
         var (final, log) = Simulate(FromNpc("mountain_bandit"), Player("poison"), 20261012);
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(final) + string.Join("\n", log))))[..16];
-        Assert.Equal("combat-1", Config.RulesVersion);
+        Assert.Equal("combat-2", Config.RulesVersion);
         Assert.Equal(GoldenHash, hash, $"outcome {final.Outcome} after {final.Turn} turns, {log.Count} events");
     }
 
-    private const string GoldenHash = "047CC75C2DDD6B8A"; // bandit vs poison starter, seed 20261012: a_won after 27 turns, 65 events
+    private const string GoldenHash = "C9A37960B899952B"; // bandit vs poison starter, seed 20261012: b_won after 15 turns, 36 events (rules combat-2)
 
     [Fact]
     public void Random_battles_always_terminate_with_consistent_state()

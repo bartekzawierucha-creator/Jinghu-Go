@@ -31,6 +31,7 @@ public static class QuestsModule
         else
             services.AddSingleton<IQuestRepository, InMemoryQuestRepository>();
         services.AddScoped<QuestService>();
+        services.AddSingleton<JianghuGo.Modules.Combat.Contracts.ICombatStatBonuses, TitleCombatBonuses>();
         services.AddSingleton<IOutboxHandler, BattleCounter>();
         services.AddSingleton<IOutboxHandler, MeditationCounter>();
         services.AddSingleton<IOutboxHandler, BreakthroughCounter>();

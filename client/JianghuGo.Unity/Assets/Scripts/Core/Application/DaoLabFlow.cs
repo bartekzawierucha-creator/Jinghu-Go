@@ -11,7 +11,7 @@ namespace JianghuGo.Client.Application
     /// </summary>
     public sealed class DaoLabFlow
     {
-        private static readonly string[] Layout = { "attack", "attack", "attack", "attack", "defense", "defense", "movement", "counter" };
+        private static readonly string[] Layout = { "attack", "attack", "attack", "attack", "defense", "defense", "special", "counter" };
         private readonly ApiClient _api;
         private readonly Guid _characterId;
 

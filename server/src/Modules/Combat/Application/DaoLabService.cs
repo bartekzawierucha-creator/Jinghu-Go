@@ -161,7 +161,7 @@ public sealed class DaoLabService(
     private static DaoTechniqueView View(CustomTechnique t)
     {
         var d = t.Definition;
-        return new DaoTechniqueView(t.Id, d.NamePl, d.Slot, d.QiCost, d.Cooldown, d.Speed, d.Attack, d.Defense, d.Movement, d.Counter,
+        return new DaoTechniqueView(t.Id, d.NamePl, d.Kind, d.QiCost, d.Cooldown, d.Speed, d.Attack, d.Defense, d.Movement, d.Counter,
             t.AuthorCharacterId.Value, t.AuthorName, t.Points, t.Allowance, t.RulesVersion, t.CreatedAt);
     }
 

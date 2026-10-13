@@ -33,7 +33,30 @@ namespace JianghuGo.Client.Application
             await ReloadAsync(ct).ConfigureAwait(false);
         }
 
-        public async Task ReloadAsync(CancellationToken ct) => Set(await _api.GetInventoryAsync(_characterId, ct).ConfigureAwait(false));
+        public async Task ReloadAsync(CancellationToken ct)
+        {
+            Set(await _api.GetInventoryAsync(_characterId, ct).ConfigureAwait(false));
+            Professions = (await _api.GetProfessionsAsync(_characterId, ct).ConfigureAwait(false)).Items;
+        }
+
+        /// <summary>Alchemy and Smithing levels (reloaded with the inventory).</summary>
+        public List<ProfessionDto> Professions { get; private set; } = new List<ProfessionDto>();
+
+        public ProfessionDto Profession(string id)
+        {
+            foreach (var p in Professions) if (p.Id == id) return p;
+            return null;
+        }
+
+        /// <summary>Whether the character's profession level allows this recipe.</summary>
+        public bool LevelAllows(RecipeDto recipe) => recipe.MinLevel <= (Profession(recipe.Profession)?.Level ?? 1);
+
+        /// <summary>Stone cost after the profession discount (the server applies the same rule).</summary>
+        public long StonesFor(RecipeDto recipe)
+        {
+            var p = Profession(recipe.Profession);
+            return p == null ? recipe.Stones : recipe.Stones * (1000 - p.StoneDiscountPermille) / 1000;
+        }
 
         /// <summary>Equips, or unequips when already equipped. Returns false (after reloading) on a version conflict.</summary>
         public async Task<bool> ToggleEquipAsync(ItemInstanceDto item, CancellationToken ct)
@@ -74,7 +97,7 @@ namespace JianghuGo.Client.Application
                 if (Inventory.Count(input.Item) < (long)input.Quantity * times) return false;
             }
 
-            return Inventory.Balance >= recipe.Stones * times;
+            return LevelAllows(recipe) && Inventory.Balance >= StonesFor(recipe) * times;
         }
 
         public async Task<CraftResultDto> CraftAsync(string recipeId, int times, CancellationToken ct)

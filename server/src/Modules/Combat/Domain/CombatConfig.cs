@@ -18,8 +18,16 @@ public sealed record CombatConfig(
     IReadOnlyList<string> Slots,
     IReadOnlyList<TechniqueDefinition> Techniques,
     IReadOnlyDictionary<string, IReadOnlyList<string>> StarterLoadouts,
-    IReadOnlyList<NpcDefinition> Npcs)
+    IReadOnlyList<NpcDefinition> Npcs,
+    IdleRules? Idle = null,
+    IReadOnlyDictionary<string, PathPerks>? PathPerks = null)
 {
+    /// <summary>Combat perks of a cultivation path (none for an unknown path or a config without them).</summary>
+    public PathPerks? Perks(string? path) => path is not null && PathPerks is not null && PathPerks.TryGetValue(path, out var p) ? p : null;
+
+    /// <summary>Idle hunts (automatic battles while away); defaults apply when the config has no "idle" section.</summary>
+    public IdleRules IdleRules => Idle ?? new IdleRules(5, 4);
+
     public TechniqueDefinition Technique(string id) =>
         Techniques.FirstOrDefault(t => t.Id == id) ?? throw new KeyNotFoundException($"Unknown technique '{id}'.");
 
@@ -33,6 +41,25 @@ public sealed record CombatConfig(
 }
 
 public sealed record DistanceRules(int Start, int Min, int Max);
+
+/// <summary>
+/// What a cultivation path is good at in battle (all ‰ unless noted). Frozen into the combatant when a battle starts.
+/// </summary>
+public sealed record PathPerks(
+    string DescriptionPl,
+    int QiPermille = 0,
+    int QiRegen = 0,
+    int GuardPermille = 0,
+    int EffectChancePermille = 0,
+    int BleedPermille = 0,
+    int HealPermille = 0,
+    IReadOnlyDictionary<string, int>? ScalingDamagePermille = null)
+{
+    public int DamageBonus(string? scaling) => scaling is not null && ScalingDamagePermille is not null ? ScalingDamagePermille.GetValueOrDefault(scaling) : 0;
+}
+
+/// <summary>One automatic battle every <see cref="MinutesPerBattle"/> minutes, for at most <see cref="MaxHours"/> hours per hunt.</summary>
+public sealed record IdleRules(int MinutesPerBattle, int MaxHours);
 
 public sealed record VitalsRules(int BaseHp, int HpPerConstitution, int BaseQi, int QiPerSpirit, int QiRegenPerTurn, int RestQiGain);
 
@@ -54,7 +81,12 @@ public sealed record TechniqueDefinition(
     AttackSpec? Attack,
     DefenseSpec? Defense,
     MovementSpec? Movement,
-    CounterSpec? Counter);
+    CounterSpec? Counter,
+    SpecialSpec? Special = null)
+{
+    /// <summary>The slot this technique goes in. The old "movement" slot is now the special-skill slot.</summary>
+    public string Kind => Slot == "movement" ? SlotKinds.Special : Slot;
+}
 
 public sealed record AttackSpec(int Power, string Scaling, int RangeMin, int RangeMax, int AccuracyPermille, EffectSpec? Effect);
 
@@ -62,7 +94,14 @@ public sealed record EffectSpec(string Type, int ChancePermille, int Magnitude, 
 
 public sealed record DefenseSpec(int BlockPermille);
 
+/// <summary>Legacy (pre-1.3) movement technique: now a special skill that only grants evasion for the turn.</summary>
 public sealed record MovementSpec(int EvasionPermille);
+
+/// <summary>
+/// Special skill: any mix of a strike (power &gt; 0, scaled by a stat), healing (‰ of max HP), evasion and a guard for the
+/// turn, and an effect on the target. Usually expensive with a long cooldown.
+/// </summary>
+public sealed record SpecialSpec(int Power, string? Scaling, int AccuracyPermille, int HealPermille, int EvasionPermille, int GuardPermille, EffectSpec? Effect);
 
 public sealed record CounterSpec(int ReflectPermille, int QiSteal);
 
@@ -85,9 +124,9 @@ public static class SlotKinds
 {
     public const string Attack = "attack";
     public const string Defense = "defense";
-    public const string Movement = "movement";
+    public const string Special = "special";
     public const string Counter = "counter";
-    public static readonly IReadOnlyList<string> Layout = [Attack, Attack, Attack, Attack, Defense, Defense, Movement, Counter];
+    public static readonly IReadOnlyList<string> Layout = [Attack, Attack, Attack, Attack, Defense, Defense, Special, Counter];
 }
 
 public static class EffectTypes
@@ -119,6 +158,8 @@ public static class CombatConfigValidator
         if (c.Vitals is null || c.Vitals.BaseHp < 1 || c.Vitals.HpPerConstitution < 0 || c.Vitals.BaseQi < 0 || c.Vitals.QiPerSpirit < 0 || c.Vitals.QiRegenPerTurn < 0 || c.Vitals.RestQiGain < 0)
             e.Add("vitals invalid.");
         if (c.InitiativeRandom is < 1 or > 100) e.Add("initiativeRandom must be 1-100.");
+        if (c.Idle is { } idle && (idle.MinutesPerBattle is < 1 or > 120 || idle.MaxHours is < 1 or > 24))
+            e.Add("idle: minutesPerBattle must be 1-120 and maxHours 1-24.");
         if (c.PathHpBonusPermille is null || !c.PathHpBonusPermille.Keys.Order().SequenceEqual(Paths.Order()) || c.PathHpBonusPermille.Values.Any(v => v is < 0 or > 1000))
             e.Add("pathHpBonusPermille must give 0-1000 for every path.");
         if (c.HitChance is null || !(0 < c.HitChance.MinPermille && c.HitChance.MinPermille <= c.HitChance.BasePermille && c.HitChance.BasePermille <= c.HitChance.MaxPermille && c.HitChance.MaxPermille < 1000))
@@ -128,7 +169,12 @@ public static class CombatConfigValidator
         if (c.Progression is null || c.Progression.MaxTechniqueLevel != 10 || c.Progression.XpPerUse < 1 || c.Progression.XpPerLevel < 1 || c.Progression.DailyRewardedPveWins < 0)
             e.Add("progression invalid (techniques have levels 1-10).");
         if (c.Slots is null || !c.Slots.SequenceEqual(SlotKinds.Layout))
-            e.Add("slots must be 4 attack, 2 defense, 1 movement, 1 counter (in that order).");
+            e.Add("slots must be 4 attack, 2 defense, 1 special, 1 counter (in that order).");
+        if (c.PathPerks is not null && (!c.PathPerks.Keys.Order().SequenceEqual(Paths.Order()) || c.PathPerks.Values.Any(p =>
+                string.IsNullOrWhiteSpace(p.DescriptionPl) || p.QiPermille is < 0 or > 1000 || p.QiRegen is < 0 or > 20 || p.GuardPermille is < 0 or > 300
+                || p.EffectChancePermille is < 0 or > 500 || p.BleedPermille is < 0 or > 1000 || p.HealPermille is < 0 or > 500
+                || (p.ScalingDamagePermille ?? new Dictionary<string, int>()).Any(kv => !ScalingStats.Contains(kv.Key) || kv.Value is < 0 or > 500))))
+            e.Add("pathPerks must cover every path with values in range and a Polish description.");
 
         if (c.Techniques is null || c.Techniques.Count == 0)
         {
@@ -139,16 +185,15 @@ public static class CombatConfigValidator
         foreach (var d in c.Techniques.GroupBy(t => t.Id).Where(g => g.Count() > 1)) e.Add($"duplicate technique '{d.Key}'.");
         foreach (var t in c.Techniques)
         {
-            var specs = new object?[] { t.Attack, t.Defense, t.Movement, t.Counter }.Count(x => x is not null);
-            if (specs != 1) e.Add($"technique {t.Id}: exactly one of attack/defense/movement/counter is required.");
+            var specs = new object?[] { t.Attack, t.Defense, t.Movement, t.Counter, t.Special }.Count(x => x is not null);
+            if (specs != 1) e.Add($"technique {t.Id}: exactly one of attack/defense/special/counter is required.");
             if (t.QiCost is < 0 or > 100 || t.Cooldown is < 0 or > 10 || t.Speed is < -10 or > 10) e.Add($"technique {t.Id}: qiCost 0-100, cooldown 0-10, speed -10..10.");
             if (t.Path is not null && !Paths.Contains(t.Path)) e.Add($"technique {t.Id}: unknown path '{t.Path}'.");
-            switch (t.Slot)
+            switch (t.Kind)
             {
                 case SlotKinds.Attack when t.Attack is { } a:
                     if (a.Power is < 1 or > 200) e.Add($"technique {t.Id}: power 1-200.");
                     if (!ScalingStats.Contains(a.Scaling)) e.Add($"technique {t.Id}: scaling must be strength/spirit/agility.");
-                    if (c.Distance is not null && !(c.Distance.Min <= a.RangeMin && a.RangeMin <= a.RangeMax && a.RangeMax <= c.Distance.Max)) e.Add($"technique {t.Id}: range outside distance bounds.");
                     if (a.AccuracyPermille is < -500 or > 500) e.Add($"technique {t.Id}: accuracy -500..500.");
                     if (a.Effect is { } fx && (!EffectTypes.Applicable.Contains(fx.Type) || fx.ChancePermille is < 1 or > 1000 || fx.Duration is < 1 or > 5 || fx.Magnitude is < 0 or > 900))
                         e.Add($"technique {t.Id}: invalid effect.");
@@ -156,8 +201,16 @@ public static class CombatConfigValidator
                 case SlotKinds.Defense when t.Defense is { } d:
                     if (d.BlockPermille is < 1 or > 900) e.Add($"technique {t.Id}: block 1-900‰ (never a full block).");
                     break;
-                case SlotKinds.Movement when t.Movement is { } m:
+                case SlotKinds.Special when t.Movement is { } m:
                     if (m.EvasionPermille is < 0 or > 600) e.Add($"technique {t.Id}: evasion 0-600‰.");
+                    break;
+                case SlotKinds.Special when t.Special is { } sp:
+                    if (sp.Power is < 0 or > 300 || (sp.Power > 0 && !ScalingStats.Contains(sp.Scaling ?? string.Empty)) || sp.AccuracyPermille is < -500 or > 500
+                        || sp.HealPermille is < 0 or > 600 || sp.EvasionPermille is < 0 or > 600 || sp.GuardPermille is < 0 or > 900
+                        || sp.Power + sp.HealPermille + sp.EvasionPermille + sp.GuardPermille == 0)
+                        e.Add($"technique {t.Id}: special values invalid (power 0-300 with a scaling stat, heal/evasion 0-600‰, guard 0-900‰, something to do).");
+                    if (sp.Effect is { } sfx && (!EffectTypes.Applicable.Contains(sfx.Type) || sfx.ChancePermille is < 1 or > 1000 || sfx.Duration is < 1 or > 5 || sfx.Magnitude is < 0 or > 900))
+                        e.Add($"technique {t.Id}: invalid effect.");
                     break;
                 case SlotKinds.Counter when t.Counter is { } k:
                     if (k.ReflectPermille is < 0 or > 1000 || k.QiSteal is < 0 or > 100) e.Add($"technique {t.Id}: counter values invalid.");
@@ -187,7 +240,7 @@ public static class CombatConfigValidator
                 if (n.Loadout[i] is not { } s) continue;
                 var t = c.Techniques.FirstOrDefault(x => x.Id == s.Id);
                 if (t is null) e.Add($"npc {n.Id}: unknown technique '{s.Id}'.");
-                else if (t.Slot != SlotKinds.Layout[i]) e.Add($"npc {n.Id}: '{s.Id}' cannot go in slot {i} ({SlotKinds.Layout[i]}).");
+                else if (t.Kind != SlotKinds.Layout[i]) e.Add($"npc {n.Id}: '{s.Id}' cannot go in slot {i} ({SlotKinds.Layout[i]}).");
                 if (s.Level is < 1 or > 10) e.Add($"npc {n.Id}: technique level 1-10.");
             }
 
@@ -213,7 +266,7 @@ public static class LoadoutRules
         {
             if (slots[i] is not { } id) continue;
             if (!known.TryGetValue(id, out var t)) return $"slot {i}: technique '{id}' is not known by the {path} path.";
-            if (t.Slot != SlotKinds.Layout[i]) return $"slot {i} accepts {SlotKinds.Layout[i]} techniques, '{id}' is {t.Slot}.";
+            if (t.Kind != SlotKinds.Layout[i]) return $"slot {i} accepts {SlotKinds.Layout[i]} techniques, '{id}' is {t.Kind}.";
         }
 
         if (slots.Where(s => s is not null).GroupBy(s => s).Any(g => g.Count() > 1)) return "a technique can be equipped only once.";

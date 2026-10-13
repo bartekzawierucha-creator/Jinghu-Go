@@ -73,6 +73,25 @@ internal sealed class InMemoryCombatRepository : ICombatRepository
         return Task.CompletedTask;
     }
 
+    private const string Hunts = "combat.idle_hunts";
+
+    public Task<IdleHunt?> FindHuntAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
+        Task.FromResult(U(uow).Table<CharacterId, IdleHunt>(Hunts).GetValueOrDefault(characterId));
+
+    public Task<bool> TrySaveHuntAsync(IUnitOfWork uow, IdleHunt hunt, int expectedVersion, CancellationToken ct)
+    {
+        var t = U(uow).Table<CharacterId, IdleHunt>(Hunts);
+        if ((t.GetValueOrDefault(hunt.CharacterId)?.Version ?? 0) != expectedVersion) return Task.FromResult(false);
+        U(uow).SetTable(Hunts, t.SetItem(hunt.CharacterId, hunt));
+        return Task.FromResult(true);
+    }
+
+    public Task DeleteHuntAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct)
+    {
+        U(uow).SetTable(Hunts, U(uow).Table<CharacterId, IdleHunt>(Hunts).Remove(characterId));
+        return Task.CompletedTask;
+    }
+
     public Task<Loadout?> FindLoadoutAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
         Task.FromResult(U(uow).Table<CharacterId, Loadout>(Loadouts).GetValueOrDefault(characterId));
 
@@ -205,6 +224,30 @@ internal sealed class PostgresCombatRepository : ICombatRepository
 
     public Task DeletePetAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
         Pg(uow).ExecuteAsync("DELETE FROM combat.spirit_pets WHERE character_id = $1", ct, characterId.Value);
+
+    public Task<IdleHunt?> FindHuntAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
+        Pg(uow).QuerySingleOrDefaultAsync(
+            "SELECT account_id, npc_id, started_at, settled_at, battles, wins, losses, qi, version FROM combat.idle_hunts WHERE character_id = $1",
+            r => new IdleHunt(characterId, new AccountId(r.GetGuid(0)), r.GetString(1), r.GetFieldValue<DateTimeOffset>(2), r.GetFieldValue<DateTimeOffset>(3),
+                r.GetInt32(4), r.GetInt32(5), r.GetInt32(6), r.GetInt64(7), r.GetInt32(8)), ct, characterId.Value);
+
+    public async Task<bool> TrySaveHuntAsync(IUnitOfWork uow, IdleHunt h, int expectedVersion, CancellationToken ct)
+    {
+        if (expectedVersion == 0)
+        {
+            return await Pg(uow).ExecuteAsync(
+                "INSERT INTO combat.idle_hunts (character_id, account_id, npc_id, started_at, settled_at, battles, wins, losses, qi, version) " +
+                "VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT (character_id) DO NOTHING",
+                ct, h.CharacterId.Value, h.AccountId.Value, h.NpcId, h.StartedAt, h.SettledAt, h.Battles, h.Wins, h.Losses, h.Qi, h.Version) == 1;
+        }
+
+        return await Pg(uow).ExecuteAsync(
+            "UPDATE combat.idle_hunts SET settled_at = $2, battles = $3, wins = $4, losses = $5, qi = $6, version = $7 WHERE character_id = $1 AND version = $8",
+            ct, h.CharacterId.Value, h.SettledAt, h.Battles, h.Wins, h.Losses, h.Qi, h.Version, expectedVersion) == 1;
+    }
+
+    public Task DeleteHuntAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
+        Pg(uow).ExecuteAsync("DELETE FROM combat.idle_hunts WHERE character_id = $1", ct, characterId.Value);
 
     private static Battle MapBattle(NpgsqlDataReader r) => new(
         r.GetGuid(0), r.GetString(1), r.GetString(2), r.GetString(3), (ulong)r.GetDecimal(4), r.GetString(5),

@@ -43,6 +43,30 @@ namespace JianghuGo.Android
             return ui;
         }
 
+        /// <summary>Where the stats come from: the three traits with their modifiers, the path's perks and the titles' bonuses.</summary>
+        private void ShowOriginsSheet() => Run(async () =>
+        {
+            var c = _me;
+            _catalog ??= await _api.GetCombatCatalogAsync(Ct);
+            _board ??= await _api.GetQuestsAsync(c.Id, Ct);
+            var body = Sheet("Pochodzenie i premie", 0.78f, out _, "portrait_" + c.Path);
+            foreach (var t in c.Traits)
+            {
+                var card = _ui.Card(body, 1f, 8, Ui.RarityOf(t.Rarity).Color);
+                _ui.Text(CategoryName(t.Category).ToUpperInvariant() + " · " + t.NamePl, card, 13, Ui.Gold, bold: true);
+                var mods = StatsText(t.Modifiers);
+                _ui.Text(mods.Length > 0 ? mods : "Bez premii do cech.", card, 12, Ui.Ink, maxLines: 2);
+            }
+
+            var path = _ui.Card(body, 1.4f, 8, Ui.QiBlue);
+            _ui.Text("ŚCIEŻKA " + PathName(c.Path).ToUpperInvariant(), path, 13, Ui.Gold, bold: true);
+            _ui.Text(_catalog.Paths != null && _catalog.Paths.TryGetValue(c.Path, out var pp) ? pp.DescriptionPl : string.Empty, path, 12, Ui.Ink, maxLines: 4);
+            var titles = _ui.Card(body, 1f, 8, Ui.Violet);
+            _ui.Text("TYTUŁY (" + _board.Titles.Count + ")", titles, 13, Ui.Gold, bold: true);
+            var tb = StatsText(_board.TitleBonuses);
+            _ui.Text(tb.Length > 0 ? tb : "Zdobądź tytuły za osiągnięcia — każdy daje stałą premię do cech w walce.", titles, 12, Ui.Ink, maxLines: 3);
+        });
+
         // ---- Postać: the silhouette with five equipment slots ---------------------------------------------------
 
         private async Task ShowHeroAsync()
@@ -69,7 +93,8 @@ namespace JianghuGo.Android
             foreach (var slot in HeroDollView.Slots)
                 doll.Equipped[slot] = inv.Equipped.TryGetValue(slot, out var id) ? inv.Items.FirstOrDefault(i => i.Id == id) : null;
             ui.AddWeighted(page, doll, 1f);
-            ui.Text("Dotknij slotu, by założyć lub ulepszyć przedmiot.", page, 11, Ui.Muted, center: true);
+            var info = ui.HRow(page, 34, 4);
+            ui.Btn("Cechy, ścieżka i tytuły", () => ShowOriginsSheet(), info, secondary: true, sp: 12, heightDp: 34, icon: "menu_hero");
 
             // combat stats: base + equipment + meridians/realm + pet, 3×3
             var statsCard = ui.Card(page, 0f, 8);
@@ -82,7 +107,8 @@ namespace JianghuGo.Android
                 var eq = inv.Bonuses.TryGetValue(st.Id, out var e) ? e : 0;
                 var mer = meridians == null ? 0 : (meridians.Allocated.TryGetValue(st.Id, out var a) ? a : 0) + meridians.RealmBonus;
                 var pb = pet != null && pet.Bonuses.TryGetValue(st.Id, out var b) ? b : 0;
-                var total = st.Value + eq + mer + pb;
+                var tb = _board?.TitleBonuses != null && _board.TitleBonuses.TryGetValue(st.Id, out var tv) ? tv : 0;
+                var total = st.Value + eq + mer + pb + tb;
                 var cell = ui.Box(row, 1f, horizontal: true, marginDp: 4);
                 ui.Icon(cell, "icon_" + st.Id, 18);
                 var name = StatName(st.Id);
@@ -200,7 +226,7 @@ namespace JianghuGo.Android
             var loadout = await _api.GetLoadoutAsync(c.Id, Ct);
             var ui = HeroScreen(2, Resource.Drawable.place_qiarray);
             var page = ui.Content;
-            ui.Text("4 ataki · 2 obrony · ruch · kontra. Dotknij slotu, by zmienić technikę.", page, 11, Ui.Muted, center: true);
+            ui.Text("4 ataki · 2 obrony · specjalna · kontra. Dotknij slotu, by zmienić.", page, 11, Ui.Muted, center: true);
             var slots = loadout.Slots.OrderBy(s => s.Slot).ToList();
             var grid = ui.Pages(page, slots.Count, 2, 4, (i, cell) =>
             {
@@ -242,7 +268,7 @@ namespace JianghuGo.Android
                     var known = options[i];
                     var card = _ui.Card(cell, 1f, 6, known.Id == slot.TechniqueId ? Ui.Gold : (Color?)null, 0);
                     var row = _ui.HRow(card, 44, 0);
-                    _ui.Icon(row, _ui.ArtId("tech_" + known.Id) != 0 ? "tech_" + known.Id : "tech_custom_" + (slot.Kind == "movement" ? "movement" : slot.Kind == "attack" ? "attack" : "defense"), 38);
+                    _ui.Icon(row, _ui.ArtId("tech_" + known.Id) != 0 ? "tech_" + known.Id : "tech_custom_" + (slot.Kind == "special" ? "movement" : slot.Kind == "attack" ? "attack" : "defense"), 38);
                     var col = _ui.Box(row, 1f, marginDp: 8);
                     _ui.Text(known.NamePl, col, 13, Ui.Ink, bold: true);
                     _ui.Text("poz. " + known.Level + " · " + known.Xp + "/" + known.XpToNextLevel + " XP", col, 11, Ui.Muted);

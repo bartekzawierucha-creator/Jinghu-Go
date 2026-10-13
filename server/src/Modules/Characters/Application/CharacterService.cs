@@ -5,7 +5,8 @@ using JianghuGo.Modules.Characters.Domain;
 
 namespace JianghuGo.Modules.Characters.Application;
 
-public sealed record TraitView(string Id, string Category, string Rarity, string NamePl, string NameEn);
+/// <param name="Modifiers">What the trait adds to (or takes from) the stats, so players can see it.</param>
+public sealed record TraitView(string Id, string Category, string Rarity, string NamePl, string NameEn, IReadOnlyDictionary<string, int> Modifiers);
 
 public sealed record StatView(string Id, int Value);
 
@@ -291,7 +292,10 @@ public sealed class CharacterService(
         new(c.Id.Value, c.Name, c.Path, c.RulesVersion, TraitViews(c.Traits), StatViews(c.Stats), c.CreatedAt);
 
     private List<TraitView> TraitViews(RolledTraits traits) =>
-        [.. traits.All.Select(config.Trait).Select(t => new TraitView(t.Id, t.Category, t.Rarity, t.NamePl, t.NameEn))];
+        [.. traits.All.Select(config.Trait).Select(t => new TraitView(t.Id, t.Category, t.Rarity, t.NamePl, t.NameEn,
+            // keys in PostgreSQL jsonb order (length, then bytes) so a replayed idempotent response is byte-identical
+            (t.Modifiers ?? new Dictionary<string, int>()).OrderBy(kv => System.Text.Encoding.UTF8.GetByteCount(kv.Key)).ThenBy(kv => kv.Key, StringComparer.Ordinal)
+                .ToDictionary(kv => kv.Key, kv => kv.Value)))];
 
     private static List<StatView> StatViews(IReadOnlyList<KeyValuePair<string, int>> stats) =>
         [.. stats.Select(s => new StatView(s.Key, s.Value))];

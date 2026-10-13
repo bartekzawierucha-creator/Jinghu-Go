@@ -92,12 +92,6 @@ public class DaoLabTests : IAsyncLifetime
         var battle = await Ok(await p.PostAsync("/api/v1/combat/battles/pve", new { characterId = c.Str("id"), npcId = "training_dummy" }, Player.NewKey()), HttpStatusCode.Created);
         Assert.Equal(techniqueId, battle["mySlots"]![0]!.Str("techniqueId"));
         Assert.Equal("Dłoń Burzy", battle["mySlots"]![0]!.Str("namePl"));
-        if (battle.Int("distance") > 1)
-        {
-            var move = battle["mySlots"]!.AsArray().First(s => s!.Str("kind") == "movement")!;
-            battle = await Ok(await p.PostAsync($"/api/v1/combat/battles/{battle.Str("id")}/actions", new { turn = battle.Int("turn"), slot = move.Int("slot"), direction = "advance" }, Player.NewKey()));
-        }
-
         var after = await Ok(await p.PostAsync($"/api/v1/combat/battles/{battle.Str("id")}/actions", new { turn = battle.Int("turn"), slot = 0, direction = (string?)null }, Player.NewKey()));
         Assert.True(after["lastTurnEvents"]!.AsArray().Any(e => e!["techniqueId"]?.GetValue<string>() == techniqueId), after.Compact());
 

@@ -362,6 +362,10 @@ namespace JianghuGo.Android
 
         // ---- texts --------------------------------------------------------------------------------------------
 
+        /// <summary>"Siła +2 · Duch −1" for a set of stat changes (empty text when there are none).</summary>
+        private static string StatsText(IDictionary<string, int> mods, string separator = " · ") =>
+            mods == null ? string.Empty : string.Join(separator, mods.Where(kv => kv.Value != 0).Select(kv => StatName(kv.Key) + " " + (kv.Value > 0 ? "+" : "−") + Math.Abs(kv.Value)));
+
         private static string StatName(string id) => id switch
         {
             "strength" => "Siła",
@@ -401,7 +405,7 @@ namespace JianghuGo.Android
             "move" or "advance" => "naprzód",
             "retreat" => "odwrót",
             "guard" => "garda",
-            "movement" => "ruch",
+            "movement" or "special" => "umiejętność specjalna",
             "rest" => "odpoczynek",
             "timeout" => "zwłoka",
             _ => action,

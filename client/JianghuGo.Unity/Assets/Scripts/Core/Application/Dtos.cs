@@ -21,6 +21,7 @@ namespace JianghuGo.Client.Application
         public string Rarity { get; set; }
         public string NamePl { get; set; }
         public string NameEn { get; set; }
+        public Dictionary<string, int> Modifiers { get; set; } = new Dictionary<string, int>();
     }
 
     public sealed class StatDto
@@ -181,6 +182,7 @@ namespace JianghuGo.Client.Application
         public int Distance { get; set; }
         public int HpA { get; set; }
         public int HpB { get; set; }
+        public int Healed { get; set; }
     }
 
     public sealed class BattleDto

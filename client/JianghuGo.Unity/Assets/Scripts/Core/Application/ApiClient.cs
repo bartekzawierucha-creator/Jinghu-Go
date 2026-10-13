@@ -146,7 +146,7 @@ namespace JianghuGo.Client.Application
         public Task<BattleDto> GetBattleAsync(Guid battleId, CancellationToken ct) =>
             SendAsync<BattleDto>("GET", "/api/v1/combat/battles/" + battleId, null, true, null, ct);
 
-        /// <summary>slot null = rest; direction only for the movement slot ("advance" / "retreat").</summary>
+        /// <summary>slot null = rest. Direction is obsolete (no distance since 1.3) and ignored by the server.</summary>
         public Task<BattleDto> ActAsync(BattleDto battle, int? slot, string direction, CancellationToken ct) =>
             SendAsync<BattleDto>("POST", "/api/v1/combat/battles/" + battle.Id + "/actions",
                 new { turn = battle.Turn, slot, direction }, true, NewIdempotencyKey(), ct);
@@ -222,6 +222,22 @@ namespace JianghuGo.Client.Application
         /// <summary>The character's unfinished battles (active or waiting for the opponent).</summary>
         public Task<OpenBattlesDto> GetOpenBattlesAsync(Guid characterId, CancellationToken ct) =>
             SendAsync<OpenBattlesDto>("GET", "/api/v1/characters/" + characterId + "/combat/battles", null, true, null, ct);
+
+        /// <summary>Auto-battle: the server plays this turn for the player with the NPC AI.</summary>
+        public Task<BattleDto> AutoActAsync(Guid battleId, CancellationToken ct) =>
+            SendAsync<BattleDto>("POST", "/api/v1/combat/battles/" + battleId + "/auto", null, true, NewIdempotencyKey(), ct);
+
+        public Task<HuntEnvelopeDto> GetHuntAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<HuntEnvelopeDto>("GET", "/api/v1/characters/" + characterId + "/combat/hunt", null, true, null, ct);
+
+        public Task<HuntEnvelopeDto> StartHuntAsync(Guid characterId, string npcId, CancellationToken ct) =>
+            SendAsync<HuntEnvelopeDto>("POST", "/api/v1/characters/" + characterId + "/combat/hunt", new { npcId }, true, null, ct);
+
+        public Task<HuntEnvelopeDto> ClaimHuntAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<HuntEnvelopeDto>("POST", "/api/v1/characters/" + characterId + "/combat/hunt/claim", null, true, null, ct);
+
+        public Task<ProfessionsDto> GetProfessionsAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<ProfessionsDto>("GET", "/api/v1/characters/" + characterId + "/crafting/professions", null, true, null, ct);
 
         public Task<CombatCatalogDto> GetCombatCatalogAsync(CancellationToken ct) =>
             SendAsync<CombatCatalogDto>("GET", "/api/v1/combat/catalog", null, true, null, ct);

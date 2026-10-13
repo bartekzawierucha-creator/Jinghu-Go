@@ -6,12 +6,45 @@ public sealed record CraftingConfig(
     string RulesVersion,
     IReadOnlyList<Recipe> Recipes,
     int AlchemyInsightBonusPermille,
-    UpgradeRules Upgrade)
+    UpgradeRules Upgrade,
+    ProfessionRules? Professions = null)
 {
+    public ProfessionRules ProfessionRules => Professions ?? new ProfessionRules(10, 15, 3, 1, 15, 10, 20);
+
     public Recipe? Find(string? id) => id is null ? null : Recipes.FirstOrDefault(r => r.Id == id);
 }
 
-public sealed record Recipe(string Id, string Kind, IReadOnlyList<ItemAmount> Inputs, long Stones, ItemAmount Output, int SuccessPermille);
+public sealed record Recipe(string Id, string Kind, IReadOnlyList<ItemAmount> Inputs, long Stones, ItemAmount Output, int SuccessPermille, int MinLevel = 1);
+
+/// <summary>
+/// Crafting professions: Alchemy (pills, elixirs) and Smithing (forging and upgrading). Level n needs
+/// xpPerLevel × n(n−1)/2 XP in total. Each level above 1 adds success chance and lowers the stone cost.
+/// </summary>
+public sealed record ProfessionRules(int MaxLevel, int XpPerLevel, int XpPerSuccess, int XpPerFailure, int SuccessPermillePerLevel,
+    int UpgradeSuccessPermillePerLevel, int StoneDiscountPermillePerLevel)
+{
+    public int Level(long xp)
+    {
+        var level = 1;
+        while (level < MaxLevel && xp >= XpFor(level + 1)) level++;
+        return level;
+    }
+
+    /// <summary>Total XP needed to reach <paramref name="level"/>.</summary>
+    public long XpFor(int level) => (long)XpPerLevel * level * (level - 1) / 2;
+
+    public int SuccessBonus(int level) => (level - 1) * SuccessPermillePerLevel;
+    public int UpgradeBonus(int level) => (level - 1) * UpgradeSuccessPermillePerLevel;
+    public long Stones(long stones, int level) => stones * (1000 - Math.Min(500, (level - 1) * StoneDiscountPermillePerLevel)) / 1000;
+}
+
+public static class Professions
+{
+    public const string Alchemy = "alchemy";
+    public const string Smithing = "smithing";
+
+    public static string Of(Recipe r) => r.Kind == RecipeKinds.Alchemy ? Alchemy : Smithing;
+}
 
 public sealed record ItemAmount(string Item, int Quantity);
 
@@ -65,9 +98,14 @@ public static class CraftingConfigValidator
             if (r.Output is null || itemExists(r.Output.Item) is null || r.Output.Quantity is < 1 or > 100) e.Add($"recipe {r.Id}: unknown output.");
             else if (itemExists(r.Output.Item) is false && r.Output.Quantity != 1) e.Add($"recipe {r.Id}: unique items are crafted one at a time.");
             if (r.SuccessPermille is < 1 or > 1000) e.Add($"recipe {r.Id}: successPermille must be 1-1000.");
+            if (r.MinLevel < 1 || r.MinLevel > c.ProfessionRules.MaxLevel) e.Add($"recipe {r.Id}: minLevel must be 1-{c.ProfessionRules.MaxLevel}.");
             if (r.Kind == RecipeKinds.Forge && r.SuccessPermille != 1000) e.Add($"recipe {r.Id}: forging never fails (only alchemy does).");
         }
 
+        var p = c.ProfessionRules;
+        if (p.MaxLevel is < 1 or > 50 || p.XpPerLevel < 1 || p.XpPerSuccess < 0 || p.XpPerFailure < 0 || p.SuccessPermillePerLevel is < 0 or > 100
+            || p.UpgradeSuccessPermillePerLevel is < 0 or > 100 || p.StoneDiscountPermillePerLevel is < 0 or > 100)
+            e.Add("professions rules invalid.");
         var u = c.Upgrade;
         if (u is null || u.MaxLevel is < 1 or > 100 || u.StonesPerLevel < 0 || itemExists(u.Material) is not true
             || u.SuccessPermilleByTargetLevel is null || u.SuccessPermilleByTargetLevel.Count != u.MaxLevel

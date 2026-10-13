@@ -29,7 +29,12 @@ public interface ICraftingRepository
 {
     Task AddAsync(IUnitOfWork uow, CraftLogEntry entry, CancellationToken ct);
     Task<IReadOnlyList<CraftLogEntry>> ListAsync(IUnitOfWork uow, CharacterId characterId, Guid? before, int limit, CancellationToken ct);
+
+    /// <summary>Attempts and successes per (kind, subject) over the character's whole crafting history (profession XP).</summary>
+    Task<IReadOnlyList<(string Kind, string Subject, long Attempts, long Successes)>> TotalsAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct);
 }
+
+public sealed record ProfessionView(string Id, int Level, long Xp, long XpForLevel, long? XpForNextLevel, int SuccessBonusPermille, int StoneDiscountPermille, int MaxLevel);
 
 public sealed record CraftCommand(string? RecipeId, int Times);
 
@@ -60,6 +65,38 @@ public sealed class CraftingService(
     /// One atomic transaction: take inputs, charge stones, roll, give outputs, log. Any failure (missing materials,
     /// stones, bag space) rolls back everything — nothing is consumed (acceptance #5).
     /// </summary>
+    public Task<Result<IReadOnlyList<ProfessionView>>> ProfessionsAsync(AccountId accountId, Guid characterId, CancellationToken ct) =>
+        uowFactory.RunAsync<Result<IReadOnlyList<ProfessionView>>>(async uow =>
+        {
+            var c = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
+            if (c is null) return CharacterNotFound;
+            var xp = await XpAsync(uow, c.Id, ct);
+            return Result<IReadOnlyList<ProfessionView>>.Success([View(Professions.Alchemy, xp.Alchemy), View(Professions.Smithing, xp.Smithing)]);
+        }, ct);
+
+    private ProfessionView View(string id, long xp)
+    {
+        var p = config.ProfessionRules;
+        var level = p.Level(xp);
+        return new ProfessionView(id, level, xp, p.XpFor(level), level < p.MaxLevel ? p.XpFor(level + 1) : null,
+            id == Professions.Alchemy ? p.SuccessBonus(level) : p.UpgradeBonus(level), Math.Min(500, (level - 1) * p.StoneDiscountPermillePerLevel), p.MaxLevel);
+    }
+
+    /// <summary>Profession XP from the crafting log: successes and failures of alchemy recipes vs forging and upgrades.</summary>
+    private async Task<(long Alchemy, long Smithing)> XpAsync(IUnitOfWork uow, CharacterId id, CancellationToken ct)
+    {
+        var p = config.ProfessionRules;
+        long alchemy = 0, smithing = 0;
+        foreach (var (kind, subject, attempts, successes) in await repo.TotalsAsync(uow, id, ct))
+        {
+            var xp = (successes * p.XpPerSuccess) + ((attempts - successes) * p.XpPerFailure);
+            if (kind == "craft" && config.Find(subject) is { Kind: RecipeKinds.Alchemy }) alchemy += xp;
+            else smithing += xp;
+        }
+
+        return (alchemy, smithing);
+    }
+
     public Task<Result<CraftResult>> CraftAsync(AccountId accountId, Guid characterId, string? key, CraftCommand cmd, CancellationToken ct) =>
         uowFactory.RunAsync<Result<CraftResult>>(async uow =>
         {
@@ -71,6 +108,10 @@ public sealed class CraftingService(
                     return Error.Validation("times_invalid", unique ? "Unique items are crafted one at a time." : $"Times must be 1-{CraftingRules.MaxTimesPerRequest}.");
                 var c = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
                 if (c is null) return CharacterNotFound;
+                var xpNow = await XpAsync(uow, c.Id, ct);
+                var level = config.ProfessionRules.Level(Professions.Of(recipe) == Professions.Alchemy ? xpNow.Alchemy : xpNow.Smithing);
+                if (level < recipe.MinLevel)
+                    return Error.Conflict("profession_level_too_low", $"This recipe needs {Professions.Of(recipe)} level {recipe.MinLevel} (you have {level}).");
 
                 var now = clock.GetUtcNow();
                 var logId = Uuid7.New();
@@ -81,7 +122,7 @@ public sealed class CraftingService(
                     if (!removed.IsSuccess) return removed.Error!;
                 }
 
-                var stones = checked(recipe.Stones * cmd.Times);
+                var stones = checked(config.ProfessionRules.Stones(recipe.Stones, level) * cmd.Times);
                 long balance = await inventory.BalanceAsync(uow, c.Id, ct);
                 if (stones > 0)
                 {
@@ -90,7 +131,7 @@ public sealed class CraftingService(
                     balance = debited.Value;
                 }
 
-                var chance = CraftingRules.ChancePermille(config, recipe, c.Stats.GetValueOrDefault("insight"));
+                var chance = Math.Min(1000, CraftingRules.ChancePermille(config, recipe, c.Stats.GetValueOrDefault("insight")) + config.ProfessionRules.SuccessBonus(level));
                 var seed = seeds.NextSeed();
                 var successes = CraftingRules.Rolls(seed, cmd.Times).Count(r => r < chance);
                 var outputQty = successes * recipe.Output.Quantity;
@@ -143,11 +184,12 @@ public sealed class CraftingService(
                 var target = item.UpgradeLevel + 1;
                 var removed = await inventory.RemoveItemsAsync(uow, c.Id, config.Upgrade.Material, 1, "upgrade", reference, ct);
                 if (!removed.IsSuccess) return removed.Error!;
-                var stones = CraftingRules.UpgradeStones(config, target);
+                var smithing = config.ProfessionRules.Level((await XpAsync(uow, c.Id, ct)).Smithing);
+                var stones = config.ProfessionRules.Stones(CraftingRules.UpgradeStones(config, target), smithing);
                 var debited = await inventory.DebitAsync(uow, c.Id, stones, "upgrade", reference, ct);
                 if (!debited.IsSuccess) return debited.Error!;
 
-                var chance = CraftingRules.UpgradeChancePermille(config, target);
+                var chance = Math.Min(1000, CraftingRules.UpgradeChancePermille(config, target) + config.ProfessionRules.UpgradeBonus(smithing));
                 var seed = seeds.NextSeed();
                 var success = CraftingRules.Rolls(seed, 1)[0] < chance;
                 var level = item.UpgradeLevel;

@@ -1250,6 +1250,58 @@ paths:
         "200": { description: OK }
         "404": { $ref: "#/components/responses/Problem" }
         "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/combat/battles/{battleId}/auto:
+    post:
+      tags: [Combat]
+      summary: Auto-battle - the server plays this turn for the player with the NPC AI.
+      parameters: [{ name: battleId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/combat/hunt:
+    get:
+      tags: [Combat]
+      summary: The idle hunt (automatic battles while away) with every due battle already fought; null when none.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+    post:
+      tags: [Combat]
+      summary: Start an idle hunt against a training opponent (one battle per interval, limited hours).
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [npcId]
+              properties:
+                npcId: { type: string }
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/combat/hunt/claim:
+    post:
+      tags: [Combat]
+      summary: End the hunt and return its final tally (rewards are credited per battle).
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/crafting/professions:
+    get:
+      tags: [Crafting]
+      summary: Alchemy and Smithing levels (XP from the crafting history), their success bonus and stone discount.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
 components:
   securitySchemes:
     bearer:

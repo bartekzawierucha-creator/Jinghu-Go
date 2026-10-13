@@ -18,10 +18,11 @@ namespace JianghuGo.Android
         {
             var c = _me;
             _catalog ??= await _api.GetCombatCatalogAsync(Ct);
-            var open = tab == 2 ? (await _api.GetOpenBattlesAsync(c.Id, Ct)).Items : new List<BattleDto>();
+            var open = tab == 3 ? (await _api.GetOpenBattlesAsync(c.Id, Ct)).Items : new List<BattleDto>();
+            var hunt = tab == 1 ? (await _api.GetHuntAsync(c.Id, Ct)).Hunt : null;
             var ui = NewScreen(null, art: Resource.Drawable.arena_courtyard, tab: TabCombat);
             var page = ui.Content;
-            ui.Tabs(page, new[] { "Trening", "Bossowie", "Pojedynki" }, tab, i => Run(() => ShowCombatTabAsync(i)));
+            ui.Tabs(page, new[] { "Trening", "Polowanie", "Bossowie", "Pojedynki" }, tab, i => Run(() => ShowCombatTabAsync(i)));
 
             if (tab == 0)
             {
@@ -35,6 +36,10 @@ namespace JianghuGo.Android
                 ui.Text("★ zagrożenie  ·  🐾 można oswoić po zwycięstwie", page, 11, Ui.Muted, center: true);
             }
             else if (tab == 1)
+            {
+                Hunt(ui, page, hunt);
+            }
+            else if (tab == 2)
             {
                 var bosses = _catalog.Npcs.Where(n => n.Boss).OrderBy(n => n.Tier).ToList();
                 ui.Pages(page, bosses.Count, 2, 2, (i, cell) =>
@@ -70,6 +75,66 @@ namespace JianghuGo.Android
                     }), row, sp: 12, heightDp: 38).LayoutParameters = new LinearLayout.LayoutParams(Px(96), Px(38)) { Gravity = GravityFlags.CenterVertical };
                 }, empty: "Brak trwających walk.");
             }
+        }
+
+        /// <summary>
+        /// Idle hunt: pick a training opponent and the character fights it on its own, one battle every few minutes for
+        /// a few hours, even with the game closed. Rewards are real (Qi, loot, quests, pet XP) and share the daily cap.
+        /// </summary>
+        private void Hunt(Ui ui, LinearLayout page, HuntDto hunt)
+        {
+            var c = _me;
+            if (hunt == null)
+            {
+                ui.Text("Wybierz przeciwnika: twoja postać walczy sama co 5 min przez 4 h — także przy zamkniętej grze. Nagrody wliczają się do dziennego limitu.", page, 12, Ui.Muted, center: true, maxLines: 3);
+                var npcs = _catalog.Npcs.Where(n => !n.WorldOnly).OrderBy(n => n.Tier).ThenBy(n => n.RewardQi).ToList();
+                ui.Pages(page, npcs.Count, 2, 2, (i, cell) =>
+                {
+                    var n = npcs[i];
+                    ui.TileIn(cell, n.NamePl, new string('★', Math.Clamp(n.Tier, 1, 5)) + "  ·  +" + n.RewardQi + " Qi / wygrana", NpcLooks.For(n.Id).TileArt, () => Run(async () =>
+                    {
+                        await _api.StartHuntAsync(c.Id, n.Id, Ct);
+                        Sfx.Play(Sfx.Chime);
+                        await ShowCombatTabAsync(1);
+                        SetStatus("Polowanie rozpoczęte — wróć za jakiś czas po łupy.");
+                    }), pixelArt: true, accent: Ui.Jade, titleSp: 13);
+                });
+                return;
+            }
+
+            var card = ui.Card(page, 1f, 10, Ui.Jade);
+            var art = new ImageView(this);
+            var bmp = new global::Android.Graphics.Drawables.BitmapDrawable(Resources, Ui.Art(this, NpcLooks.For(hunt.NpcId).TileArt));
+            bmp.SetFilterBitmap(false);
+            art.SetImageDrawable(bmp);
+            art.SetScaleType(ImageView.ScaleType.FitCenter);
+            card.AddView(art, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0, 1f));
+            ui.Text("Polowanie: " + hunt.NpcNamePl, card, 16, Ui.Gold, bold: true, center: true);
+            var now = DateTimeOffset.UtcNow;
+            var total = (hunt.EndsAt - hunt.StartedAt).TotalMinutes;
+            var done = Math.Clamp((now - hunt.StartedAt).TotalMinutes, 0, total);
+            ui.MeterIn(card, Ui.Jade, hunt.Finished ? "Zakończone" : "Zostało " + MeditationForecast.FormatMinutes((int)Math.Ceiling(total - done)), done, total, 18);
+            var stats = ui.HRow(card, 46, 4);
+            foreach (var (label, value, color) in new[] { ("Walki", hunt.Battles.ToString(), Ui.Ink), ("Wygrane", hunt.Wins.ToString(), Ui.Jade),
+                         ("Porażki", hunt.Losses.ToString(), Ui.Cinnabar), ("Qi", "+" + hunt.Qi, Ui.QiBlue) })
+            {
+                var col = ui.Box(stats, 1f, marginDp: 2);
+                ui.Text(value, col, 18, color, bold: true, center: true);
+                ui.Text(label, col, 11, Ui.Muted, center: true);
+            }
+
+            ui.Text(hunt.NextBattleAt is { } next && !hunt.Finished ? "Następna walka o " + next.ToLocalTime().ToString("HH:mm") + " · co " + hunt.MinutesPerBattle + " min"
+                : "Odbierz wynik i zacznij nowe polowanie.", card, 11, Ui.Muted, center: true);
+            var row = ui.HRow(page, 46, 6);
+            ui.Btn("Odśwież", () => Run(() => ShowCombatTabAsync(1)), row, secondary: true, sp: 13, heightDp: 46);
+            ui.Btn(hunt.Finished ? "Odbierz łupy" : "Zakończ i odbierz", () => Run(async () =>
+            {
+                var final = (await _api.ClaimHuntAsync(c.Id, Ct)).Hunt;
+                await ShowCombatTabAsync(1);
+                Sfx.Play(Sfx.Coin);
+                ShowBanner("POLOWANIE", final.Wins + " zwycięstw z " + final.Battles + " walk", "+" + final.Qi + " Qi · łupy trafiły do sakwy", "menu_battle");
+                RefreshHud();
+            }), row, sp: 14, heightDp: 46);
         }
 
         /// <summary>Starts a training fight; a fight left unfinished earlier is resumed instead (one battle at a time).</summary>
@@ -109,7 +174,7 @@ namespace JianghuGo.Android
 
             string TechIcon(CombatSlotDto slot) =>
                 slot.TechniqueId != null && ui.ArtId("tech_" + slot.TechniqueId) != 0 ? "tech_" + slot.TechniqueId
-                : slot.Kind == "attack" ? "tech_custom_attack" : slot.Kind == "movement" ? "tech_custom_movement" : "tech_custom_defense";
+                : slot.Kind == "attack" ? "tech_custom_attack" : slot.Kind == "special" ? "tech_custom_movement" : "tech_custom_defense";
 
             void Act(int? slot, string direction) => Run(async () =>
             {
@@ -117,7 +182,7 @@ namespace JianghuGo.Android
                 if (gen == _screen) Render();
             });
 
-            // 8 slots as a 4×2 grid; the movement slot splits into ⬅ / ➡
+            // 8 slots as a 4×2 grid (slot 7 = the special skill)
             var slots = combat.Battle.MySlots.OrderBy(s => s.Slot).ToList();
             for (var r = 0; r < 2; r++)
             {
@@ -134,15 +199,7 @@ namespace JianghuGo.Android
 
                     var slot = slots[idx];
                     var cost = slot.QiCost > 0 ? slot.QiCost + " Qi" : null;
-                    if (slot.Kind == "movement")
-                    {
-                        var pair = ui.Box(row, 1f, horizontal: true, marginDp: 6);
-                        buttons.Add(ui.SkillTile(pair, TechIcon(slot), "⬅ cofnij", cost, false, () => Act(slot.Slot, "retreat")));
-                        buttons.Add(ui.SkillTile(pair, TechIcon(slot), "naprzód ➡", cost, false, () => Act(slot.Slot, "advance")));
-                        continue;
-                    }
-
-                    var b = ui.SkillTile(row, TechIcon(slot), slot.NamePl, cost, slot.Kind == "attack", () => Act(slot.Slot, null));
+                    var b = ui.SkillTile(row, TechIcon(slot), (slot.Kind == "special" ? "★ " : string.Empty) + slot.NamePl, cost, slot.Kind is "attack" or "special", () => Act(slot.Slot, null));
                     b.Tag = slot.Slot;
                     buttons.Add(b);
                 }
@@ -150,11 +207,46 @@ namespace JianghuGo.Android
 
             var controls = ui.HRow(page, 42, 6);
             buttons.Add(ui.Btn("Odpocznij", () => Act(null, null), controls, secondary: true, sp: 12, heightDp: 42));
-            ui.Btn("⟳", () => Run(async () =>
+            // Auto-battle: the server plays each turn for the player (same AI as the enemies); tap again to take over.
+            var auto = false;
+            Button autoBtn = null;
+            autoBtn = ui.Btn("▶ Auto", () =>
             {
-                await combat.RefreshAsync(Ct);
-                Render();
-            }), controls, secondary: true, sp: 16, heightDp: 42).LayoutParameters = new LinearLayout.LayoutParams(Px(48), Px(42)) { LeftMargin = Px(6) };
+                auto = !auto;
+                autoBtn.Text = auto ? "⏸ Auto" : "▶ Auto";
+                Sfx.Play(Sfx.Click);
+                if (auto) AutoLoop();
+            }, controls, secondary: true, sp: 12, heightDp: 42);
+            autoBtn.LayoutParameters = new LinearLayout.LayoutParams(Px(74), Px(42)) { LeftMargin = Px(6) };
+
+            async void AutoLoop()
+            {
+                while (auto && gen == _screen && combat.Battle.IsActive && !_lifetime.IsCancellationRequested)
+                {
+                    try
+                    {
+                        if (!combat.Battle.MyActionSubmitted && !_paused)
+                        {
+                            await combat.AutoAsync(Ct);
+                            if (gen == _screen) Render();
+                        }
+
+                        await Task.Delay(Math.Max(1200, combat.Battle.LastTurnEvents.Count * 760 + 500), Ct);
+                    }
+                    catch (System.OperationCanceledException)
+                    {
+                        return;
+                    }
+                    catch (ApiException e)
+                    {
+                        if (gen == _screen) SetStatus(Describe(e));
+                        auto = false;
+                    }
+                }
+
+                auto = false;
+                if (gen == _screen) autoBtn.Text = "▶ Auto";
+            }
             var confirmForfeit = false;
             Button forfeit = null;
             forfeit = ui.Btn("Poddaj", () =>
@@ -185,7 +277,8 @@ namespace JianghuGo.Android
                     : !b.IsActive ? "WYNIK: " + ResultName(b) + (b.RewardQi > 0 ? "  (+" + b.RewardQi + " Qi)" : string.Empty)
                     : b.LastTurnEvents.Count == 0 ? "Tura " + b.Turn + " · Qi " + b.Me.Qi + "/" + b.Me.MaxQi + " — przeciwnicy mierzą się wzrokiem…"
                     : "Tura " + b.Turn + " · " + string.Join("  ·  ", b.LastTurnEvents.Select(e =>
-                        (b.IsMine(e) ? "Ty" : "Wróg") + ": " + ActionName(e.Action) + (e.Hit == true ? " " + e.Damage : e.Hit == false ? " pudło" : string.Empty)));
+                        (b.IsMine(e) ? "Ty" : "Wróg") + ": " + ActionName(e.Action) + (e.Hit == true ? " " + e.Damage : e.Hit == false ? " pudło" : string.Empty)
+                        + (e.Healed > 0 ? " +" + e.Healed + " HP" : string.Empty)));
                 foreach (var button in buttons)
                 {
                     var on = b.IsActive && !b.MyActionSubmitted;

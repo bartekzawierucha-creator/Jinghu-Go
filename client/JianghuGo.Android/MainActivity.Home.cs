@@ -188,7 +188,7 @@ namespace JianghuGo.Android
                 var top = ui.HRow(card, 22, 0);
                 ui.Text((q.Claimed ? "✓ " : string.Empty) + q.NamePl, top, 14, q.Claimed ? Ui.Muted : q.Completed ? Ui.Gold : Ui.Ink, bold: true);
                 ui.Text("+" + q.Stones, top, 12, Ui.Gold, bold: true).Gravity = GravityFlags.End;
-                ui.Text(q.DescriptionPl + (q.TitlePl != null ? "  ·  tytuł 「" + q.TitlePl + "」" : string.Empty), card, 11, Ui.Muted, maxLines: 1);
+                ui.Text(q.DescriptionPl + (q.TitlePl != null ? "  ·  「" + q.TitlePl + "」" + (q.Bonus != null ? " " + StatsText(q.Bonus, ", ") : string.Empty) : string.Empty), card, 11, Ui.Muted, maxLines: 2);
                 ui.Box(card, 1f, marginDp: 0);
                 var bottom = ui.HRow(card, 30, 2);
                 var meterBox = ui.Box(bottom, 1.4f, marginDp: 0);
@@ -238,11 +238,14 @@ namespace JianghuGo.Android
                 }
                 else
                 {
+                    ui.Text("Razem w walce: " + StatsText(board.TitleBonuses), page, 12, Ui.Jade, bold: true, center: true, maxLines: 2);
                     ui.Pages(page, board.Titles.Count, 2, 4, (i, cell) =>
                     {
                         var card = ui.Card(cell, 1f, 8, Ui.Gold, 0);
                         card.SetGravity(GravityFlags.Center);
                         ui.Text("「" + board.Titles[i] + "」", card, 15, Ui.Gold, bold: true, center: true, maxLines: 2);
+                        var bonus = board.Achievements.FirstOrDefault(a => a.TitlePl == board.Titles[i])?.Bonus;
+                        if (bonus != null) ui.Text(StatsText(bonus, ", "), card, 11, Ui.Ink, center: true, maxLines: 2);
                     });
                 }
             }

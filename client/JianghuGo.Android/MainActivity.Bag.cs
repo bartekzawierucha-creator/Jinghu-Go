@@ -184,7 +184,18 @@ namespace JianghuGo.Android
             foreach (var st in inv.Stacks) names[st.ItemId] = st.NamePl;
             foreach (var it in inv.Items) names[it.ItemId] = it.NamePl;
             string N(string id) => names.TryGetValue(id, out var n) ? n : Pretty(id);
-            var recipes = economy.Recipes.Items.OrderByDescending(r => economy.CanAfford(r, 1)).ThenBy(r => r.Stones).ToList();
+            var recipes = economy.Recipes.Items.OrderByDescending(r => economy.CanAfford(r, 1)).ThenByDescending(r => economy.LevelAllows(r)).ThenBy(r => r.Stones).ToList();
+            var profRow = ui.HRow(page, 30, 2);
+            foreach (var (id, label, icon) in new[] { ("alchemy", "Alchemia", "menu_daolab"), ("smithing", "Kowalstwo", "menu_forge") })
+            {
+                var p = economy.Profession(id);
+                var cell = ui.Box(profRow, 1f, horizontal: true, marginDp: 4);
+                ui.Icon(cell, icon, 24);
+                var next = p?.XpForNextLevel is long n ? " · " + p.Xp + "/" + n + " XP" : " · max";
+                ui.Text(label + " " + (p?.Level ?? 1) + (p == null ? string.Empty : next), cell, 12, Ui.Gold, bold: true)
+                    .LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f) { LeftMargin = Px(4), Gravity = GravityFlags.CenterVertical };
+            }
+
             Pager pager = null;
             pager = ui.Pages(page, recipes.Count, 1, 3, (i, cell) =>
             {
@@ -196,9 +207,18 @@ namespace JianghuGo.Android
                 ui.Icon(row, ui.ArtId("item_" + recipe.Output.Item) != 0 ? "item_" + recipe.Output.Item : "item_slot_empty", 40);
                 var col = ui.Box(row, 1f, marginDp: 8);
                 ui.Text(N(recipe.Output.Item) + (recipe.Output.Quantity > 1 ? " ×" + recipe.Output.Quantity : string.Empty), col, 13, can ? Ui.Gold : Ui.Ink, bold: true);
-                ui.Text((recipe.Kind == "alchemy" ? "Alchemia · " + recipe.SuccessPermille / 10 + "%+" : "Kuźnia") + " · " + recipe.Stones + " KD", col, 11, Ui.Muted);
-                ui.Btn(can ? "Wytwórz" : "Brak", () => Run(async () =>
+                var allowed = economy.LevelAllows(recipe);
+                var bonus = economy.Profession(recipe.Profession)?.SuccessBonusPermille ?? 0;
+                ui.Text((recipe.Kind == "alchemy" ? "Alchemia · " + Math.Min(100, (recipe.SuccessPermille + bonus) / 10) + "%+" : "Kuźnia") + " · " + economy.StonesFor(recipe) + " KD"
+                        + (allowed ? string.Empty : " · wym. poz. " + recipe.MinLevel), col, 11, allowed ? Ui.Muted : Ui.Cinnabar);
+                ui.Btn(can ? "Wytwórz" : allowed ? "Brak" : "🔒 " + recipe.MinLevel, () => Run(async () =>
                 {
+                    if (!allowed)
+                    {
+                        SetStatus((recipe.Profession == "alchemy" ? "Alchemia" : "Kowalstwo") + " musi mieć poziom " + recipe.MinLevel + " — wytwarzaj prostsze rzeczy, by zdobyć doświadczenie.");
+                        return;
+                    }
+
                     if (!economy.CanAfford(recipe, 1))
                     {
                         SetStatus("Brakuje składników lub kamieni.");

@@ -23,6 +23,14 @@ internal sealed class InMemoryCraftingRepository : ICraftingRepository
             .Where(e => e.CharacterId == characterId && (before is null || e.Id.CompareTo(before.Value) < 0)).OrderByDescending(e => e.Id).Take(limit)];
         return Task.FromResult(list);
     }
+
+    public Task<IReadOnlyList<(string Kind, string Subject, long Attempts, long Successes)>> TotalsAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct)
+    {
+        IReadOnlyList<(string, string, long, long)> list = [.. InMemoryUnitOfWork.From(uow).Table<Guid, CraftLogEntry>(Log).Values
+            .Where(e => e.CharacterId == characterId).GroupBy(e => (e.Kind, e.Subject))
+            .Select(g => (g.Key.Kind, g.Key.Subject, g.Sum(e => (long)e.Attempts), g.Sum(e => (long)e.Successes)))];
+        return Task.FromResult(list);
+    }
 }
 
 internal sealed class PostgresCraftingRepository : ICraftingRepository
@@ -42,4 +50,9 @@ internal sealed class PostgresCraftingRepository : ICraftingRepository
                 (ulong)r.GetDecimal(7), r.GetInt64(8), r.IsDBNull(9) ? null : r.GetInt32(9), r.IsDBNull(10) ? null : r.GetInt32(10), r.GetString(11),
                 r.GetFieldValue<DateTimeOffset>(12)),
             ct, characterId.Value, before, limit);
+
+    public async Task<IReadOnlyList<(string Kind, string Subject, long Attempts, long Successes)>> TotalsAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
+        await PostgresUnitOfWork.From(uow).QueryAsync(
+            "SELECT kind, subject, sum(attempts)::bigint, sum(successes)::bigint FROM crafting.log WHERE character_id = $1 GROUP BY kind, subject",
+            r => (r.GetString(0), r.GetString(1), r.GetInt64(2), r.GetInt64(3)), ct, characterId.Value);
 }

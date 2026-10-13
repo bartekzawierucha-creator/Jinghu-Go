@@ -200,4 +200,28 @@ public class CraftingTests : IAsyncLifetime
         await Problem(await Upgrade(p, c, sword.Id, listed.Version), HttpStatusCode.Conflict, "item_listed");
         Assert.Equal(1, (await StateAsync(p, c)).Stacks["refining_stone"], "a refused upgrade consumes nothing");
     }
+
+    [Fact]
+    public async Task Smithing_levels_come_from_crafting_and_unlock_recipes_with_a_discount()
+    {
+        var (p, c) = await CharacterAsync();
+        var url = $"/api/v1/characters/{c.Str("id")}/crafting/professions";
+        var profs = (await Ok(await p.GetAsync(url)))["items"]!.AsArray().Select(x => x!.AsObject()).ToDictionary(x => x.Str("id"));
+        Assert.Equal(1, profs["smithing"].Int("level"));
+        Assert.Equal(1, profs["alchemy"].Int("level"));
+        await InUowAsync(async (uow, inv) => (await inv.CreditAsync(uow, Id(c), 1000, "test", Guid.NewGuid().ToString(), CancellationToken.None)).Value);
+        await GiveAsync(c, "fire_crystal", 2);
+        await GiveAsync(c, "iron_ore", 30);
+        await Problem(await Craft(p, c, "forge_fire_ring", 1), HttpStatusCode.Conflict, "profession_level_too_low");
+
+        await Ok(await Craft(p, c, "refine_stone", 5));                            // 5 × 3 XP = 15 = level 2
+        profs = (await Ok(await p.GetAsync(url)))["items"]!.AsArray().Select(x => x!.AsObject()).ToDictionary(x => x.Str("id"));
+        Assert.Equal(2, profs["smithing"].Int("level"));
+        Assert.Equal(15, profs["smithing"].Int("xp"));
+        Assert.Equal(20, profs["smithing"].Int("stoneDiscountPermille"));
+        Assert.Equal(1, profs["alchemy"].Int("level"));
+
+        var ring = await Ok(await Craft(p, c, "forge_fire_ring", 1));
+        Assert.Equal(117, ring.Int("stonesSpent"));                                 // 120 − 2 %
+    }
 }

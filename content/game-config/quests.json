@@ -14,19 +14,19 @@
     {"id": "d_boss_1", "namePl": "Łowca bestii", "descriptionPl": "Pokonaj bossa w świecie.", "metric": "bosses_won", "target": 1, "stones": 120}
   ],
   "achievements": [
-    {"id": "a_win_10", "namePl": "Pierwsza krew", "descriptionPl": "Wygraj 10 pojedynków.", "metric": "battles_won", "target": 10, "stones": 100, "titlePl": "Wojownik"},
-    {"id": "a_win_100", "namePl": "Sto zwycięstw", "descriptionPl": "Wygraj 100 pojedynków.", "metric": "battles_won", "target": 100, "stones": 600, "titlePl": "Mistrz Miecza"},
-    {"id": "a_pvp_10", "namePl": "Postrach Jianghu", "descriptionPl": "Wygraj 10 pojedynków z kultywatorami.", "metric": "pvp_won", "target": 10, "stones": 500, "titlePl": "Postrach Jianghu"},
-    {"id": "a_boss_1", "namePl": "Pogromca", "descriptionPl": "Pokonaj pierwszego bossa.", "metric": "bosses_won", "target": 1, "stones": 200, "titlePl": "Pogromca Bestii"},
-    {"id": "a_boss_10", "namePl": "Łowca legend", "descriptionPl": "Pokonaj 10 bossów.", "metric": "bosses_won", "target": 10, "stones": 1000, "titlePl": "Łowca Legend"},
-    {"id": "a_meditate_600", "namePl": "Dziesięć godzin ciszy", "descriptionPl": "Medytuj łącznie 600 minut.", "metric": "meditation_minutes", "target": 600, "stones": 300, "titlePl": "Pustelnik"},
-    {"id": "a_break_5", "namePl": "Przez bramy", "descriptionPl": "Dokonaj 5 przełomów.", "metric": "breakthroughs", "target": 5, "stones": 250, "titlePl": "Przebudzony"},
-    {"id": "a_break_20", "namePl": "Niebiańska ścieżka", "descriptionPl": "Dokonaj 20 przełomów.", "metric": "breakthroughs", "target": 20, "stones": 1200, "titlePl": "Nieśmiertelny Adept"},
-    {"id": "a_gather_200", "namePl": "Zielarz", "descriptionPl": "Zbierz 200 materiałów.", "metric": "items_gathered", "target": 200, "stones": 300, "titlePl": "Zielarz"},
-    {"id": "a_craft_25", "namePl": "Mistrz kuźni", "descriptionPl": "Udanie wytwórz 25 przedmiotów.", "metric": "crafts", "target": 25, "stones": 400, "titlePl": "Mistrz Kuźni"},
-    {"id": "a_sell_10", "namePl": "Kupiec", "descriptionPl": "Sprzedaj 10 ofert na targu.", "metric": "market_sales", "target": 10, "stones": 200, "titlePl": "Kupiec"},
-    {"id": "a_checkin_7", "namePl": "Wytrwałość", "descriptionPl": "Zamelduj się 7 dni.", "metric": "checkins", "target": 7, "stones": 150, "titlePl": "Wytrwały"},
-    {"id": "a_checkin_30", "namePl": "Miesiąc drogi", "descriptionPl": "Zamelduj się 30 dni.", "metric": "checkins", "target": 30, "stones": 800, "titlePl": "Strażnik Drogi"}
+    {"id": "a_win_10", "namePl": "Pierwsza krew", "descriptionPl": "Wygraj 10 pojedynków.", "metric": "battles_won", "target": 10, "stones": 100, "titlePl": "Wojownik", "bonus": {"strength": 2}},
+    {"id": "a_win_100", "namePl": "Sto zwycięstw", "descriptionPl": "Wygraj 100 pojedynków.", "metric": "battles_won", "target": 100, "stones": 600, "titlePl": "Mistrz Miecza", "bonus": {"strength": 3, "agility": 3}},
+    {"id": "a_pvp_10", "namePl": "Postrach Jianghu", "descriptionPl": "Wygraj 10 pojedynków z kultywatorami.", "metric": "pvp_won", "target": 10, "stones": 500, "titlePl": "Postrach Jianghu", "bonus": {"agility": 3, "willpower": 2}},
+    {"id": "a_boss_1", "namePl": "Pogromca", "descriptionPl": "Pokonaj pierwszego bossa.", "metric": "bosses_won", "target": 1, "stones": 200, "titlePl": "Pogromca Bestii", "bonus": {"constitution": 3}},
+    {"id": "a_boss_10", "namePl": "Łowca legend", "descriptionPl": "Pokonaj 10 bossów.", "metric": "bosses_won", "target": 10, "stones": 1000, "titlePl": "Łowca Legend", "bonus": {"constitution": 4, "strength": 4}},
+    {"id": "a_meditate_600", "namePl": "Dziesięć godzin ciszy", "descriptionPl": "Medytuj łącznie 600 minut.", "metric": "meditation_minutes", "target": 600, "stones": 300, "titlePl": "Pustelnik", "bonus": {"spirit": 3}},
+    {"id": "a_break_5", "namePl": "Przez bramy", "descriptionPl": "Dokonaj 5 przełomów.", "metric": "breakthroughs", "target": 5, "stones": 250, "titlePl": "Przebudzony", "bonus": {"insight": 2, "spirit": 2}},
+    {"id": "a_break_20", "namePl": "Niebiańska ścieżka", "descriptionPl": "Dokonaj 20 przełomów.", "metric": "breakthroughs", "target": 20, "stones": 1200, "titlePl": "Nieśmiertelny Adept", "bonus": {"spirit": 4, "insight": 4, "willpower": 3}},
+    {"id": "a_gather_200", "namePl": "Zielarz", "descriptionPl": "Zbierz 200 materiałów.", "metric": "items_gathered", "target": 200, "stones": 300, "titlePl": "Zielarz", "bonus": {"insight": 2}},
+    {"id": "a_craft_25", "namePl": "Mistrz kuźni", "descriptionPl": "Udanie wytwórz 25 przedmiotów.", "metric": "crafts", "target": 25, "stones": 400, "titlePl": "Mistrz Kuźni", "bonus": {"strength": 2, "focus": 2}},
+    {"id": "a_sell_10", "namePl": "Kupiec", "descriptionPl": "Sprzedaj 10 ofert na targu.", "metric": "market_sales", "target": 10, "stones": 200, "titlePl": "Kupiec", "bonus": {"fate": 3}},
+    {"id": "a_checkin_7", "namePl": "Wytrwałość", "descriptionPl": "Zamelduj się 7 dni.", "metric": "checkins", "target": 7, "stones": 150, "titlePl": "Wytrwały", "bonus": {"willpower": 2}},
+    {"id": "a_checkin_30", "namePl": "Miesiąc drogi", "descriptionPl": "Zamelduj się 30 dni.", "metric": "checkins", "target": 30, "stones": 800, "titlePl": "Strażnik Drogi", "bonus": {"fate": 3, "willpower": 3}}
   ],
   "checkin": {"baseStones": 20, "perDayStones": 10, "maxBonusDays": 7}
 }

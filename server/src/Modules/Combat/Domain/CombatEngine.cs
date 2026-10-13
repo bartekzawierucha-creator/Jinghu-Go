@@ -9,7 +9,8 @@ namespace JianghuGo.Modules.Combat.Domain;
 public sealed record EquippedTechnique(string Id, int Level, TechniqueDefinition? Definition = null);
 
 /// <summary>Immutable snapshot of a fighter's build, frozen when the battle starts (later loadout changes do not leak in).</summary>
-public sealed record Combatant(string Name, IReadOnlyDictionary<string, int> Stats, IReadOnlyList<EquippedTechnique?> Slots, int? HpOverride, int HpBonusPermille = 0)
+public sealed record Combatant(string Name, IReadOnlyDictionary<string, int> Stats, IReadOnlyList<EquippedTechnique?> Slots, int? HpOverride, int HpBonusPermille = 0,
+    PathPerks? Perks = null)
 {
     public int Stat(string id) => Stats.GetValueOrDefault(id);
 }
@@ -34,7 +35,7 @@ public sealed record BattleState(int Turn, int Distance, Fighter A, Fighter B, s
     public Fighter Of(char side) => side == 'a' ? A : B;
 }
 
-/// <summary>What a player wants to do. Slot null = rest (recover Qi). Direction only for the movement slot.</summary>
+/// <summary>What a player wants to do. Slot null = rest (recover Qi). Direction is obsolete (there is no distance any more) and ignored.</summary>
 public sealed record Intent(int? Slot, string? Direction)
 {
     public static readonly Intent Rest = new(null, null);
@@ -60,7 +61,8 @@ public sealed record TurnEvent(
     int HpA,
     int HpB,
     int QiA,
-    int QiB);
+    int QiB,
+    int Healed = 0);
 
 /// <summary>
 /// The whole combat ruleset as a pure function: (config, combatants, state, intents, rng) → (state', events).
@@ -79,31 +81,22 @@ public static class CombatEngine
         var hp = x.HpOverride ?? c.Vitals.BaseHp + (x.Stat("constitution") * c.Vitals.HpPerConstitution);
         hp = hp * (1000 + x.HpBonusPermille) / 1000;
         var qi = c.Vitals.BaseQi + (x.Stat("spirit") * c.Vitals.QiPerSpirit);
+        qi = qi * (1000 + (x.Perks?.QiPermille ?? 0)) / 1000;
         return new Fighter(hp, hp, qi, qi, [0, 0, 0, 0, 0, 0, 0, 0], []);
     }
 
-    /// <summary>Null when the intent is legal right now; otherwise a stable error code.</summary>
+    /// <summary>
+    /// Null when the intent is legal right now; otherwise a stable error code. There is no distance: every attack reaches.
+    /// (The distance parameter is kept for call-site compatibility and ignored.)
+    /// </summary>
     public static string? Validate(CombatConfig c, Combatant who, Fighter f, int distance, Intent intent)
     {
-        if (intent.Slot is not { } slot)
-        {
-            return intent.Direction is null ? null : "direction_only_for_movement";
-        }
-
+        if (intent.Slot is not { } slot) return null;
         if (slot is < 0 or > 7) return "slot_invalid";
         if (who.Slots.ElementAtOrDefault(slot) is not { } equipped) return "slot_empty";
         var t = c.Technique(equipped);
         if (f.Cooldowns[slot] > 0) return "on_cooldown";
         if (f.Qi < t.QiCost) return "insufficient_qi";
-        if (t.Movement is null && intent.Direction is not null) return "direction_only_for_movement";
-        if (t.Movement is not null)
-        {
-            if (intent.Direction is not (Directions.Advance or Directions.Retreat)) return "direction_required";
-            if (intent.Direction == Directions.Advance && distance <= c.Distance.Min) return "cannot_advance";
-            if (intent.Direction == Directions.Retreat && distance >= c.Distance.Max) return "cannot_retreat";
-        }
-
-        if (t.Attack is { } a && (distance < a.RangeMin || distance > a.RangeMax)) return "out_of_range";
         return null;
     }
 
@@ -129,8 +122,8 @@ public static class CombatEngine
         var b = new W(s.B);
         var distance = s.Distance;
         var events = new List<TurnEvent>();
-        void Log(char actor, string action, string? tech = null, bool? hit = null, int dmg = 0, int reflected = 0, int stolen = 0, string? fx = null) =>
-            events.Add(new TurnEvent(actor.ToString(), action, tech, hit, dmg, reflected, stolen, fx, distance, Math.Max(0, a.Hp), Math.Max(0, b.Hp), a.Qi, b.Qi));
+        void Log(char actor, string action, string? tech = null, bool? hit = null, int dmg = 0, int reflected = 0, int stolen = 0, string? fx = null, int healed = 0) =>
+            events.Add(new TurnEvent(actor.ToString(), action, tech, hit, dmg, reflected, stolen, fx, distance, Math.Max(0, a.Hp), Math.Max(0, b.Hp), a.Qi, b.Qi, healed));
 
         // 1. Effective intents: stun consumes the action; anything no longer legal degrades to rest (defence in depth).
         (Intent? Intent, bool Stunned) Effective(Combatant who, Fighter f, W w, Intent intent)
@@ -149,7 +142,7 @@ public static class CombatEngine
 
         // 2. Timeline order: stances/movement/rest before attacks; within a phase by initiative.
         int Priority(Combatant who, Intent? intent) =>
-            intent?.Slot is { } slot && c.Technique(who.Slots[slot]!).Attack is not null ? 1 : 0;
+            intent?.Slot is { } slot && c.Technique(who.Slots[slot]!) is var t && (t.Attack is not null || t.Special is { Power: > 0 }) ? 1 : 0;
         int Speed(Combatant who, Intent? intent) => intent?.Slot is { } slot ? c.Technique(who.Slots[slot]!).Speed : 0;
 
         var initA = ca.Stat("agility") + Speed(ca, effA) + rng.NextInt(0, c.InitiativeRandom);
@@ -184,69 +177,90 @@ public static class CombatEngine
 
             if (t.Defense is { } d)
             {
-                me.Effects.Add(new Effect(EffectTypes.Guard, d.BlockPermille, 0, 1));
+                me.Effects.Add(new Effect(EffectTypes.Guard, Math.Min(900, d.BlockPermille + (who.Perks?.GuardPermille ?? 0)), 0, 1));
                 Log(side, "defend", t.Id);
             }
             else if (t.Movement is { } m)
             {
-                distance = Math.Clamp(distance + (intent.Direction == Directions.Advance ? -1 : 1), c.Distance.Min, c.Distance.Max);
+                // legacy movement technique = special skill granting evasion only
                 me.Effects.Add(new Effect(EffectTypes.Evasion, m.EvasionPermille, 0, 1));
-                Log(side, intent.Direction!, t.Id);
+                Log(side, "special", t.Id);
             }
             else if (t.Counter is { } k)
             {
                 me.Effects.Add(new Effect(EffectTypes.Counter, k.ReflectPermille, k.QiSteal, 1));
                 Log(side, "counter_stance", t.Id);
             }
+            else if (t.Special is { } sp)
+            {
+                if (sp.EvasionPermille > 0) me.Effects.Add(new Effect(EffectTypes.Evasion, sp.EvasionPermille, 0, 1));
+                if (sp.GuardPermille > 0) me.Effects.Add(new Effect(EffectTypes.Guard, Math.Min(900, sp.GuardPermille + (who.Perks?.GuardPermille ?? 0)), 0, 1));
+                var healed = 0;
+                if (sp.HealPermille > 0)
+                {
+                    var heal = me.MaxHp * (sp.HealPermille + (who.Perks?.HealPermille ?? 0)) / 1000;
+                    healed = Math.Max(0, Math.Min(me.MaxHp, me.Hp + heal) - me.Hp);
+                    me.Hp += healed;
+                }
+
+                if (sp.Power > 0)
+                {
+                    var (hit, damage, reflected, stolen, applied) = Strike(me, foe, who, foeWho, eq, sp.Power, sp.Scaling!, sp.AccuracyPermille, sp.Effect);
+                    Log(side, "special", t.Id, hit: hit, dmg: damage, reflected: reflected, stolen: stolen, fx: applied, healed: healed);
+                }
+                else
+                {
+                    Log(side, "special", t.Id, healed: healed);
+                }
+            }
             else if (t.Attack is { } atk)
             {
-                if (distance < atk.RangeMin || distance > atk.RangeMax)
-                {
-                    Log(side, "out_of_range", t.Id, hit: false);
-                    continue;
-                }
+                var (hit, damage, reflected, stolen, applied) = Strike(me, foe, who, foeWho, eq, atk.Power, atk.Scaling, atk.AccuracyPermille, atk.Effect);
+                Log(side, "attack", t.Id, hit: hit, dmg: damage, reflected: reflected, stolen: stolen, fx: applied);
+            }
+        }
 
-                var chance = c.HitChance.BasePermille
-                             + ((who.Stat("agility") - foeWho.Stat("agility")) * c.HitChance.AgilityDiffPermille)
-                             + atk.AccuracyPermille - foe.Sum(EffectTypes.Evasion);
-                chance = Math.Clamp(chance, c.HitChance.MinPermille, c.HitChance.MaxPermille);
-                var hit = rng.NextInt(0, 1000) < chance;
-                var variance = rng.NextInt(-c.Damage.VariancePermille, c.Damage.VariancePermille + 1);
-                if (!hit)
-                {
-                    Log(side, "attack", t.Id, hit: false);
-                    continue;
-                }
+        // A strike (attack or special): hit roll, damage, counter-reflection, effect. Same RNG order as before 1.3.
+        (bool Hit, int Damage, int Reflected, int Stolen, string? Applied) Strike(W me, W foe, Combatant who, Combatant foeWho, EquippedTechnique eq,
+            int power, string scaling, int accuracy, EffectSpec? effect)
+        {
+            var chance = c.HitChance.BasePermille
+                         + ((who.Stat("agility") - foeWho.Stat("agility")) * c.HitChance.AgilityDiffPermille)
+                         + accuracy - foe.Sum(EffectTypes.Evasion);
+            chance = Math.Clamp(chance, c.HitChance.MinPermille, c.HitChance.MaxPermille);
+            var hit = rng.NextInt(0, 1000) < chance;
+            var variance = rng.NextInt(-c.Damage.VariancePermille, c.Damage.VariancePermille + 1);
+            if (!hit) return (false, 0, 0, 0, null);
 
-                long dmg = atk.Power;
-                dmg = dmg * (1000 + ((eq.Level - 1) * c.Damage.LevelScalingPermille)) / 1000;
-                dmg = dmg * (1000 + (who.Stat(atk.Scaling) * c.Damage.StatScalingPermille)) / 1000;
-                dmg = dmg * (1000 - me.Sum(EffectTypes.Weaken)) / 1000;
-                dmg = dmg * (1000 + variance) / 1000;
-                dmg = dmg * (1000 - foe.Sum(EffectTypes.Guard)) / 1000;
-                var damage = (int)Math.Max(1, dmg);
-                foe.Hp -= damage;
+            long dmg = power;
+            dmg = dmg * (1000 + ((eq.Level - 1) * c.Damage.LevelScalingPermille)) / 1000;
+            dmg = dmg * (1000 + (who.Stat(scaling) * c.Damage.StatScalingPermille)) / 1000;
+            dmg = dmg * (1000 + (who.Perks?.DamageBonus(scaling) ?? 0)) / 1000;
+            dmg = dmg * (1000 - me.Sum(EffectTypes.Weaken)) / 1000;
+            dmg = dmg * (1000 + variance) / 1000;
+            dmg = dmg * (1000 - foe.Sum(EffectTypes.Guard)) / 1000;
+            var damage = (int)Math.Max(1, dmg);
+            foe.Hp -= damage;
 
-                int reflected = 0, stolen = 0;
-                if (foe.Effects.FirstOrDefault(e => e.Type == EffectTypes.Counter) is { } counter)
-                {
-                    reflected = damage * counter.Magnitude / 1000;
-                    me.Hp -= reflected;
-                    stolen = Math.Min(counter.Extra, me.Qi);
-                    me.Qi -= stolen;
-                    foe.Qi = Math.Min(foe.MaxQi, foe.Qi + stolen);
-                }
-
-                string? applied = null;
-                if (atk.Effect is { } fx && foe.Hp > 0 && rng.NextInt(0, 1000) < fx.ChancePermille)
-                {
-                    foe.Effects.Add(new Effect(fx.Type, fx.Magnitude, 0, fx.Duration));
-                    applied = fx.Type;
-                }
-
-                Log(side, "attack", t.Id, hit: true, dmg: damage, reflected: reflected, stolen: stolen, fx: applied);
+            int reflected = 0, stolen = 0;
+            if (foe.Effects.FirstOrDefault(e => e.Type == EffectTypes.Counter) is { } counter)
+            {
+                reflected = damage * counter.Magnitude / 1000;
+                me.Hp -= reflected;
+                stolen = Math.Min(counter.Extra, me.Qi);
+                me.Qi -= stolen;
+                foe.Qi = Math.Min(foe.MaxQi, foe.Qi + stolen);
             }
 
+            string? applied = null;
+            if (effect is { } fx && foe.Hp > 0 && rng.NextInt(0, 1000) < Math.Min(1000, fx.ChancePermille + (who.Perks?.EffectChancePermille ?? 0)))
+            {
+                var magnitude = fx.Type == EffectTypes.Bleed ? fx.Magnitude * (1000 + (who.Perks?.BleedPermille ?? 0)) / 1000 : fx.Magnitude;
+                foe.Effects.Add(new Effect(fx.Type, magnitude, 0, fx.Duration));
+                applied = fx.Type;
+            }
+
+            return (true, damage, reflected, stolen, applied);
         }
 
         // 4. End of turn: bleeding, effect expiry, cooldowns, Qi regeneration.
@@ -278,7 +292,7 @@ public static class CombatEngine
             }
 
             for (var i = 0; i < 8; i++) w.Cd[i] = Math.Max(0, w.Cd[i] - 1);
-            if (w.Hp > 0) w.Qi = Math.Min(w.MaxQi, w.Qi + c.Vitals.QiRegenPerTurn);
+            if (w.Hp > 0) w.Qi = Math.Min(w.MaxQi, w.Qi + c.Vitals.QiRegenPerTurn + ((ReferenceEquals(w, a) ? ca : cb).Perks?.QiRegen ?? 0));
         }
 
         // 5. Outcome.
@@ -303,38 +317,22 @@ public static class CombatEngine
 /// <summary>Server-side opponent for PvE. Deterministic for a given RNG, so NPC choices replay exactly too.</summary>
 public static class CombatAi
 {
+    /// <summary>Weighted random choice among legal actions: attacks first, the special skill when it pays off, guards now and then.</summary>
     public static Intent Choose(CombatConfig c, Combatant self, Fighter me, int distance, DeterministicRandom rng)
     {
         if (me.IsStunned) return Intent.Rest;
         var options = new List<(Intent Intent, int Weight)> { (Intent.Rest, me.Qi < 10 ? 4 : 1) };
-        var attackInRange = false;
         for (var slot = 0; slot < 8; slot++)
         {
             if (self.Slots[slot] is not { } eq) continue;
-            var t = c.Technique(eq);
-            if (t.Movement is not null)
-            {
-                foreach (var dir in new[] { Directions.Advance, Directions.Retreat })
-                {
-                    var intent = new Intent(slot, dir);
-                    if (CombatEngine.Validate(c, self, me, distance, intent) is null) options.Add((intent, -1)); // weight fixed below
-                }
-
-                continue;
-            }
-
             var candidate = new Intent(slot, null);
             if (CombatEngine.Validate(c, self, me, distance, candidate) is not null) continue;
-            if (t.Attack is not null) attackInRange = true;
-            options.Add((candidate, t.Attack is not null ? 6 : 2));
-        }
-
-        // Without an attack in range, close the distance (or open it, for ranged-only fighters).
-        for (var i = 0; i < options.Count; i++)
-        {
-            if (options[i].Weight != -1) continue;
-            var advance = options[i].Intent.Direction == Directions.Advance;
-            options[i] = (options[i].Intent, attackInRange ? 1 : advance ? 6 : 2);
+            var t = c.Technique(eq);
+            var weight = t.Attack is not null ? 6
+                : t.Special is { } sp ? (sp.HealPermille > 0 && me.Hp * 2 < me.MaxHp ? 9 : sp.Power > 0 ? 7 : 3)
+                : t.Movement is not null ? 2
+                : 2;
+            options.Add((candidate, weight));
         }
 
         var total = options.Sum(o => o.Weight);

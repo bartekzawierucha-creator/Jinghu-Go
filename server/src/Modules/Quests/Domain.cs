@@ -2,7 +2,9 @@ using JianghuGo.Domain;
 
 namespace JianghuGo.Modules.Quests.Domain;
 
-public sealed record QuestDefinition(string Id, string NamePl, string DescriptionPl, string Metric, long Target, long Stones, string? TitlePl = null);
+/// <param name="Bonus">Permanent stat bonus of the title (counts in every battle once the achievement is claimed).</param>
+public sealed record QuestDefinition(string Id, string NamePl, string DescriptionPl, string Metric, long Target, long Stones, string? TitlePl = null,
+    IReadOnlyDictionary<string, int>? Bonus = null);
 
 public sealed record CheckinConfig(long BaseStones, long PerDayStones, int MaxBonusDays);
 
@@ -86,6 +88,8 @@ public static class QuestRules
 
 public static class QuestsConfigValidator
 {
+    public static readonly string[] Stats = ["strength", "spirit", "agility", "constitution", "insight", "willpower", "focus", "elementalAffinity", "fate"];
+
     public static List<string> Validate(QuestsConfig? c)
     {
         var e = new List<string>();
@@ -110,6 +114,8 @@ public static class QuestsConfigValidator
             if (!Metrics.All.Contains(q.Metric)) e.Add($"quest {q.Id}: unknown metric '{q.Metric}'.");
             if (q.Target < 1 || q.Stones < 0 || q.Stones > 100_000) e.Add($"quest {q.Id}: target must be >= 1 and stones 0-100000.");
             if (string.IsNullOrWhiteSpace(q.NamePl) || string.IsNullOrWhiteSpace(q.DescriptionPl)) e.Add($"quest {q.Id}: name and description are required.");
+            if (q.Bonus is { } b && (q.TitlePl is null || b.Count == 0 || b.Any(kv => !Stats.Contains(kv.Key) || kv.Value is < 1 or > 20)))
+                e.Add($"quest {q.Id}: a bonus needs a title and 1-20 points of known stats.");
         }
 
         if (c.Checkin.BaseStones < 0 || c.Checkin.PerDayStones < 0 || c.Checkin.MaxBonusDays < 1) e.Add("checkin values invalid.");

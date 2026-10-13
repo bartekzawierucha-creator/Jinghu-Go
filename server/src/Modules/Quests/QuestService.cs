@@ -6,11 +6,13 @@ using JianghuGo.Modules.Quests.Domain;
 
 namespace JianghuGo.Modules.Quests.Application;
 
-public sealed record QuestView(string Id, string NamePl, string DescriptionPl, string Metric, long Target, long Progress, long Stones, bool Completed, bool Claimed, string? TitlePl);
+public sealed record QuestView(string Id, string NamePl, string DescriptionPl, string Metric, long Target, long Progress, long Stones, bool Completed, bool Claimed, string? TitlePl,
+    IReadOnlyDictionary<string, int>? Bonus = null);
 
 public sealed record CheckinView(int Streak, int BestStreak, bool CheckedInToday, long NextReward);
 
-public sealed record QuestBoard(string Day, IReadOnlyList<QuestView> Daily, IReadOnlyList<QuestView> Achievements, CheckinView Checkin, IReadOnlyList<string> Titles);
+public sealed record QuestBoard(string Day, IReadOnlyList<QuestView> Daily, IReadOnlyList<QuestView> Achievements, CheckinView Checkin, IReadOnlyList<string> Titles,
+    IReadOnlyDictionary<string, int>? TitleBonuses = null);
 
 public sealed record ClaimResult(string QuestId, long Stones, long Balance, QuestBoard Board);
 
@@ -117,7 +119,7 @@ public sealed class QuestService(
         {
             var progress = rows.GetValueOrDefault("m_" + q.Metric)?.Progress ?? 0;
             var claimed = rows.ContainsKey("q_" + q.Id);
-            return new QuestView(q.Id, q.NamePl, q.DescriptionPl, q.Metric, q.Target, Math.Min(progress, q.Target), q.Stones, progress >= q.Target, claimed, q.TitlePl);
+            return new QuestView(q.Id, q.NamePl, q.DescriptionPl, q.Metric, q.Target, Math.Min(progress, q.Target), q.Stones, progress >= q.Target, claimed, q.TitlePl, q.Bonus);
         }
 
         var daily = QuestRules.DailyFor(config, id.Value, today).Select(q => View(q, todayRows)).ToList();
@@ -126,9 +128,10 @@ public sealed class QuestService(
         var checkedToday = checkin?.LastDay == today;
         var nextStreak = checkedToday ? checkin!.Streak + 1 : QuestRules.NextStreak(checkin, today).Streak;
         var titles = achievements.Where(a => a.Claimed && a.TitlePl is not null).Select(a => a.TitlePl!).ToList();
+        var titleBonuses = TitleBonuses.Sum(config, lifeRows.Keys);
         return new QuestBoard(day, daily, achievements,
             new CheckinView(checkedToday ? checkin!.Streak : checkin is not null && checkin.LastDay == today.AddDays(-1) ? checkin.Streak : 0, checkin?.BestStreak ?? 0, checkedToday,
-                QuestRules.CheckinStones(config, nextStreak)), titles);
+                QuestRules.CheckinStones(config, nextStreak)), titles, titleBonuses);
     }
 
     private Task AuditAsync(IUnitOfWork uow, AccountId accountId, string action, Guid characterId, string json, DateTimeOffset now, CancellationToken ct) =>
@@ -153,4 +156,23 @@ internal static class QuestCounter
             await repo.AddProgressAsync(uow, c.Id, QuestRules.Life, "m_" + metric, amount, ct);
         }
     }
+}
+
+/// <summary>Stat bonuses of claimed titles, summed. Combat adds them to the battle snapshot.</summary>
+internal static class TitleBonuses
+{
+    public static IReadOnlyDictionary<string, int> Sum(QuestsConfig config, IEnumerable<string> lifeKeys)
+    {
+        var claimed = lifeKeys.Where(k => k.StartsWith("q_", StringComparison.Ordinal)).Select(k => k[2..]).ToHashSet();
+        var sum = new Dictionary<string, int>();
+        foreach (var a in config.Achievements.Where(a => a.Bonus is not null && claimed.Contains(a.Id)))
+            foreach (var (stat, v) in a.Bonus!) sum[stat] = sum.GetValueOrDefault(stat) + v;
+        return sum;
+    }
+}
+
+internal sealed class TitleCombatBonuses(IQuestRepository repo, QuestsConfig config) : JianghuGo.Modules.Combat.Contracts.ICombatStatBonuses
+{
+    public async Task<IReadOnlyDictionary<string, int>> BonusesAsync(IUnitOfWork uow, Guid characterId, CancellationToken ct) =>
+        TitleBonuses.Sum(config, (await repo.ListAsync(uow, new CharacterId(characterId), QuestRules.Life, ct)).Select(r => r.Key));
 }

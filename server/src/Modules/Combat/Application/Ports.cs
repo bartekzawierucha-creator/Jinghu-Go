@@ -32,6 +32,13 @@ public interface ICombatRepository
     Task AddTurnAsync(IUnitOfWork uow, TurnRecord turn, CancellationToken ct);
     Task<IReadOnlyList<TurnRecord>> ListTurnsAsync(IUnitOfWork uow, Guid battleId, CancellationToken ct);
 
+    // ---- idle hunts
+    Task<IdleHunt?> FindHuntAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct);
+
+    /// <summary>Insert when <paramref name="expectedVersion"/> is 0, otherwise update only at that version.</summary>
+    Task<bool> TrySaveHuntAsync(IUnitOfWork uow, IdleHunt hunt, int expectedVersion, CancellationToken ct);
+    Task DeleteHuntAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct);
+
     // ---- spirit pets
     Task<SpiritPet?> FindPetAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct);
     Task SavePetAsync(IUnitOfWork uow, SpiritPet pet, CancellationToken ct);

@@ -210,9 +210,8 @@ public class CombatTests : IAsyncLifetime
     public async Task Illegal_actions_report_engine_codes()
     {
         var (p, c) = await FighterAsync("qi");
-        var battle = await Ok(await StartPve(p, c), HttpStatusCode.Created);   // distance 2
-        Assert.Equal("out_of_range", (await ApiHost.Json(await Act(p, battle, 0))).Str("code"));        // palm strike is melee
-        Assert.Equal("direction_required", (await ApiHost.Json(await Act(p, battle, 6))).Str("code"));
+        var battle = await Ok(await StartPve(p, c), HttpStatusCode.Created);
+        Assert.Equal("special", battle["mySlots"]![6].Str("kind"));                                     // the old movement slot
         Assert.Equal("slot_invalid", (await ApiHost.Json(await Act(p, battle, 9))).Str("code"));
         var used = await Ok(await Act(p, battle, 2));                                                    // qi blast, cooldown 2
         Assert.Equal("on_cooldown", used["mySlots"]![2].Str("unavailable"));

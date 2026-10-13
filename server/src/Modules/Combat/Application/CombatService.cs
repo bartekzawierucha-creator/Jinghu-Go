@@ -55,6 +55,12 @@ public sealed record ChallengeCommand(Guid CharacterId, Guid OpponentCharacterId
 
 public sealed record ActionCommand(int Turn, int? Slot, string? Direction);
 
+public sealed record StartHuntCommand(string? NpcId);
+
+/// <summary>An idle hunt as the player sees it: who, how long, what it has brought so far.</summary>
+public sealed record HuntView(string NpcId, string NpcNamePl, int Tier, DateTimeOffset StartedAt, DateTimeOffset EndsAt, DateTimeOffset? NextBattleAt,
+    bool Finished, int Battles, int Wins, int Losses, long Qi, int MinutesPerBattle, int MaxHours);
+
 public sealed record TurnView(int Turn, Intent IntentA, Intent IntentB, bool ForcedA, bool ForcedB, IReadOnlyList<TurnEvent> Events, BattleState StateAfter, DateTimeOffset ResolvedAt);
 
 public sealed class CombatService(
@@ -129,7 +135,7 @@ public sealed class CombatService(
         {
             var m = mastery.GetValueOrDefault(t.Id);
             var level = m?.Level ?? 1;
-            return new KnownTechniqueView(t.Id, t.NamePl, t.Slot, level, m?.Xp ?? 0,
+            return new KnownTechniqueView(t.Id, t.NamePl, t.Kind, level, m?.Xp ?? 0,
                 level >= config.Progression.MaxTechniqueLevel ? 0 : level * config.Progression.XpPerLevel);
         }).ToList();
         return new LoadoutView(c.Id.Value, version, slotViews, known);
@@ -154,7 +160,7 @@ public sealed class CombatService(
 
         var stats = c.Stats.ToDictionary(s => s.Key, s => s.Value + bonuses.GetValueOrDefault(s.Key));
         return new Combatant(c.Name, stats, [.. slots.Select(id => id is null ? null : new EquippedTechnique(id, mastery.GetValueOrDefault(id, 1), dao.GetValueOrDefault(id)))],
-            null, config.PathHpBonusPermille[c.Path]);
+            null, config.PathHpBonusPermille[c.Path], config.Perks(c.Path));
     }
 
     private static Combatant NpcCombatant(NpcDefinition n) =>
@@ -572,11 +578,7 @@ public sealed class CombatService(
             : me.Slots.Select((eq, i) =>
             {
                 var t = eq is null ? null : config.Technique(eq);
-                var probe = eq is null ? null : t!.Movement is not null
-                    ? (CombatEngine.Validate(config, me, state.Of(side), state.Distance, new Intent(i, Directions.Advance)) is null
-                       || CombatEngine.Validate(config, me, state.Of(side), state.Distance, new Intent(i, Directions.Retreat)) is null
-                        ? null : CombatEngine.Validate(config, me, state.Of(side), state.Distance, new Intent(i, Directions.Advance)))
-                    : CombatEngine.Validate(config, me, state.Of(side), state.Distance, new Intent(i, null));
+                var probe = eq is null ? null : CombatEngine.Validate(config, me, state.Of(side), state.Distance, new Intent(i, null));
                 return new SlotView(i, SlotKinds.Layout[i], eq?.Id, t?.NamePl, eq?.Level ?? 0, t?.QiCost ?? 0, state.Of(side).Cooldowns[i], eq is null ? "slot_empty" : probe);
             }).ToList();
 
@@ -591,6 +593,133 @@ public sealed class CombatService(
             side == 'a' ? b.CharacterB?.Value : b.CharacterA.Value,
             b.SeedHash, finished ? b.Seed.ToString(CultureInfo.InvariantCulture) : null, b.RewardQi,
             finished && side == 'a' && b.Kind == BattleKinds.Pve && await repo.FindPetAsync(uow, b.CharacterA, ct) is { } tamed && tamed.TamedInBattle == b.Id ? tamed.NpcId : null);
+    }
+
+    // ---------------------------------------------------------------- automatic play
+
+    /// <summary>Plays this turn for the player with the same AI that drives NPCs (auto-battle). The server picks; the client only asks.</summary>
+    public async Task<Result<BattleView>> AutoActAsync(AccountId accountId, Guid battleId, string? key, CancellationToken ct)
+    {
+        var picked = await uowFactory.RunAsync<Result<ActionCommand>>(async uow =>
+        {
+            var battle = await LoadAndAdvanceAsync(uow, battleId, clock.GetUtcNow(), ct);
+            if (battle is null || battle.SideOf(accountId) is not { } side) return BattleNotFound;
+            if (battle.Status != BattleStatuses.Active) return Error.Conflict("battle_not_active", $"The battle is {battle.Status}.");
+            var state = battle.State!;
+            var me = side == 'a' ? battle.CombatantA! : battle.CombatantB!;
+            var intent = CombatAi.Choose(config, me, state.Of(side), state.Distance, new DeterministicRandom(seeds.NextSeed()));
+            await uow.CommitAsync(ct); // persists turns resolved by elapsed deadlines
+            return new ActionCommand(state.Turn, intent.Slot, intent.Direction);
+        }, ct);
+        return picked.IsSuccess ? await ActAsync(accountId, battleId, key, picked.Value, ct) : picked.Error!;
+    }
+
+    // ---------------------------------------------------------------- idle hunts
+
+    public const int MaxBattlesPerSettle = 60;
+
+    public Task<Result<HuntView>> StartHuntAsync(AccountId accountId, Guid characterId, StartHuntCommand cmd, CancellationToken ct) =>
+        uowFactory.RunAsync<Result<HuntView>>(async uow =>
+        {
+            var now = clock.GetUtcNow();
+            var c = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
+            if (c is null) return CharacterNotFound;
+            if (cmd.NpcId is null || config.Npc(cmd.NpcId) is not { } npc) return Error.Validation("npc_not_found", "Unknown opponent.");
+            if (npc.WorldOnly) return Error.Validation("npc_world_only", "This opponent can only be found in the world.");
+            if (await repo.FindHuntAsync(uow, c.Id, ct) is not null) return Error.Conflict("hunt_in_progress", "Collect the current hunt first.");
+            var hunt = new IdleHunt(c.Id, accountId, npc.Id, now, now, 0, 0, 0, 0, 1);
+            if (!await repo.TrySaveHuntAsync(uow, hunt, 0, ct)) return Error.Conflict("hunt_in_progress", "Collect the current hunt first.");
+            await AuditAsync(uow, accountId, "combat.hunt_started", Guid.Empty, new { characterId, npc = npc.Id }, now, ct);
+            await uow.CommitAsync(ct);
+            return HuntViewOf(hunt, now);
+        }, ct);
+
+    /// <summary>The hunt with every battle that is due by now already fought (null when there is no hunt).</summary>
+    public Task<Result<HuntView?>> GetHuntAsync(AccountId accountId, Guid characterId, CancellationToken ct) =>
+        uowFactory.RunAsync<Result<HuntView?>>(async uow =>
+        {
+            var now = clock.GetUtcNow();
+            var c = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
+            if (c is null) return CharacterNotFound;
+            if (await repo.FindHuntAsync(uow, c.Id, ct) is not { } hunt) return (HuntView?)null;
+            hunt = await SettleHuntAsync(uow, c, hunt, now, ct);
+            await uow.CommitAsync(ct);
+            return HuntViewOf(hunt, now);
+        }, ct);
+
+    /// <summary>Ends the hunt (fighting what is due first) and returns its final tally. Rewards were credited per battle.</summary>
+    public Task<Result<HuntView>> ClaimHuntAsync(AccountId accountId, Guid characterId, CancellationToken ct) =>
+        uowFactory.RunAsync<Result<HuntView>>(async uow =>
+        {
+            var now = clock.GetUtcNow();
+            var c = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
+            if (c is null) return CharacterNotFound;
+            if (await repo.FindHuntAsync(uow, c.Id, ct) is not { } hunt) return Error.NotFound("no_hunt", "There is no hunt to collect.");
+            hunt = await SettleHuntAsync(uow, c, hunt, now, ct);
+            await repo.DeleteHuntAsync(uow, c.Id, ct);
+            await AuditAsync(uow, accountId, "combat.hunt_collected", Guid.Empty,
+                new { characterId, npc = hunt.NpcId, hunt.Battles, hunt.Wins, hunt.Losses, hunt.Qi }, now, ct);
+            await uow.CommitAsync(ct);
+            return HuntViewOf(hunt, now) with { Finished = true, NextBattleAt = null };
+        }, ct);
+
+    /// <summary>
+    /// Fights every battle due since the last settlement (one per interval, until the hunt's time is up) as ordinary PvE
+    /// battles played by the AI on both sides, at the moment each one was due. Rewards, loot, pet, quest progress and the
+    /// daily rewarded-wins cap therefore work exactly as for battles played by hand.
+    /// </summary>
+    private async Task<IdleHunt> SettleHuntAsync(IUnitOfWork uow, CharacterSummary c, IdleHunt hunt, DateTimeOffset now, CancellationToken ct)
+    {
+        var rules = config.IdleRules;
+        var interval = TimeSpan.FromMinutes(rules.MinutesPerBattle);
+        var end = now < hunt.EndsAt(rules) ? now : hunt.EndsAt(rules);
+        if (hunt.SettledAt + interval > end || config.Npc(hunt.NpcId) is not { } npc) return hunt;
+
+        var a = await SnapshotAsync(uow, c, ct);
+        var b = NpcCombatant(npc);
+        var h = hunt;
+        for (var n = 0; n < MaxBattlesPerSettle && h.SettledAt + interval <= end; n++)
+        {
+            var at = h.SettledAt + interval;
+            // Stored as finished from the start: an idle battle is never "active", so it neither blocks nor is blocked by a
+            // battle the player is fighting by hand (one active battle per character).
+            var battle = NewBattle(BattleKinds.Pve, BattleStatuses.Finished, c, null, npc.Id, at) with
+            {
+                CombatantA = a,
+                CombatantB = b,
+                State = CombatEngine.Start(config, a, b),
+                Deadline = at.AddSeconds(config.TurnDeadlineSeconds),
+                FinishedAt = at,
+            };
+            await repo.AddBattleAsync(uow, battle, ct);
+            for (var guard = 0; battle.State!.Outcome is null && guard <= config.MaxTurns + 1; guard++)
+            {
+                var st = battle.State!;
+                var ia = CombatAi.Choose(config, a, st.A, st.Distance, CombatEngine.TurnRng(battle.Seed ^ 0xC3C3C3C3C3C3C3C3UL, st.Turn));
+                battle = await ResolveAsync(uow, battle, ia, null, false, false, at, ct) ?? throw new TransientConflictException("idle battle race");
+            }
+
+            var won = battle.State!.Outcome == Outcomes.AWon;
+            var lost = battle.State.Outcome == Outcomes.BWon;
+            h = h with
+            {
+                SettledAt = at, Battles = h.Battles + 1, Wins = h.Wins + (won ? 1 : 0), Losses = h.Losses + (lost ? 1 : 0), Qi = h.Qi + battle.RewardQi,
+            };
+        }
+
+        h = h with { Version = hunt.Version + 1 };
+        if (!await repo.TrySaveHuntAsync(uow, h, hunt.Version, ct)) throw new TransientConflictException("hunt changed while settling");
+        return h;
+    }
+
+    private HuntView HuntViewOf(IdleHunt h, DateTimeOffset now)
+    {
+        var rules = config.IdleRules;
+        var ends = h.EndsAt(rules);
+        var next = h.SettledAt.AddMinutes(rules.MinutesPerBattle);
+        var npc = config.Npc(h.NpcId);
+        return new HuntView(h.NpcId, npc?.NamePl ?? h.NpcId, npc?.Tier ?? 1, h.StartedAt, ends, next <= ends ? next : null, now >= ends || next > ends,
+            h.Battles, h.Wins, h.Losses, h.Qi, rules.MinutesPerBattle, rules.MaxHours);
     }
 
     // ---------------------------------------------------------------- spirit pet

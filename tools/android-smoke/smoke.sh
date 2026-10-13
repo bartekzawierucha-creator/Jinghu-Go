@@ -104,10 +104,11 @@ $UI shot shots/06b-battle.png
 $UI tap "Odpocznij" 20
 sleep 3
 $UI shot shots/06c-battle-turn.png
-$UI tap "Poddaj"
-$UI tap "Na pewno?" 20
-$UI wait "PORAŻKA" 30
-$UI tap "Dalej" 20
+$UI tap "Auto" 20
+$UI wait "WYNIK" 180
+sleep 4
+$UI shot shots/06e-auto-result.png
+$UI tap "Zabierz" 15 || $UI tap "Dalej" 15
 $UI tap "Wyjdź"
 $UI wait "Trening" 30
 for foe in "Kamienny Golem" "Zdrajca Sekty"; do
@@ -126,12 +127,27 @@ done
 $UI tap "Bossowie"
 $UI wait "legowiskach" 30
 $UI shot shots/06d-bosses.png
+$UI tap "Polowanie"
+$UI wait "Wybierz przeciwnika" 30
+$UI noscroll
+$UI shot shots/06f-hunt-pick.png
+$UI tap "Drewniany Manekin"
+$UI wait "Zakończ i odbierz" 60
+$UI noscroll
+$UI shot shots/06g-hunt.png
+$UI tap "Zakończ i odbierz"
+$UI wait "POLOWANIE" 30
+$UI tap "Dalej" 20
 
 step "hero: silhouette, meridians, techniques, pet, Dao"
 $UI tap "Bohater"
-$UI wait "Dotknij slotu" 60
+$UI wait "Cechy, ścieżka i tytuły" 60
 $UI noscroll
 $UI shot shots/07-hero.png
+$UI tap "Cechy, ścieżka i tytuły"
+$UI wait "ŚCIEŻKA" 30
+$UI shot shots/07f-origins.png
+adb shell input keyevent KEYCODE_BACK; sleep 1
 $UI tap "Meridiany"
 $UI wait "Wolne punkty" 60
 $UI shot shots/07b-meridians.png
@@ -151,7 +167,7 @@ $UI wait "Kamieni Duchowych" 60
 $UI noscroll
 $UI shot shots/08-bag.png
 $UI tap "Kuźnia"
-$UI wait "KD" 60
+$UI wait "Kowalstwo" 60
 $UI shot shots/08b-forge.png
 $UI tap "Targ"
 $UI wait "Moje oferty" 60

@@ -89,23 +89,24 @@ public static partial class DaoLabRules
     public static int Allowance(DaoLabConfig c, string slot, int qiCost, int cooldown) =>
         c.Budget.Base.GetValueOrDefault(slot) + qiCost * c.Budget.PerQiCost + cooldown * c.Budget.PerCooldownTurn;
 
-    public static int Points(DaoLabConfig c, TechniqueDefinition t) => Points(c, t.Slot, t.Speed, t.Attack, t.Defense, t.Movement, t.Counter);
+    public static int Points(DaoLabConfig c, TechniqueDefinition t) => Points(c, t.Kind, t.Speed, t.Attack, t.Defense, t.Movement, t.Counter);
 
-    public static int Allowance(DaoLabConfig c, TechniqueDefinition t) => Allowance(c, t.Slot, t.QiCost, t.Cooldown);
+    public static int Allowance(DaoLabConfig c, TechniqueDefinition t) => Allowance(c, t.Kind, t.QiCost, t.Cooldown);
 
     public static DaoAssessment Assess(DaoLabConfig c, CombatConfig combat, DaoDesign d)
     {
         var e = new List<string>();
         var l = c.Limits;
         if (d.Name is null || !NameFormat().IsMatch(d.Name.Trim())) e.Add("name: 2-32 letters, spaces, apostrophes or hyphens.");
-        if (d.Slot is null || !SlotKinds.Layout.Contains(d.Slot)) return new DaoAssessment(0, 0, [.. e, "slot must be attack, defense, movement or counter."]);
+        if (d.Slot == "movement") d = d with { Slot = SlotKinds.Special }; // pre-1.3 clients
+        if (d.Slot is null || !SlotKinds.Layout.Contains(d.Slot)) return new DaoAssessment(0, 0, [.. e, "slot must be attack, defense, special or counter."]);
 
         var specs = new object?[] { d.Attack, d.Defense, d.Movement, d.Counter }.Count(x => x is not null);
         var matching = d.Slot switch
         {
             SlotKinds.Attack => d.Attack is not null,
             SlotKinds.Defense => d.Defense is not null,
-            SlotKinds.Movement => d.Movement is not null,
+            SlotKinds.Special => d.Movement is not null,
             _ => d.Counter is not null,
         };
         if (specs != 1 || !matching) e.Add($"a {d.Slot} technique needs exactly one '{d.Slot}' component.");
@@ -117,8 +118,7 @@ public static partial class DaoLabRules
         {
             if (!l.Power.Contains(a.Power)) e.Add($"attack.power must be {l.Power}.");
             if (!ScalingStats.Contains(a.Scaling)) e.Add("attack.scaling must be strength, spirit or agility.");
-            if (a.RangeMin < combat.Distance.Min || a.RangeMax > combat.Distance.Max || a.RangeMin > a.RangeMax)
-                e.Add($"attack range must lie within {combat.Distance.Min}-{combat.Distance.Max} with rangeMin <= rangeMax.");
+            if (a.RangeMin > a.RangeMax) e.Add("attack range is obsolete; leave rangeMin <= rangeMax.");
             if (!l.AccuracyPermille.Contains(a.AccuracyPermille)) e.Add($"attack.accuracyPermille must be {l.AccuracyPermille}.");
             if (a.Effect is { } fx)
             {
@@ -145,7 +145,7 @@ public static partial class DaoLabRules
         }
 
         if (d.Defense is { } def && !l.BlockPermille.Contains(def.BlockPermille)) e.Add($"defense.blockPermille must be {l.BlockPermille}.");
-        if (d.Movement is { } mov && !l.EvasionPermille.Contains(mov.EvasionPermille)) e.Add($"movement.evasionPermille must be {l.EvasionPermille}.");
+        if (d.Movement is { } mov && !l.EvasionPermille.Contains(mov.EvasionPermille)) e.Add($"special.evasionPermille must be {l.EvasionPermille}.");
         if (d.Counter is { } ctr)
         {
             if (!l.ReflectPermille.Contains(ctr.ReflectPermille)) e.Add($"counter.reflectPermille must be {l.ReflectPermille}.");
@@ -166,7 +166,7 @@ public static partial class DaoLabRules
     public static bool IsDaoId(string? id) => id is { Length: 20 } && id.StartsWith("dao_", StringComparison.Ordinal) && id[4..].All(ch => ch is >= 'a' and <= 'p');
 
     public static TechniqueDefinition ToDefinition(string id, DaoDesign d) =>
-        new(id, d.Name!.Trim(), d.Name!.Trim(), d.Slot!, d.QiCost, d.Cooldown, d.Speed, null, d.Attack, d.Defense, d.Movement, d.Counter);
+        new(id, d.Name!.Trim(), d.Name!.Trim(), d.Slot == "movement" ? SlotKinds.Special : d.Slot!, d.QiCost, d.Cooldown, d.Speed, null, d.Attack, d.Defense, d.Movement, d.Counter);
 }
 
 public static class DaoLabConfigValidator

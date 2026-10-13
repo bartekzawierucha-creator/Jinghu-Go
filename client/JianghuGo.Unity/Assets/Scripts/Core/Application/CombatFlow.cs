@@ -34,6 +34,21 @@ namespace JianghuGo.Client.Application
         /// Returns false (after refreshing) when the turn moved on before the action arrived — e.g. the deadline passed
         /// or the action was already submitted from another device.
         /// </summary>
+        /// <summary>Auto-battle step: the server chooses and plays this turn for the player. False when the turn moved on.</summary>
+        public async Task<bool> AutoAsync(CancellationToken ct)
+        {
+            try
+            {
+                Set(await _api.AutoActAsync(Battle.Id, ct).ConfigureAwait(false));
+                return true;
+            }
+            catch (ApiException e) when (e.Code == "turn_mismatch" || e.Code == "action_already_submitted" || e.Code == "battle_not_active")
+            {
+                await RefreshAsync(ct).ConfigureAwait(false);
+                return false;
+            }
+        }
+
         public async Task<bool> ActAsync(int? slot, string direction, CancellationToken ct)
         {
             try

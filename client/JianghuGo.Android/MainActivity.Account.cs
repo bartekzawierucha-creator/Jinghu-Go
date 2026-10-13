@@ -105,7 +105,8 @@ namespace JianghuGo.Android
                         var r = ui.HRow(card, 40, 0);
                         var col = ui.Box(r, 1f, marginDp: 0);
                         ui.Text(trait.NamePl, col, 15, Ui.Ink, bold: true);
-                        ui.Text(CategoryName(trait.Category) + " · " + rarity.Name, col, 11, rarity.Color);
+                        var mods = StatsText(trait.Modifiers);
+                        ui.Text(CategoryName(trait.Category) + " · " + (mods.Length > 0 ? mods : "bez premii"), col, 11, rarity.Color);
                         var lockIcon = ui.Text(locked ? "🔒" : "🔓", r, 20);
                         lockIcon.LayoutParameters = new LinearLayout.LayoutParams(Px(36), ViewGroup.LayoutParams.WrapContent) { Gravity = GravityFlags.CenterVertical };
                         lockIcon.Alpha = locked ? 1f : 0.45f;
@@ -140,10 +141,10 @@ namespace JianghuGo.Android
                 ui.Text("Wybierz ścieżkę kultywacji. Zdecyduje, jak rośnie twoja moc.", page, 12, Ui.Muted, maxLines: 2);
                 var paths = new[]
                 {
-                    ("qi", "Qi", "równowaga i technika", Resource.Drawable.place_qiarray, Ui.QiBlue),
-                    ("body", "Ciało", "siła i kroki z telefonu", Resource.Drawable.loc_fortress, Color.Rgb(196, 140, 80)),
-                    ("flame", "Płomień", "moc 12 miejsc Płomienia", Resource.Drawable.place_brazier, Ui.Violet),
-                    ("poison", "Trucizna", "podstęp, nocą silniejsza", Resource.Drawable.place_rift, Ui.Jade),
+                    ("qi", "Qi", "+25% Qi · regeneracja · Duch", Resource.Drawable.place_qiarray, Ui.QiBlue),
+                    ("body", "Ciało", "+25% HP · gardy · leczenie", Resource.Drawable.loc_fortress, Color.Rgb(196, 140, 80)),
+                    ("flame", "Płomień", "oparzenia +50% · Płomień", Resource.Drawable.place_brazier, Ui.Violet),
+                    ("poison", "Trucizna", "efekty +25% · noc ×2", Resource.Drawable.place_rift, Ui.Jade),
                 };
                 for (var i = 0; i < 4; i += 2)
                 {
@@ -160,7 +161,13 @@ namespace JianghuGo.Android
             {
                 var summary = ui.Card(page, 1f, 12, Ui.Gold);
                 ui.Text("Ścieżka: " + PathName(path), summary, 16, Ui.Gold, bold: true);
-                ui.Text(string.Join(" · ", flow.Draft.Traits.Select(t => t.NamePl)), summary, 13, Ui.Ink, maxLines: 3);
+                var perks = ui.Text("…", summary, 12, Ui.Ink, maxLines: 4);
+                Run(async () =>
+                {
+                    _catalog ??= await _api.GetCombatCatalogAsync(Ct);
+                    perks.Text = _catalog.Paths != null && _catalog.Paths.TryGetValue(path, out var pp) ? pp.DescriptionPl : string.Empty;
+                });
+                ui.Text(string.Join(" · ", flow.Draft.Traits.Select(t => t.NamePl)), summary, 13, Ui.Gold, maxLines: 2);
                 ui.Text(string.Join("  ", flow.Draft.Stats.Select(s => StatName(s.Id) + " " + s.Value)), summary, 11, Ui.Muted, maxLines: 4);
                 ui.Text("Imię", page, 12, Ui.Muted);
                 var field = ui.Field("Imię postaci (2–24 litery)", value: name, parent: page);

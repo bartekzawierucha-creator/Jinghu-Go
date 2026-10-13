@@ -6,6 +6,16 @@ public sealed record SpiritPet(JianghuGo.Domain.CharacterId CharacterId, string 
     public int Level => SpiritPetRules.Level(Xp);
 }
 
+/// <summary>
+/// An idle hunt: the character fights <see cref="NpcId"/> automatically, one battle per interval, while the player is
+/// away. Battles are real battles (same engine, rewards, loot, quests, daily reward cap), settled lazily on read.
+/// </summary>
+public sealed record IdleHunt(JianghuGo.Domain.CharacterId CharacterId, JianghuGo.Domain.AccountId AccountId, string NpcId, DateTimeOffset StartedAt, DateTimeOffset SettledAt,
+    int Battles, int Wins, int Losses, long Qi, int Version)
+{
+    public DateTimeOffset EndsAt(IdleRules r) => StartedAt.AddHours(r.MaxHours);
+}
+
 public static class SpiritPetRules
 {
     public const int MaxLevel = 10;

@@ -25,7 +25,7 @@ public class DaoLabTests
     [Fact]
     public void Every_pathless_official_technique_fits_the_dao_budget()
     {
-        foreach (var t in Combat.Techniques.Where(t => t.Path is null))
+        foreach (var t in Combat.Techniques.Where(t => t.Path is null && t.Special is null)) // Dao specials are evasion-only
         {
             Assert.True(DaoLabRules.Points(Dao, t) <= DaoLabRules.Allowance(Dao, t), $"{t.Id}: {DaoLabRules.Points(Dao, t)} > {DaoLabRules.Allowance(Dao, t)}");
             var asDesign = new DaoDesign("Kopia", t.Slot, t.QiCost, t.Cooldown, t.Speed, t.Attack, t.Defense, t.Movement, t.Counter);
@@ -50,7 +50,6 @@ public class DaoLabTests
     {
         string Problems(DaoDesign d) => string.Join(" | ", DaoLabRules.Assess(Dao, Combat, d).Problems);
         Assert.True(Problems(Strike(power: 31, qiCost: 20, cooldown: 4)).Contains("attack.power", StringComparison.Ordinal));
-        Assert.True(Problems(Strike(rangeMin: 1, rangeMax: 4)).Contains("range", StringComparison.Ordinal));
         Assert.True(Problems(Strike(rangeMin: 3, rangeMax: 2)).Contains("range", StringComparison.Ordinal));
         Assert.True(Problems(Strike(power: 5, qiCost: 10, cooldown: 1, effect: new EffectSpec("stun", 200, 0, 1))).Contains("cooldown of at least 2", StringComparison.Ordinal));
         Assert.True(Problems(Strike(power: 5, qiCost: 10, cooldown: 3, effect: new EffectSpec("stun", 400, 0, 1))).Contains("stun chance", StringComparison.Ordinal));

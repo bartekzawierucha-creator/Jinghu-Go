@@ -130,6 +130,15 @@ public class ProgressionTests : IAsyncLifetime
         Assert.Equal(200, claim.Int("stones"));
         Assert.True(Quest(claim["board"]!.AsObject(), "achievements", "a_boss_1")["claimed"]!.GetValue<bool>());
         Assert.Contains("Pogromca Bestii", claim["board"]!["titles"]!.ToJsonString());
+        Assert.Equal(3, claim["board"]!["titleBonuses"].Int("constitution"));        // the title's stat bonus
+        var fromTitles = await _host.Service<IUnitOfWorkFactory>().RunAsync(async uow =>
+        {
+            var total = 0;
+            foreach (var provider in _host.Service<IEnumerable<ICombatStatBonuses>>())
+                total += (await provider.BonusesAsync(uow, Guid.Parse(id), default)).GetValueOrDefault("constitution");
+            return total;
+        }, default);
+        Assert.Equal(3, fromTitles);                                                   // no realm/meridians yet: only the title
         await Problem(await p.PostAsync(url + "/a_boss_1/claim"), HttpStatusCode.Conflict, "quest_already_claimed");
 
         var leaders = await Ok(await p.GetAsync(url + "/leaders/meditation_minutes"));
@@ -217,6 +226,75 @@ public class ProgressionTests : IAsyncLifetime
         Assert.Equal(cb.Str("id"), items[0].Str("characterId"));
         Assert.Equal("<250m", items[0].Str("distanceBand"));
         Assert.False(json.Compact().Contains("lat", StringComparison.OrdinalIgnoreCase) || json.Compact().Contains("21.01", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Traits_show_their_stat_modifiers_and_paths_describe_their_perks()
+    {
+        var (p, c) = await NewAsync();
+        var me = await Ok(await p.GetAsync($"/api/v1/characters/{c.Str("id")}"));
+        Assert.True(me["traits"]!.AsArray().All(t => t!["modifiers"] is JsonObject), me.Compact());
+        var catalog = await Ok(await p.GetAsync("/api/v1/combat/catalog"));
+        foreach (var path in new[] { "qi", "body", "flame", "poison" })
+            Assert.False(string.IsNullOrWhiteSpace(catalog["paths"]![path]!.Str("descriptionPl")));
+        Assert.Equal("special", catalog["slots"]![6]!.GetValue<string>());
+    }
+
+    [Fact]
+    public async Task Auto_battle_plays_turns_for_the_player_until_the_end()
+    {
+        var (p, c) = await NewAsync();
+        var battle = await Ok(await p.PostAsync("/api/v1/combat/battles/pve", new { characterId = c.Str("id"), npcId = "training_dummy" }, Player.NewKey()), HttpStatusCode.Created);
+        var url = $"/api/v1/combat/battles/{battle.Str("id")}/auto";
+        var turns = 0;
+        for (; turns < 40 && battle.Str("status") == "active"; turns++)
+            battle = await Ok(await p.PostAsync(url, null, Player.NewKey()));
+        Assert.Equal("finished", battle.Str("status"), battle.Compact());
+        Assert.True(turns > 1);
+        Assert.True(battle["result"]!.GetValue<string>() is "won" or "lost" or "draw");
+        await Problem(await p.PostAsync(url, null, Player.NewKey()), HttpStatusCode.Conflict, "battle_not_active");
+        var (stranger, _) = await NewAsync();
+        await Problem(await stranger.PostAsync(url, null, Player.NewKey()), HttpStatusCode.NotFound, "battle_not_found");
+    }
+
+    [Fact]
+    public async Task Idle_hunt_fights_one_battle_per_interval_up_to_the_time_limit()
+    {
+        var (p, c) = await NewAsync();
+        var id = c.Str("id");
+        var url = $"/api/v1/characters/{id}/combat/hunt";
+        Assert.Null((await Ok(await p.GetAsync(url)))["hunt"]);
+        await Problem(await p.PostAsync(url, new { npcId = "jiao_dragon" }), HttpStatusCode.BadRequest, "npc_world_only");
+        await Problem(await p.PostAsync(url + "/claim"), HttpStatusCode.NotFound, "no_hunt");
+
+        var hunt = (await Ok(await p.PostAsync(url, new { npcId = "training_dummy" })))["hunt"]!.AsObject();
+        Assert.Equal(0, hunt.Int("battles"));
+        Assert.Equal(5, hunt.Int("minutesPerBattle"));
+        await Problem(await p.PostAsync(url, new { npcId = "grey_wolf" }), HttpStatusCode.Conflict, "hunt_in_progress");
+
+        _host.Clock.Advance(TimeSpan.FromMinutes(23));
+        await p.RefreshAsync();
+        hunt = (await Ok(await p.GetAsync(url)))["hunt"]!.AsObject();
+        Assert.Equal(4, hunt.Int("battles"));
+        Assert.False(hunt["finished"]!.GetValue<bool>());
+        // a manual battle is still possible during a hunt
+        await Ok(await p.PostAsync("/api/v1/combat/battles/pve", new { characterId = id, npcId = "training_dummy" }, Player.NewKey()), HttpStatusCode.Created);
+
+        _host.Clock.Advance(TimeSpan.FromHours(10));
+        await p.RefreshAsync();
+        hunt = (await Ok(await p.GetAsync(url)))["hunt"]!.AsObject();
+        Assert.Equal(48, hunt.Int("battles"));               // 4 h / 5 min, nothing after the limit
+        Assert.True(hunt["finished"]!.GetValue<bool>());
+        var wins = hunt.Int("wins");
+        Assert.True(wins > 0 && wins + hunt.Int("losses") <= 48, hunt.Compact());
+        Assert.True(hunt.Int("qi") <= 20 * 5, "idle wins share the daily rewarded-wins cap");
+
+        var final = (await Ok(await p.PostAsync(url + "/claim")))["hunt"]!.AsObject();
+        Assert.Equal(48, final.Int("battles"));
+        Assert.Null((await Ok(await p.GetAsync(url)))["hunt"]);
+        await _host.DrainOutboxAsync();
+        var board = await Ok(await p.GetAsync($"/api/v1/characters/{id}/quests"));
+        Assert.True(Quest(board, "achievements", "a_win_10").Int("progress") >= Math.Min(10, wins), "idle wins count for quests");
     }
 
     [Fact]

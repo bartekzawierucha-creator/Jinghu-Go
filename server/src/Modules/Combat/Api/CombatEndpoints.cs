@@ -22,6 +22,7 @@ public static class CombatEndpoints
             c.TurnDeadlineSeconds,
             c.Distance,
             techniques = c.Techniques,
+            paths = c.PathPerks,
             npcs = c.Npcs.Select(n => new { n.Id, n.NamePl, n.NameEn, n.RewardQi, n.Tier, n.Boss, n.WorldOnly, n.Tameable }),
         })).WithTags("Combat").RequireAuthorization();
 
@@ -34,6 +35,12 @@ public static class CombatEndpoints
             ApiResults.From(await svc.GetPetAsync(http.User.GetAccountId(), characterId, ct), pet => Results.Ok(new { pet })));
         character.MapPost("/pet/release", async (Guid characterId, HttpContext http, CombatService svc, CancellationToken ct) =>
             ApiResults.From(await svc.ReleasePetAsync(http.User.GetAccountId(), characterId, ct), _ => Results.Ok(new { pet = (PetView?)null })));
+        character.MapGet("/hunt", async (Guid characterId, HttpContext http, CombatService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.GetHuntAsync(http.User.GetAccountId(), characterId, ct), hunt => Results.Ok(new { hunt })));
+        character.MapPost("/hunt", async (Guid characterId, StartHuntCommand body, HttpContext http, CombatService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.StartHuntAsync(http.User.GetAccountId(), characterId, body, ct), hunt => Results.Ok(new { hunt })));
+        character.MapPost("/hunt/claim", async (Guid characterId, HttpContext http, CombatService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.ClaimHuntAsync(http.User.GetAccountId(), characterId, ct), hunt => Results.Ok(new { hunt })));
         character.MapGet("/battles", async (Guid characterId, HttpContext http, CombatService svc, CancellationToken ct) =>
             ApiResults.From(await svc.ListOpenAsync(http.User.GetAccountId(), characterId, ct), list => Results.Ok(new { items = list })));
 
@@ -48,6 +55,8 @@ public static class CombatEndpoints
             ApiResults.From(await svc.AcceptAsync(http.User.GetAccountId(), battleId, ct), Results.Ok));
         g.MapPost("/{battleId:guid}/decline", async (Guid battleId, HttpContext http, CombatService svc, CancellationToken ct) =>
             ApiResults.From(await svc.DeclineAsync(http.User.GetAccountId(), battleId, ct), Results.Ok));
+        g.MapPost("/{battleId:guid}/auto", async (Guid battleId, [FromHeader(Name = "Idempotency-Key")] string? key, HttpContext http, CombatService svc, CancellationToken ct) =>
+            await Guard(async () => ApiResults.From(await svc.AutoActAsync(http.User.GetAccountId(), battleId, key, ct), Results.Ok)));
         g.MapPost("/{battleId:guid}/forfeit", async (Guid battleId, HttpContext http, CombatService svc, CancellationToken ct) =>
             ApiResults.From(await svc.ForfeitAsync(http.User.GetAccountId(), battleId, ct), Results.Ok));
         g.MapPost("/{battleId:guid}/actions", async (Guid battleId, ActionCommand body, [FromHeader(Name = "Idempotency-Key")] string? key, HttpContext http, CombatService svc, CancellationToken ct) =>

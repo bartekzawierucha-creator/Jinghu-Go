@@ -39,6 +39,9 @@ public static class CraftingEndpoints
         g.MapPost("/upgrade", async (Guid characterId, UpgradeCommand body, [FromHeader(Name = "Idempotency-Key")] string? key, HttpContext http, CraftingService svc, CancellationToken ct) =>
             await Guard(async () => ApiResults.From(await svc.UpgradeAsync(http.User.GetAccountId(), characterId, key, body, ct), Results.Ok)));
 
+        g.MapGet("/professions", async (Guid characterId, HttpContext http, CraftingService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.ProfessionsAsync(http.User.GetAccountId(), characterId, ct), list => Results.Ok(new { items = list })));
+
         g.MapGet("/log", async (Guid characterId, Guid? before, int? limit, HttpContext http, CraftingService svc, CancellationToken ct) =>
             ApiResults.From(await svc.LogAsync(http.User.GetAccountId(), characterId, before, limit, ct), list => Results.Ok(new
             {
