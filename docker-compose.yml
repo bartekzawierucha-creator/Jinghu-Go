@@ -50,7 +50,7 @@ services:
       ConnectionStrings__Jianghu: Host=postgres;Database=jianghu;Username=${POSTGRES_USER:-jianghu};Password=${POSTGRES_PASSWORD:-jianghu-dev}
       Worker__RunInProcess: "false"   # the worker service below drains the outbox
       World__Seed: ${WORLD_SEED:-7231994812734417}   # dev default; production: a secret
-    ports: ["127.0.0.1:8080:8080"]
+    ports: ["${API_BIND:-127.0.0.1}:8080:8080"]   # API_BIND=0.0.0.0 to reach it from a phone on the same Wi-Fi
 
   worker:
     build:
