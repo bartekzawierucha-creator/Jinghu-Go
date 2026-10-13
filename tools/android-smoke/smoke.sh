@@ -39,7 +39,7 @@ $UI wait "Żetony Losu" 30
 $UI tap "Dalej ›"
 $UI wait "ŚCIEŻKA" 30
 $UI shot shots/02b-path.png
-$UI tap "równowaga i technika"
+$UI tap "+25% Qi · regeneracja"
 $UI wait "Rozpocznij drogę" 30
 $UI field 0 "Lin"
 $UI tap "Rozpocznij drogę"
