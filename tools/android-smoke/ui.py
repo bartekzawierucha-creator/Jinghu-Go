@@ -92,9 +92,14 @@ def tap(text, timeout=30):
 
 
 def field(index, value):
-    edits = [n for n in nodes() if n.get("class") == "android.widget.EditText"]
+    edits = []
+    for attempt in range(5):
+        edits = [n for n in nodes() if n.get("class") == "android.widget.EditText"]
+        if len(edits) > index:
+            break
+        swipe_up()
     if len(edits) <= index:
-        print(f"no EditText #{index}", file=sys.stderr)
+        report(f"no text field #{index}")
         return False
     x, y = center(edits[index])
     subprocess.run(["adb", "shell", "input", "tap", str(x), str(y)])
