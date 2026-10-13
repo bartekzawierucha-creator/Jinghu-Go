@@ -17,10 +17,11 @@
     <ApplicationDisplayVersion>0.9.0</ApplicationDisplayVersion>
     <AndroidPackageFormat>apk</AndroidPackageFormat>
     <AndroidPackageFormats>apk</AndroidPackageFormats>
-    <!-- System.Text.Json, minimal APIs and DI use reflection over the client and the embedded server: no trimming. -->
+    <!-- System.Text.Json, minimal APIs and DI use reflection over the client and the embedded server. -->
     <JsonSerializerIsReflectionEnabledByDefault>true</JsonSerializerIsReflectionEnabledByDefault>
-    <AndroidLinkMode>None</AndroidLinkMode>
-    <PublishTrimmed>false</PublishTrimmed>
+    <!-- Trim only the base class library (partial mode); the app, the client core, the embedded server and ASP.NET Core
+         are rooted below because they are used through reflection. Keeps each APK small enough to download easily. -->
+    <TrimMode>partial</TrimMode>
     <RunAOTCompilation>false</RunAOTCompilation>
     <AndroidEnableProfiledAot>false</AndroidEnableProfiledAot>
     <RuntimeIdentifiers>android-arm64;android-arm;android-x64</RuntimeIdentifiers>
@@ -36,6 +37,9 @@
   <ItemGroup Condition="'$(ServerBin)' != '' And '$(AspNetDir)' != ''">
     <Reference Include="$(AspNetDir)/*.dll" Private="true" />
     <Reference Include="$(ServerBin)/*.dll" Exclude="$(ServerBin)/JianghuGo.*Tests*.dll" Private="true" />
+    <_EmbeddedServerDll Include="$(AspNetDir)/*.dll;$(ServerBin)/*.dll" />
+    <TrimmerRootAssembly Include="@(_EmbeddedServerDll->'%(Filename)')" RootMode="All" />
+    <TrimmerRootAssembly Include="JianghuGo.Client.Core" RootMode="All" />
     <AndroidAsset Include="../../content/game-config/*.json" Link="Assets/game-config/%(Filename)%(Extension)" />
     <AndroidAsset Include="../../server/src/Api/appsettings.json" Link="Assets/appsettings.json" />
   </ItemGroup>
