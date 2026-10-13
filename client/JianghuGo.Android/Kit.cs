@@ -210,7 +210,7 @@ namespace JianghuGo.Android
             t.SetMaxLines(2);
             t.SetIncludeFontPadding(false);
             t.SetLineSpacing(0, 0.9f);
-            t.SetAutoSizeTextTypeUniformWithConfiguration(7, 11, 1, global::Android.Util.ComplexUnitType.Sp);
+            t.SetAutoSizeTextTypeUniformWithConfiguration(7, 11, 1, (int)global::Android.Util.ComplexUnitType.Sp);
             tile.AddView(t, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0, 1f) { TopMargin = Dp(1) });
             if (!string.IsNullOrEmpty(cost))
             {
