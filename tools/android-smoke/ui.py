@@ -92,27 +92,37 @@ def tap(text, timeout=30):
 
 
 def field(index, value):
-    edits = []
-    for attempt in range(8):
-        all_nodes = nodes()
-        if find("\u0000no-such-text\u0000") is None and any("isn't responding" in (n.get("text") or "") for n in all_nodes):
-            continue  # find() tapped "Wait" on a system dialog; look again
-        edits = [n for n in all_nodes if n.get("class") == "android.widget.EditText"]
-        if len(edits) > index:
-            break
-        swipe_up()
-    if len(edits) <= index:
-        report(f"no text field #{index}")
-        return False
-    x, y = center(edits[index])
-    subprocess.run(["adb", "shell", "input", "tap", str(x), str(y)])
-    time.sleep(0.5)
-    subprocess.run(["adb", "shell", "input", "keyevent", "KEYCODE_MOVE_END"])
-    subprocess.run(["adb", "shell", "input", "keyevent"] + ["KEYCODE_DEL"] * 40)
-    subprocess.run(["adb", "shell", "input", "text", value])
-    time.sleep(0.5)
-    hide_keyboard()
-    return True
+    """Types into the index-th text field; verifies the text landed (a half-visible field may miss the tap)."""
+    for attempt in range(6):
+        edits = []
+        for _ in range(8):
+            all_nodes = nodes()
+            if find("\u0000no-such-text\u0000") is None and any("isn't responding" in (n.get("text") or "") for n in all_nodes):
+                continue  # find() tapped "Wait" on a system dialog; look again
+            edits = [n for n in all_nodes if n.get("class") == "android.widget.EditText"]
+            if len(edits) > index:
+                break
+            swipe_up()
+        if len(edits) <= index:
+            report(f"no text field #{index}")
+            return False
+        x, y = center(edits[index])
+        if y < 300 or y > 2100:  # not comfortably on screen: bring it into view first
+            subprocess.run(["adb", "shell", "input", "swipe", "540", "1500", "540", "1100", "300"])
+            time.sleep(1)
+            continue
+        subprocess.run(["adb", "shell", "input", "tap", str(x), str(y)])
+        time.sleep(0.8)
+        subprocess.run(["adb", "shell", "input", "keyevent", "KEYCODE_MOVE_END"])
+        subprocess.run(["adb", "shell", "input", "keyevent"] + ["KEYCODE_DEL"] * 40)
+        subprocess.run(["adb", "shell", "input", "text", value])
+        time.sleep(0.8)
+        hide_keyboard()
+        edits = [n for n in nodes() if n.get("class") == "android.widget.EditText"]
+        if len(edits) > index and (edits[index].get("text") or "") == value:
+            return True
+    report(f"could not type into text field #{index}")
+    return False
 
 
 def report(message):

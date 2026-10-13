@@ -329,7 +329,7 @@ add(w["nodeKinds"], [
     NK("jade_outcrop", "Jadeitowa Skała", "Jade Outcrop", 8, 10, None, [Y("jade", 800, 1, 2), Y("soul_jade", 20)]),
     NK("bamboo_grove", "Bambusowy Gaj", "Bamboo Grove", 14, 8, None, [Y("bamboo_essence", 900, 1, 3), Y("spirit_silk", 200)]),
     NK("lotus_pond", "Staw Lotosów", "Lotus Pond", 6, 20, None, [Y("lotus_seed", 500), Y("heaven_dew", 150)]),
-    NK("ancient_ruins", "Starożytne Ruiny", "Ancient Ruins", 4, 30, None, [Y("technique_scroll", 60), Y("ancient_compass", 25), Y("jade", 400, 1, 2), Y("fire_crystal", 200)]),
+    NK("ancient_ruins", "Starożytne Ruiny", "Ancient Ruins", 4, 30, None, [Y("soul_jade", 60), Y("refining_stone", 300), Y("jade", 400, 1, 2), Y("fire_crystal", 200)]),
     NK("shrine", "Przydrożna Kapliczka", "Wayside Shrine", 6, 60, None, [Y("heaven_dew", 300)]),
     NK("boar_den", "Legowisko Dzika", "Boar Den", 10, 0, "wild_boar"),
     NK("viper_nest", "Gniazdo Żmij", "Viper Nest", 8, 0, "bamboo_viper"),

@@ -30,12 +30,14 @@ public class CultivationRulesTests
     public void Qi_required_grows_geometrically_with_major_multiplier()
     {
         Assert.Equal(100, CultivationRules.QiRequired(Config, 0, 1));
-        Assert.Equal(120, CultivationRules.QiRequired(Config, 0, 2));
-        Assert.Equal(144, CultivationRules.QiRequired(Config, 0, 3));
-        Assert.Equal(1290, CultivationRules.QiRequired(Config, 0, 9));   // 100 × 1.2^8 × 3 = 1289.9 → 1290
+        Assert.Equal(110, CultivationRules.QiRequired(Config, 0, 2));
+        Assert.Equal(121, CultivationRules.QiRequired(Config, 0, 3));
+        Assert.Equal(643, CultivationRules.QiRequired(Config, 0, 9));    // 100 × 1.1^8 × 3 = 643.08 → 643
         Assert.True(CultivationRules.IsMajor(Config, 0, 9));
         Assert.Equal((1, 1), CultivationRules.Next(Config, 0, 9));
-        Assert.True(CultivationRules.IsPeak(Config, 2, 9));
+        var last = Config.Realms.Count - 1;
+        Assert.True(CultivationRules.IsPeak(Config, last, Config.Realms[last].Stages));
+        Assert.False(CultivationRules.IsPeak(Config, 2, 9));
     }
 
     [Fact]

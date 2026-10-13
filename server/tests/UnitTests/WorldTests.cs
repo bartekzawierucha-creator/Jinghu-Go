@@ -53,10 +53,12 @@ public class WorldTests
             }
         }
 
+        var weights = Config.NodeKinds.Sum(k => k.Weight);
         foreach (var k in Config.NodeKinds)
         {
             var share = 100.0 * counts[k.Id] / total;
-            Assert.True(Math.Abs(share - k.Weight) < 2.5, $"{k.Id}: {share:0.0}% vs weight {k.Weight}");
+            var expected = 100.0 * k.Weight / weights; // weights are relative
+            Assert.True(Math.Abs(share - expected) < 2.5, $"{k.Id}: {share:0.0}% vs expected {expected:0.0}%");
         }
     }
 
