@@ -110,7 +110,7 @@ $UI tap "Zadania i osiągnięcia"
 $UI wait "Nowe zadania o północy" 60
 $UI shot shots/13-quests.png
 adb shell input keyevent KEYCODE_BACK; sleep 2
-$UI tap "Meridiany"
+$UI tap "Punkty z każdego etapu"
 $UI wait "Wolne punkty" 60
 $UI shot shots/14-meridians.png
 adb shell input keyevent KEYCODE_BACK; sleep 2
