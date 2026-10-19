@@ -73,7 +73,8 @@ namespace JianghuGo.Android
             {
                 var zc = _ui.Card(body, 0.8f, 8, z.LuckyToday ? Ui.Gold : Ui.GoldDim);
                 _ui.Text("ZNAK URODZENIA: " + z.Hanzi + " " + z.NamePl.ToUpperInvariant(), zc, 13, Ui.Gold, bold: true);
-                _ui.Text(z.DescriptionPl + " +" + z.Bonus + " " + StatName(z.Stat) + (z.LuckyToday ? " — dziś twój dzień (podwójnie)!" : " · dziś dzień: " + z.TodayNamePl), zc, 12, Ui.Ink, maxLines: 2);
+                _ui.Text(z.DescriptionPl + " +" + z.Bonus + " " + StatName(z.Stat) + (z.LuckyToday ? " — dziś twój dzień (podwójnie)!" : " · dziś dzień: " + z.TodayNamePl)
+                    + (z.PhysiqueNamePl != null ? "\n✦ " + z.PhysiqueNamePl + ": " + z.PhysiqueDescriptionPl : string.Empty), zc, 12, Ui.Ink, maxLines: 3);
             }
         });
 

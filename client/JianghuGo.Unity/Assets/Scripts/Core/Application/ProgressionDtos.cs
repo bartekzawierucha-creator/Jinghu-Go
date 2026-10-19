@@ -102,6 +102,12 @@ namespace JianghuGo.Client.Application
         public string TodayId { get; set; }
         public string TodayNamePl { get; set; }
         public bool LuckyToday { get; set; }
+
+        /// <summary>Special physique, if the cultivator was born with one (2.2).</summary>
+        public string PhysiqueId { get; set; }
+        public string PhysiqueNamePl { get; set; }
+        public string PhysiqueDescriptionPl { get; set; }
+        public string PhysiqueRarity { get; set; }
     }
 
     public sealed class PassLevelDto

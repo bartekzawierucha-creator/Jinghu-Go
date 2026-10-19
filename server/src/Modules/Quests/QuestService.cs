@@ -369,7 +369,9 @@ public sealed class QuestService(
     {
         var s = Zodiac.Of(characterId);
         var d = Zodiac.OfDay(today);
-        return new ZodiacView(s.Id, s.NamePl, s.Hanzi, s.Stat, d.Id == s.Id ? Zodiac.Bonus * 2 : Zodiac.Bonus, s.DescriptionPl, d.Id, d.NamePl, d.Id == s.Id);
+        var p = Physiques.Of(characterId);
+        return new ZodiacView(s.Id, s.NamePl, s.Hanzi, s.Stat, d.Id == s.Id ? Zodiac.Bonus * 2 : Zodiac.Bonus, s.DescriptionPl, d.Id, d.NamePl, d.Id == s.Id,
+            p?.Id, p?.NamePl, p?.DescriptionPl, p?.Rarity);
     }
 
     private Task AuditAsync(IUnitOfWork uow, AccountId accountId, string action, Guid characterId, string json, DateTimeOffset now, CancellationToken ct) =>

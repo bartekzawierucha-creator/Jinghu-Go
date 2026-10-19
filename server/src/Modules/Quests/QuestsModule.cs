@@ -42,6 +42,7 @@ public static class QuestsModule
         services.AddSingleton<IOutboxHandler, ExpeditionCounter>();
         services.AddSingleton<JianghuGo.Modules.Combat.Contracts.ICombatStatBonuses, TitleCombatBonuses>();
         services.AddSingleton<JianghuGo.Modules.Combat.Contracts.ICombatStatBonuses, ZodiacCombatBonuses>();
+        services.AddSingleton<JianghuGo.Modules.Combat.Contracts.ICombatPerkBonuses, PhysiqueCombatPerks>();
         services.AddSingleton<IOutboxHandler, BattleCounter>();
         services.AddSingleton<IOutboxHandler, MeditationCounter>();
         services.AddSingleton<IOutboxHandler, BreakthroughCounter>();
