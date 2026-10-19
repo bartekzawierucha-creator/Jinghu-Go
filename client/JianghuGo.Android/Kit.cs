@@ -258,7 +258,9 @@ namespace JianghuGo.Android
                 var index = i;
                 var frame = new FrameLayout(_ctx);
                 var b = new TextView(_ctx) { Text = labels[i], Gravity = GravityFlags.Center };
-                b.SetTextSize(global::Android.Util.ComplexUnitType.Sp, labels.Length > 4 ? 11 : 12);
+                var sp = labels.Length > 5 ? 10 : labels.Length > 4 ? 11 : 12;
+                b.SetTextSize(global::Android.Util.ComplexUnitType.Sp, sp);
+                b.SetAutoSizeTextTypeUniformWithConfiguration(7, sp, 1, (int)global::Android.Util.ComplexUnitType.Sp); // six tabs on a narrow phone shrink instead of cutting
                 b.SetTypeface(Display, TypefaceStyle.Bold);
                 b.SetTextColor(i == selected ? Night : Gold);
                 b.SetMaxLines(1);

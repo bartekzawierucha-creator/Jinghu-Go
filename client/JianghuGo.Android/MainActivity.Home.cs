@@ -51,7 +51,7 @@ namespace JianghuGo.Android
 
             var more = ui.HRow(page, 40);
             ui.Btn("Odosobnienie", () => RetreatSheet(flow, Render), more, secondary: true, sp: 12, heightDp: 40, icon: "menu_meditate");
-            ui.Btn("Kultywacja", () => CultivationSheet(flow, Render), more, secondary: true, sp: 12, heightDp: 40, icon: "menu_breakthrough");
+            ui.Btn("Rozwój", () => CultivationSheet(flow, Render), more, secondary: true, sp: 12, heightDp: 40, icon: "menu_breakthrough");
             ui.Btn("Posiadłość", () => Run(() => ShowEstateAsync(0)), more, secondary: true, sp: 12, heightDp: 40, icon: "menu_sect");
 
             // the day: three quests and the check-in seal

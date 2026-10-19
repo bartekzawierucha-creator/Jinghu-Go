@@ -54,9 +54,21 @@ $UI wait "Szansa przełomu" 60
 $UI noscroll
 $UI shot shots/03-home.png
 $UI tap "Medytuj"
-$UI wait "Medytujesz od" 30
+$UI wait "Medytacja ×5" 30
 sleep 2
 $UI shot shots/03b-meditating.png
+$UI tap "Rozwój" 20
+$UI wait "METODY KULTYWACJI" 30
+$UI shot shots/03c-cultivation-sheet.png
+adb shell input keyevent KEYCODE_BACK; sleep 1
+$UI tap "Posiadłość"
+$UI wait "Poletka" 60
+$UI noscroll
+$UI shot shots/03d-estate.png
+$UI tap "Uczniowie"
+$UI wait "Uczniowie:" 30
+$UI shot shots/03e-disciples.png
+adb shell input keyevent KEYCODE_BACK; sleep 2
 
 step "quests: check-in"
 $UI tap "Zadania"
@@ -70,6 +82,14 @@ $UI shot shots/04b-quests.png
 $UI tap "Osiągnięcia"
 $UI wait "Pierwsza krew" 30
 $UI shot shots/04c-achievements.png
+$UI tap "Tytuły"
+$UI wait "Nad postacią" 30
+$UI noscroll
+$UI shot shots/04d-titles.png
+$UI tap "Opowieść"
+$UI wait "ROZDZIAŁ 1" 30
+$UI noscroll
+$UI shot shots/04e-story.png
 adb shell input keyevent KEYCODE_BACK; sleep 2
 
 step "world: full-screen map with emulated GPS (Krakow)"
@@ -164,6 +184,10 @@ $UI shot shots/06g-hunt.png
 $UI tap "Zakończ i odbierz"
 $UI wait "POLOWANIE" 30
 $UI tap "Dalej" 20
+$UI tap "Arena"
+$UI wait "ARENA" 30
+$UI noscroll
+$UI shot shots/06k-arena.png
 
 step "hero: silhouette, meridians, techniques, pet, Dao"
 $UI tap "Bohater"
@@ -186,6 +210,16 @@ $UI shot shots/07d-pet.png
 $UI tap "Dao"
 $UI wait "Ułóż własną" 60
 $UI shot shots/07e-dao.png
+$UI tap "Sztuki"
+$UI wait "Płomienie:" 60
+$UI noscroll
+$UI shot shots/07g-arts-flames.png
+for t in "Trucizny:Ciało Toksyn" "Gu:Gniazdo Gu" "Ciało:KĄPIELE" "Miecz:Intencja Miecza" "Gałąź:Gałąź ścieżki"; do
+  $UI tap "${t%%:*}" 20
+  $UI wait "${t#*:}" 30
+  $UI noscroll
+  $UI shot "shots/07h-arts-${t%%:*}.png"
+done
 
 step "bag, forge, market"
 $UI tap "Sakwa"
