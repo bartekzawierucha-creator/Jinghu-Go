@@ -20,7 +20,24 @@ public sealed record DevelopmentRules(
     IReadOnlyList<BuildingDefinition> Buildings,
     IReadOnlyList<MissionDefinition> Missions,
     int MissionsPerWeek,
-    SectBossRules Boss);
+    SectBossRules Boss,
+    SectLevelRules? Levels = null);
+
+/// <summary>A sect art (1.9): a perk every member gets once the sect reaches <paramref name="Level"/>.</summary>
+public sealed record SectArt(int Level, string NamePl, string DescriptionPl, JianghuGo.Modules.Combat.Contracts.PerkBonus Bonus);
+
+/// <summary>
+/// Sect level (1.9): experience from missions, the weekly boss and buildings. Each level adds member places; arts unlock
+/// at set levels; building perks grow with each member's era.
+/// </summary>
+/// <param name="Xp">Experience needed for level 2, 3, … (ascending).</param>
+public sealed record SectLevelRules(IReadOnlyList<long> Xp, int MembersPerLevel, IReadOnlyList<SectArt> Arts, long BossXp, int MissionXpPermille, int BuildingXpPermille,
+    int EraPerkPermille)
+{
+    public int LevelOf(long xp) => 1 + Xp.Count(t => xp >= t);
+
+    public long? NextXp(long xp) => Xp.Where(t => xp < t).Cast<long?>().FirstOrDefault();
+}
 
 /// <param name="Costs">Treasury cost of each level (index 0 = level 1).</param>
 /// <param name="PerLevel">Combat perks per level (Combat.Contracts.PerkBonus, ‰).</param>
@@ -53,7 +70,8 @@ public sealed record SectDevelopment(
     IReadOnlyList<Guid> BossFighters,
     IReadOnlyDictionary<string, int> BossAttempts,
     bool BossRewarded,
-    int Version)
+    int Version,
+    long Xp = 0)
 {
     public static SectDevelopment New(Guid sectId, string week) =>
         new(sectId, new Dictionary<string, int>(), week, new Dictionary<string, long>(), [], Guid.NewGuid(), 0, [], new Dictionary<string, int>(), false, 0);
@@ -73,6 +91,12 @@ public static class SectDevelopmentRules
         ISOWeek.GetYear(at.UtcDateTime).ToString("0000", CultureInfo.InvariantCulture) + "-W" + ISOWeek.GetWeekOfYear(at.UtcDateTime).ToString("00", CultureInfo.InvariantCulture);
 
     /// <summary>This week's missions for a sect (deterministic pick).</summary>
+    /// <summary>Missions scale with the sect: ×1 at 10 members, ⅓ for a lone founder, ×2.3 at 30 (1.9).</summary>
+    public static long Scaled(long value, int members) => Math.Max(1, value * (Math.Max(1, members) + 5) / 15);
+
+    public static int MaxMembers(SectsConfig c, long xp) =>
+        c.Development?.Levels is { } l ? c.MaxMembers + ((l.LevelOf(xp) - 1) * l.MembersPerLevel) : c.MaxMembers;
+
     public static IReadOnlyList<MissionDefinition> MissionsFor(DevelopmentRules r, Guid sectId, string week)
     {
         var h = 14695981039346656037UL;
@@ -225,6 +249,15 @@ public static class SectsConfigValidator
         if (c.MaxPendingApplicationsPerCharacter is < 1 or > 20) e.Add("maxPendingApplicationsPerCharacter must be 1-20.");
         if (c.ApplicationMessageMaxLength is < 0 or > 1000) e.Add("applicationMessageMaxLength must be 0-1000.");
         if (c.MinDonation < 1 || c.MaxDonation < c.MinDonation) e.Add("donation range invalid.");
+        if (c.Development?.Levels is { } lv)
+        {
+            if (lv.Xp is null || lv.Xp.Count is < 1 or > 20 || lv.Xp.Zip(lv.Xp.Skip(1)).Any(x => x.Second <= x.First) || lv.Xp[0] <= 0) e.Add("levels.xp must be ascending and positive.");
+            if (lv.MembersPerLevel is < 0 or > 20 || lv.BossXp < 0 || lv.MissionXpPermille is < 0 or > 1000 || lv.BuildingXpPermille is < 0 or > 1000 || lv.EraPerkPermille is < 0 or > 1000)
+                e.Add("levels: values invalid.");
+            foreach (var a in lv.Arts ?? [])
+                if (a.Level < 2 || a.Level > (lv.Xp?.Count ?? 0) + 1 || string.IsNullOrWhiteSpace(a.NamePl) || a.Bonus is null) e.Add($"sect art '{a.NamePl}' invalid.");
+        }
+
         if (c.Development is { } d)
         {
             if (d.Buildings is null || d.Buildings.Count == 0 || d.Buildings.Select(b => b.Id).Distinct().Count() != d.Buildings.Count) e.Add("development.buildings invalid.");

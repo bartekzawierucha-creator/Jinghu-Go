@@ -801,6 +801,12 @@ namespace JianghuGo.Android
             }
 
             ui.Text("Skarbiec " + d.Treasury.ToString("N0") + " KD · tydzień " + d.Week, page, 12, Ui.Gold, bold: true, center: true);
+            var nextArt = d.Arts.FirstOrDefault(a => !a.Unlocked);
+            var arts = d.Arts.Where(a => a.Unlocked).Select(a => a.NamePl).ToList();
+            ui.Text("Poziom sekty " + d.Level + (d.NextLevelXp.HasValue ? " (" + d.Xp.ToString("N0") + " / " + d.NextLevelXp.Value.ToString("N0") + " PD)" : " (szczyt)")
+                + " · miejsc " + d.MaxMembers + (arts.Count > 0 ? " · sztuki: " + string.Join(", ", arts) : string.Empty)
+                + (nextArt != null ? " · na poz. " + nextArt.Level + ": " + nextArt.NamePl : string.Empty)
+                + (d.EraPerkPermille > 0 ? " · budynki +" + d.EraPerkPermille / 10 + "% na erę" : string.Empty), page, 10, Ui.Muted, center: true, maxLines: 2);
             var boss = d.Boss;
             var bc = ui.Card(page, 0f, 8, boss.Defeated ? Ui.Jade : Ui.Cinnabar);
             bc.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, Px(92)) { TopMargin = Px(4) };

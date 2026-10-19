@@ -473,6 +473,22 @@ namespace JianghuGo.Client.Application
         public List<BuildingDto> Buildings { get; set; } = new List<BuildingDto>();
         public List<SectMissionDto> Missions { get; set; } = new List<SectMissionDto>();
         public SectBossDto Boss { get; set; } = new SectBossDto();
+
+        /// <summary>Sect level, its arts and member places (1.9).</summary>
+        public int Level { get; set; } = 1;
+        public long Xp { get; set; }
+        public long? NextLevelXp { get; set; }
+        public int MaxMembers { get; set; }
+        public List<SectArtDto> Arts { get; set; } = new List<SectArtDto>();
+        public int EraPerkPermille { get; set; }
+    }
+
+    public sealed class SectArtDto
+    {
+        public int Level { get; set; }
+        public string NamePl { get; set; }
+        public string DescriptionPl { get; set; }
+        public bool Unlocked { get; set; }
     }
 
     public sealed class SectBossBattleDto

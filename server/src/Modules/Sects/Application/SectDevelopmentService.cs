@@ -29,8 +29,11 @@ public sealed record MissionView(string Id, string NamePl, string DescriptionPl,
 public sealed record SectBossView(string NpcId, string NamePl, int Seals, int SealsBroken, bool Defeated, bool Rewarded, int Fighters, int AttemptsLeft, long TreasuryReward,
     long MemberStones);
 
+public sealed record SectArtView(int Level, string NamePl, string DescriptionPl, PerkBonus Bonus, bool Unlocked);
+
 public sealed record DevelopmentView(Guid SectId, string Week, long Treasury, string MyRole, bool CanBuild, IReadOnlyList<BuildingView> Buildings,
-    IReadOnlyList<MissionView> Missions, SectBossView Boss);
+    IReadOnlyList<MissionView> Missions, SectBossView Boss, int Level = 1, long Xp = 0, long? NextLevelXp = null, int MaxMembers = 0,
+    IReadOnlyList<SectArtView>? Arts = null, int EraPerkPermille = 0);
 
 public sealed record BuildCommand(Guid CharacterId, string BuildingId);
 
@@ -76,7 +79,8 @@ public sealed class SectDevelopmentService(
             if (level >= building.Costs.Count) return Error.LimitReached("building_max", "This building is fully built.");
             var paid = await sects.PostTreasuryAsync(uow, a.Sect.Id, -building.Costs[level], "building", $"{building.Id}:{level + 1}", now, ct);
             if (!paid.IsSuccess) return paid.Error!;
-            return a.Development with { Buildings = new Dictionary<string, int>(a.Development.Buildings) { [building.Id] = level + 1 } };
+            var xp = Rules.Levels is { } lv ? building.Costs[level] * lv.BuildingXpPermille / 1000 : 0;
+            return a.Development with { Buildings = new Dictionary<string, int>(a.Development.Buildings) { [building.Id] = level + 1 }, Xp = a.Development.Xp + xp };
         }, "sects.building_upgraded", ct);
 
     /// <summary>A completed weekly mission pays the treasury (more with the Hall of Tasks) and contribution to the claimer.</summary>
@@ -88,9 +92,10 @@ public sealed class SectDevelopmentService(
             var mission = SectDevelopmentRules.MissionsFor(Rules, a.Sect.Id, d.Week).FirstOrDefault(m => m.Id == cmd.MissionId);
             if (mission is null) return Error.NotFound("mission_not_found", "This mission is not active this week.");
             if (d.MissionsClaimed.Contains(mission.Id)) return Error.Conflict("mission_claimed", "Already claimed.");
-            if (d.Missions.GetValueOrDefault(mission.Metric) < mission.Target) return Error.Conflict("mission_not_completed", "The mission is not completed yet.");
+            var members = a.Sect.MemberCount;
+            if (d.Missions.GetValueOrDefault(mission.Metric) < SectDevelopmentRules.Scaled(mission.Target, members)) return Error.Conflict("mission_not_completed", "The mission is not completed yet.");
             var bonus = Rules.Buildings.Sum(b => b.MissionRewardPermillePerLevel * d.Level(b.Id));
-            var reward = mission.TreasuryReward * (1000 + bonus) / 1000;
+            var reward = SectDevelopmentRules.Scaled(mission.TreasuryReward, members) * (1000 + bonus) / 1000;
             if (reward > 0)
             {
                 var credited = await sects.PostTreasuryAsync(uow, a.Sect.Id, reward, "mission", d.Week + ":" + mission.Id, now, ct);
@@ -98,7 +103,7 @@ public sealed class SectDevelopmentService(
             }
 
             await sects.UpdateMemberAsync(uow, a.Member with { Contribution = a.Member.Contribution + mission.ContributionReward }, ct);
-            return d with { MissionsClaimed = [.. d.MissionsClaimed, mission.Id] };
+            return d with { MissionsClaimed = [.. d.MissionsClaimed, mission.Id], Xp = d.Xp + (Rules.Levels is { } lv ? reward * lv.MissionXpPermille / 1000 : 0) };
         }, "sects.mission_claimed", ct);
 
     /// <summary>Fights the sect boss's avatar; each victory breaks one seal. Limited attempts per member per day.</summary>
@@ -175,14 +180,19 @@ public sealed class SectDevelopmentService(
         var missions = SectDevelopmentRules.MissionsFor(Rules, sect.Id, d.Week).Select(m =>
         {
             var p = d.Missions.GetValueOrDefault(m.Metric);
-            return new MissionView(m.Id, m.NamePl, m.DescriptionPl, m.Metric, m.Target, Math.Min(p, m.Target), m.TreasuryReward, m.ContributionReward, p >= m.Target,
-                d.MissionsClaimed.Contains(m.Id));
+            var target = SectDevelopmentRules.Scaled(m.Target, sect.MemberCount);
+            return new MissionView(m.Id, m.NamePl, m.DescriptionPl, m.Metric, target, Math.Min(p, target), SectDevelopmentRules.Scaled(m.TreasuryReward, sect.MemberCount),
+                m.ContributionReward, p >= target, d.MissionsClaimed.Contains(m.Id));
         }).ToList();
         var used = d.BossAttempts.GetValueOrDefault(SectDevelopment.AttemptKey(me.CharacterId.Value, now));
         var b2 = Rules.Boss;
         var boss = new SectBossView(b2.NpcId, b2.NamePl, b2.Seals, Math.Min(d.SealsBroken, b2.Seals), d.SealsBroken >= b2.Seals, d.BossRewarded,
             d.BossFighters.Count, Math.Max(0, b2.AttemptsPerDay - used), b2.TreasuryReward, b2.MemberStones);
-        return new DevelopmentView(sect.Id, d.Week, await sects.TreasuryAsync(uow, sect.Id, ct), me.Role, CanBuild(me.Role), buildings, missions, boss);
+        var lv = Rules.Levels;
+        var level = lv?.LevelOf(d.Xp) ?? 1;
+        return new DevelopmentView(sect.Id, d.Week, await sects.TreasuryAsync(uow, sect.Id, ct), me.Role, CanBuild(me.Role), buildings, missions, boss,
+            level, d.Xp, lv?.NextXp(d.Xp), SectDevelopmentRules.MaxMembers(config, d.Xp),
+            lv is null ? [] : [.. lv.Arts.Select(x => new SectArtView(x.Level, x.NamePl, x.DescriptionPl, x.Bonus, level >= x.Level))], lv?.EraPerkPermille ?? 0);
     }
 }
 
@@ -246,7 +256,7 @@ internal sealed class SectProgressHandler(IServiceScopeFactory scopes, SectsConf
                 next = next with { SealsBroken = Math.Min(config.Development.Boss.Seals, dev.SealsBroken + bossWins) };
                 if (next.SealsBroken >= config.Development.Boss.Seals && !next.BossRewarded)
                 {
-                    next = next with { BossRewarded = true };
+                    next = next with { BossRewarded = true, Xp = next.Xp + (config.Development.Levels?.BossXp ?? 0) };
                     await RewardBossAsync(sp, uow, member.SectId, next, message.OccurredAt, ct);
                 }
             }
@@ -277,9 +287,9 @@ internal sealed class SectProgressHandler(IServiceScopeFactory scopes, SectsConf
 }
 
 /// <summary>Buildings give every member combat perks…</summary>
-internal sealed class SectCombatPerks(ISectRepository sects, ISectDevelopmentRepository repo, SectsConfig config) : ICombatPerkBonuses
+internal sealed class SectCombatPerks(ISectRepository sects, ISectDevelopmentRepository repo, SectsConfig config, ICultivationStatus cultivation) : ICombatPerkBonuses
 {
-    public string SourcePl => "Budynki sekty";
+    public string SourcePl => "Sekta";
 
     public async Task<PerkBonus> BonusAsync(IUnitOfWork uow, Guid characterId, CancellationToken ct)
     {
@@ -288,8 +298,19 @@ internal sealed class SectCombatPerks(ISectRepository sects, ISectDevelopmentRep
         var sum = PerkBonus.None;
         foreach (var b in config.Development.Buildings.Where(b => b.PerLevel is not null))
             for (var i = 0; i < d.Level(b.Id); i++) sum += b.PerLevel!;
+        if (config.Development.Levels is not { } lv) return sum;
+        // Buildings grow with the member's era (1.9): +EraPerkPermille per era.
+        var era = (await cultivation.StatusAsync(uow, characterId, ct)).Realm / 11;
+        sum = Scale(sum, 1000 + (lv.EraPerkPermille * era));
+        var level = lv.LevelOf(d.Xp);
+        foreach (var art in lv.Arts.Where(a => level >= a.Level)) sum += art.Bonus;
         return sum;
     }
+
+    private static PerkBonus Scale(PerkBonus p, int permille) => new(
+        p.DamagePermille * permille / 1000, p.GuardPermille * permille / 1000, p.EffectChancePermille * permille / 1000, p.BleedPermille * permille / 1000,
+        p.HealPermille * permille / 1000, p.QiRegen, p.QiPermille * permille / 1000, p.RegenPermille * permille / 1000, p.ReflectPermille * permille / 1000,
+        p.LifestealPermille * permille / 1000, p.FirstStrikePermille * permille / 1000, p.HpPermille * permille / 1000, p.SurviveOnce, p.PetPower, p.PetEvery);
 }
 
 /// <summary>…and workshop bonuses.</summary>

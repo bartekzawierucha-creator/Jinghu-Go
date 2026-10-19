@@ -51,8 +51,13 @@ public sealed class SectService(
     IOutbox outbox,
     ICorrelationContext correlation,
     SectsConfig config,
-    TimeProvider clock)
+    TimeProvider clock,
+    ISectDevelopmentRepository development)
 {
+    /// <summary>Member places grow with the sect level (1.9).</summary>
+    private async Task<int> MaxMembersAsync(IUnitOfWork uow, Guid sectId, CancellationToken ct) =>
+        SectDevelopmentRules.MaxMembers(config, (await development.FindAsync(uow, sectId, ct))?.Xp ?? 0);
+
     public const int MaxPageSize = 100;
 
     private static readonly Error CharacterNotFound = Error.NotFound("character_not_found", "Character not found.");
@@ -178,7 +183,7 @@ public sealed class SectService(
             var s = await repo.FindSectAsync(uow, sectId, ct);
             if (s is null || s.DisbandedAt is not null) return SectNotFound;
             if (await repo.FindMemberAsync(uow, c.Id, ct) is not null) return AlreadyInSect;
-            if (s.MemberCount >= config.MaxMembers) return Error.LimitReached("sect_full", "The sect is full.");
+            if (s.MemberCount >= await MaxMembersAsync(uow, s.Id, ct)) return Error.LimitReached("sect_full", "The sect is full.");
             var pending = await repo.ListPendingForCharacterAsync(uow, c.Id, ct);
             if (pending.Any(a => a.SectId == sectId)) return Error.Conflict("application_pending", "You already applied to this sect.");
             if (pending.Count >= config.MaxPendingApplicationsPerCharacter)
@@ -220,7 +225,7 @@ public sealed class SectService(
             var closed = a with { Status = cmd.Accept ? ApplicationStatuses.Accepted : ApplicationStatuses.Rejected, DecidedAt = now, DecidedBy = c.Id };
             if (cmd.Accept)
             {
-                if (s.MemberCount >= config.MaxMembers) return Error.LimitReached("sect_full", "The sect is full.");
+                if (s.MemberCount >= await MaxMembersAsync(uow, s.Id, ct)) return Error.LimitReached("sect_full", "The sect is full.");
                 if (await repo.FindMemberAsync(uow, a.CharacterId, ct) is not null) return Error.Conflict("applicant_in_sect", "The applicant has joined another sect.");
                 if (!await repo.TryUpdateSectAsync(uow, s with { MemberCount = s.MemberCount + 1, Version = s.Version + 1 }, s.Version, ct)) return Concurrent;
                 await repo.AddMemberAsync(uow, new Member(a.CharacterId, s.Id, a.AccountId, a.CharacterName, SectRoles.Member, 0, now), ct);
@@ -386,7 +391,7 @@ public sealed class SectService(
     private async Task<SectView> ViewAsync(IUnitOfWork uow, Sect s, CancellationToken ct)
     {
         var members = await repo.ListMembersAsync(uow, s.Id, ct);
-        return new SectView(s.Id, s.Name, s.LeaderCharacterId.Value, s.MemberCount, config.MaxMembers, s.Seat?.Lat, s.Seat?.Lon, s.Version, s.CreatedAt,
+        return new SectView(s.Id, s.Name, s.LeaderCharacterId.Value, s.MemberCount, await MaxMembersAsync(uow, s.Id, ct), s.Seat?.Lat, s.Seat?.Lon, s.Version, s.CreatedAt,
             s.DisbandedAt is not null,
             [.. members.OrderByDescending(m => SectRoles.Rank(m.Role)).ThenByDescending(m => m.Contribution).ThenBy(m => m.JoinedAt)
                 .Select(m => new MemberView(m.CharacterId.Value, m.Name, m.Role, m.Contribution, m.JoinedAt))]);
