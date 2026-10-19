@@ -179,7 +179,7 @@ namespace JianghuGo.Client.Application
         public Task<SamplesResultDto> SendSamplesAsync(Guid characterId, IList<Infrastructure.LocationFix> fixes, CancellationToken ct)
         {
             var samples = new List<object>();
-            foreach (var f in fixes) samples.Add(new { lat = f.Lat, lon = f.Lon, accuracyM = f.AccuracyM, capturedAt = f.CapturedAt });
+            foreach (var f in fixes) samples.Add(new { lat = f.Lat, lon = f.Lon, accuracyM = f.AccuracyM, capturedAt = f.CapturedAt, mock = f.Mock });
             return SendAsync<SamplesResultDto>("POST", Exploration(characterId) + "/samples", new { samples }, true, null, ct, retryPost: true);
         }
 

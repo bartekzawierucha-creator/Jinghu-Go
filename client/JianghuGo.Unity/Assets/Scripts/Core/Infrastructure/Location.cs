@@ -13,13 +13,17 @@ namespace JianghuGo.Client.Infrastructure
 
     public sealed class LocationFix
     {
-        public LocationFix(double lat, double lon, double accuracyM, DateTimeOffset capturedAt)
+        public LocationFix(double lat, double lon, double accuracyM, DateTimeOffset capturedAt, bool mock = false)
         {
+            Mock = mock;
             Lat = lat;
             Lon = lon;
             AccuracyM = accuracyM;
             CapturedAt = capturedAt;
         }
+
+        /// <summary>Reported by a mock location provider (the server drops such fixes).</summary>
+        public bool Mock { get; }
 
         public double Lat { get; }
         public double Lon { get; }

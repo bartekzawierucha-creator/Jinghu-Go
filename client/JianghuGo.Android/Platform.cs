@@ -151,7 +151,10 @@ namespace JianghuGo.Android
                 if (location.Time <= _lastTime) return;
                 _lastTime = location.Time;
                 var accuracy = location.HasAccuracy ? Math.Max(1.0, location.Accuracy) : 50.0;
-                _buffer.Add(new LocationFix(location.Latitude, location.Longitude, accuracy, DateTimeOffset.FromUnixTimeMilliseconds(location.Time)));
+#pragma warning disable CA1422, CS0618 // IsFromMockProvider: the API for 26-30; IsMock from 31
+                var mock = global::Android.OS.Build.VERSION.SdkInt >= global::Android.OS.BuildVersionCodes.S ? location.IsMock : location.IsFromMockProvider;
+#pragma warning restore CA1422, CS0618
+                _buffer.Add(new LocationFix(location.Latitude, location.Longitude, accuracy, DateTimeOffset.FromUnixTimeMilliseconds(location.Time), mock));
                 if (_buffer.Count > Capacity) _buffer.RemoveAt(0);
             }
 

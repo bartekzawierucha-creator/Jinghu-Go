@@ -20,7 +20,7 @@ public interface IExplorationRepository
 /// <summary>Another cultivator nearby. Only a coarse distance band is shared — never coordinates.</summary>
 public sealed record NearbyCultivator(Guid CharacterId, string Name, string Path, string DistanceBand);
 
-public sealed record SampleDto(double Lat, double Lon, double AccuracyM, DateTimeOffset CapturedAt);
+public sealed record SampleDto(double Lat, double Lon, double AccuracyM, DateTimeOffset CapturedAt, bool Mock = false);
 
 public sealed record SamplesCommand(IReadOnlyList<SampleDto>? Samples);
 
@@ -114,7 +114,7 @@ public sealed class GeolocationService(
                 return NoSession;
             }
 
-            var (next, outcomes) = SampleProcessor.Apply(config, active, [.. cmd.Samples.Select(x => new GeoSample(x.Lat, x.Lon, x.AccuracyM, x.CapturedAt))], now);
+            var (next, outcomes) = SampleProcessor.Apply(config, active, [.. cmd.Samples.Select(x => new GeoSample(x.Lat, x.Lon, x.AccuracyM, x.CapturedAt, x.Mock))], now);
             next = next with { Version = active.Version + 1 };
             if (!await repo.TryUpdateAsync(uow, next, active.Version, ct)) throw new TransientConflictException("session changed");
             if (next.Flagged && !active.Flagged)

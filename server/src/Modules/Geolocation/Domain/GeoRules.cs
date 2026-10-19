@@ -34,7 +34,8 @@ public static class GeolocationConfigValidator
     }
 }
 
-public sealed record GeoSample(double Lat, double Lon, double AccuracyM, DateTimeOffset CapturedAt);
+/// <param name="Mock">The phone reported a mock location provider (2.1 anti-spoofing): the sample is dropped and counted as an anomaly.</param>
+public sealed record GeoSample(double Lat, double Lon, double AccuracyM, DateTimeOffset CapturedAt, bool Mock = false);
 
 public static class SessionStatuses
 {
@@ -89,6 +90,7 @@ public static class SampleOutcomes
     public const string Stale = "stale";
     public const string OutOfOrder = "out_of_order";      // duplicates and older samples
     public const string RateLimited = "rate_limited";
+    public const string Mock = "mock";
 }
 
 public static class PositionProblems
@@ -120,6 +122,15 @@ public static class SampleProcessor
         foreach (var x in samples.OrderBy(x => x.CapturedAt))
         {
             string outcome;
+            if (x.Mock)
+            {
+                // A spoofing app is running: never move the position; repeated mocks flag the session for review.
+                var anomalies = s.Anomalies + 1;
+                s = s with { DroppedSamples = s.DroppedSamples + 1, Anomalies = anomalies, Flagged = s.Flagged || anomalies >= c.FlagAfterAnomalies };
+                outcomes.Add(SampleOutcomes.Mock);
+                continue;
+            }
+
             if (!GeoPoint.IsValid(x.Lat, x.Lon) || !double.IsFinite(x.AccuracyM) || x.AccuracyM <= 0 || x.AccuracyM > c.MaxAccuracyM)
                 outcome = SampleOutcomes.Invalid;
             else if (x.CapturedAt > now.AddSeconds(c.MaxClockSkewSeconds))
