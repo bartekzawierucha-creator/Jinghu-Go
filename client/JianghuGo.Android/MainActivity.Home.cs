@@ -354,6 +354,7 @@ namespace JianghuGo.Android
                     SetStatus(next ? "Przypomnę o końcu odosobnienia, partiach, plonach i wyprawach." : "Przypomnienia wyłączone.");
                 });
             }, ui.Content, secondary: true, sp: 12, heightDp: 34);
+            ui.Btn("👥 Przyjaciele i poczta", () => Run(ShowFriendsAsync), ui.Content, secondary: true, sp: 12, heightDp: 34);
             ui.Pages(ui.Content, items.Count, 1, 5, (i, cell) =>
             {
                 var n = items[i];

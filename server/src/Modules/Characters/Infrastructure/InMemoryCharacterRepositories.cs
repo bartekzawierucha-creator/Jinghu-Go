@@ -58,6 +58,9 @@ internal sealed class InMemoryCharacterRepository : ICharacterRepository
     public Task<bool> NameExistsAsync(IUnitOfWork uow, string normalizedName, CancellationToken ct) =>
         Task.FromResult(InMemoryUnitOfWork.From(uow).Table<string, CharacterId>(Names).ContainsKey(normalizedName));
 
+    public Task<CharacterId?> FindIdByNameAsync(IUnitOfWork uow, string normalizedName, CancellationToken ct) =>
+        Task.FromResult(InMemoryUnitOfWork.From(uow).Table<string, CharacterId>(Names).TryGetValue(normalizedName, out var id) ? id : (CharacterId?)null);
+
     public Task AddCharacterAsync(IUnitOfWork uow, Character character, CancellationToken ct)
     {
         var u = InMemoryUnitOfWork.From(uow);

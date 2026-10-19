@@ -320,6 +320,7 @@ namespace JianghuGo.Android
             "market_sold" => "menu_market",
             "sect_application_accepted" or "sect_application_rejected" => "menu_sect",
             "war_declared" or "war_resolved" => "menu_war",
+            "friend_request" or "friend_accepted" or "mail_received" => "menu_chat",
             _ => "menu_notifications",
         };
 
@@ -468,6 +469,9 @@ namespace JianghuGo.Android
             "market_sold" => "Sprzedano przedmiot na targu.",
             "sect_application_accepted" => "Przyjęto cię do sekty!",
             "sect_application_rejected" => "Sekta odrzuciła twoją prośbę.",
+            "friend_request" => (PayloadString(n, "name") ?? "Ktoś") + " chce zostać twoim przyjacielem.",
+            "friend_accepted" => (PayloadString(n, "name") ?? "Ktoś") + " przyjął twoje zaproszenie.",
+            "mail_received" => "List od: " + (PayloadString(n, "name") ?? "przyjaciela") + ".",
             "war_declared" => "Wypowiedziano wojnę o terytorium twojej sekty!",
             "war_resolved" => "Wojna o terytorium rozstrzygnięta.",
             _ => n.Type,

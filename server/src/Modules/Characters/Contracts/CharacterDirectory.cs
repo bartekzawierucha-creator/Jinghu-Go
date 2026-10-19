@@ -14,6 +14,9 @@ public interface ICharacterDirectory
 
     /// <summary>Any character (e.g. a PvP opponent). Character builds are public information in the game.</summary>
     Task<CharacterSummary?> FindAsync(IUnitOfWork uow, Guid characterId, CancellationToken ct);
+
+    /// <summary>Exact name lookup (case-insensitive), e.g. to add a friend (1.9).</summary>
+    Task<CharacterSummary?> FindByNameAsync(IUnitOfWork uow, string name, CancellationToken ct) => Task.FromResult<CharacterSummary?>(null);
 }
 
 /// <summary>
@@ -86,5 +89,12 @@ internal sealed class CharacterDirectory(ICharacterRepository repo) : ICharacter
     {
         var c = await repo.FindCharacterAsync(uow, new CharacterId(characterId), ct);
         return c is null ? null : new CharacterSummary(c.Id, c.AccountId, c.Name, c.Path, c.Stats.ToDictionary(s => s.Key, s => s.Value));
+    }
+
+    public async Task<CharacterSummary?> FindByNameAsync(IUnitOfWork uow, string name, CancellationToken ct)
+    {
+        if (string.IsNullOrWhiteSpace(name) || name.Length > 64) return null;
+        var id = await repo.FindIdByNameAsync(uow, name.Trim().Normalize(System.Text.NormalizationForm.FormC).ToUpperInvariant(), ct);
+        return id is null ? null : await FindAsync(uow, id.Value.Value, ct);
     }
 }

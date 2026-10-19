@@ -28,6 +28,7 @@ tags:
   - name: Territory
   - name: Arts
   - name: Estate
+  - name: Social
 paths:
   /health/live:
     get:
@@ -333,6 +334,76 @@ paths:
       responses:
         "204": { description: Marked }
         "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/social/friends:
+    get:
+      tags: [Social]
+      summary: Friends, incoming and outgoing requests, unread counts.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+    post:
+      tags: [Social]
+      summary: Send a friend request by exact name (accepts if they asked first).
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/social/friends/{otherId}/accept:
+    post:
+      tags: [Social]
+      summary: Accept a friend request.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }, { name: otherId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/social/friends/{otherId}:
+    delete:
+      tags: [Social]
+      summary: Remove a friend, decline or withdraw a request.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }, { name: otherId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK }
+  /api/v1/characters/{characterId}/social/messages/{otherId}:
+    get:
+      tags: [Social]
+      summary: Conversation with a friend (marks it read).
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }, { name: otherId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK }
+    post:
+      tags: [Social]
+      summary: Send a direct message to a friend (rate limited).
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }, { name: otherId, in: path, required: true, schema: { type: string, format: uuid } }, { $ref: "#/components/parameters/IdempotencyKey" }]
+      responses:
+        "200": { description: OK }
+        "403": { $ref: "#/components/responses/Problem" }
+        "429": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/social/mail:
+    get:
+      tags: [Social]
+      summary: Received letters.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+    post:
+      tags: [Social]
+      summary: Send a letter to a friend with stones (5% courier fee) or tradable stackable items.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "403": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/social/mail/{mailId}/claim:
+    post:
+      tags: [Social]
+      summary: Receive a letter's gifts.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }, { name: mailId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
   /api/v1/combat/catalog:
     get:
       tags: [Combat]

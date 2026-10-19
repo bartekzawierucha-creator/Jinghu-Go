@@ -80,6 +80,12 @@ internal sealed class PostgresCharacterRepository : ICharacterRepository
     public async Task<bool> NameExistsAsync(IUnitOfWork uow, string normalizedName, CancellationToken ct) =>
         (await PostgresUnitOfWork.From(uow).QueryAsync("SELECT 1 FROM characters.characters WHERE normalized_name = $1", r => 1, ct, normalizedName)).Count > 0;
 
+    public async Task<CharacterId?> FindIdByNameAsync(IUnitOfWork uow, string normalizedName, CancellationToken ct)
+    {
+        var rows = await PostgresUnitOfWork.From(uow).QueryAsync("SELECT id FROM characters.characters WHERE normalized_name = $1", r => r.GetGuid(0), ct, normalizedName);
+        return rows.Count == 0 ? null : new CharacterId(rows[0]);
+    }
+
     public Task AddCharacterAsync(IUnitOfWork uow, Character c, CancellationToken ct) =>
         PostgresUnitOfWork.From(uow).ExecuteAsync(
             $"INSERT INTO characters.characters ({CharacterColumns.Replace("stats::text", "stats", StringComparison.Ordinal)}) " +

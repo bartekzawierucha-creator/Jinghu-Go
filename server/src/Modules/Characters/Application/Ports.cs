@@ -16,6 +16,7 @@ public interface ICharacterRepository
     Task<Character?> FindCharacterAsync(IUnitOfWork uow, CharacterId id, CancellationToken ct);
     Task<IReadOnlyList<Character>> ListCharactersAsync(IUnitOfWork uow, AccountId accountId, CancellationToken ct);
     Task<bool> NameExistsAsync(IUnitOfWork uow, string normalizedName, CancellationToken ct);
+    Task<CharacterId?> FindIdByNameAsync(IUnitOfWork uow, string normalizedName, CancellationToken ct);
 
     /// <summary>Throws <see cref="DuplicateKeyException"/> on name collision.</summary>
     Task AddCharacterAsync(IUnitOfWork uow, Character character, CancellationToken ct);
