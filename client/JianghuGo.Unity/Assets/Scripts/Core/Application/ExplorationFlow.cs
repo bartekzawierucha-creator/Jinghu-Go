@@ -35,6 +35,9 @@ namespace JianghuGo.Client.Application
         /// <summary>"location_denied", "location_unavailable", "location_starting", or the server's position problem; null when all is well.</summary>
         public string Problem { get; private set; }
 
+        /// <summary>How many times a lapsed server session was reopened automatically.</summary>
+        public int Restarts { get; private set; }
+
         public event Action Changed;
 
         /// <summary>Faster updates only when something is within reach; otherwise save battery.</summary>
@@ -77,7 +80,19 @@ namespace JianghuGo.Client.Application
             if (fixes.Count > MaxBatch) fixes = fixes.Skip(fixes.Count - MaxBatch).ToList(); // newest matter most
             if (fixes.Count > 0)
             {
-                var result = await _api.SendSamplesAsync(_characterId, fixes, ct).ConfigureAwait(false);
+                SamplesResultDto result;
+                try
+                {
+                    result = await _api.SendSamplesAsync(_characterId, fixes, ct).ConfigureAwait(false);
+                }
+                catch (ApiException e) when (e.Code == "no_session")
+                {
+                    // The session lapsed (app in the background, standing still too long, or the 4 h limit): open a new one and resend.
+                    Session = await _api.StartExplorationAsync(_characterId, ct).ConfigureAwait(false);
+                    Restarts++;
+                    result = await _api.SendSamplesAsync(_characterId, fixes, ct).ConfigureAwait(false);
+                }
+
                 _lastSent = fixes[fixes.Count - 1].CapturedAt;
                 Session = result.Session;
             }

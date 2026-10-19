@@ -94,6 +94,27 @@ public class ClientWorldTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Lapsed_session_is_reopened_without_an_error()
+    {
+        var start = new GeoPoint(52.2297, 21.0122);
+        var (api, c) = await PlayerAsync("wraca@gps.dev");
+        var gps = new FakeLocation(_host.Clock);
+        gps.Fix(start);
+        var flow = new ExplorationFlow(api, gps, c.Id);
+        await flow.StartAsync(default);
+        var first = flow.Session!.Id;
+
+        // app in the background for 15 minutes: the server ends the idle session
+        _host.Clock.Advance(TimeSpan.FromMinutes(15));
+        gps.Fix(start);
+        await flow.TickAsync(default);
+        Assert.Equal(1, flow.Restarts);
+        Assert.NotEqual(first, flow.Session!.Id);
+        Assert.Equal("active", flow.Session.Status);
+        Assert.Equal(1, flow.Session.AcceptedSamples);
+    }
+
+    [Fact]
     public void Web_mercator_tiles_and_pixels_round_trip()
     {
         var tile = WebMercator.TileFor(52.2297, 21.0122, 16);

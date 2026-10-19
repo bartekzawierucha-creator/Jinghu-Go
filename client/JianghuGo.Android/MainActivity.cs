@@ -429,6 +429,7 @@ namespace JianghuGo.Android
             "moving_too_fast" => "poruszasz się zbyt szybko",
             "relocation_cooldown" => "wykryto skok pozycji — nagrody wrócą za kilka minut",
             "no_position" => "czekam na pierwszą pozycję",
+            "no_session" => "wznawiam sesję eksploracji…",
             "stale" or "stale_position" => "pozycja nieaktualna — czekam na świeży odczyt",
             _ => problem,
         };
@@ -452,6 +453,7 @@ namespace JianghuGo.Android
 
         private static string Describe(ApiException e) => e.Code switch
         {
+            "no_session" => "Sesja eksploracji wygasła — wznawiam…",
             "network_error" => "Brak połączenia z serwerem — sprawdź adres i czy telefon jest w tej samej sieci.",
             "invalid_credentials" => "Błędny e-mail lub hasło.",
             "email_invalid" => "Niepoprawny adres e-mail.",

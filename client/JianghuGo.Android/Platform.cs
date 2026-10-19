@@ -121,8 +121,9 @@ namespace JianghuGo.Android
                 return;
             }
 
-            if (gps) _manager.RequestLocationUpdates(LocationManager.GpsProvider, 3000, 3f, this);
-            if (network) _manager.RequestLocationUpdates(LocationManager.NetworkProvider, 5000, 5f, this);
+            // no distance filter: standing still at a node still needs fresh fixes (server freshness 60 s, idle session 10 min)
+            if (gps) _manager.RequestLocationUpdates(LocationManager.GpsProvider, 3000, 0f, this);
+            if (network) _manager.RequestLocationUpdates(LocationManager.NetworkProvider, 5000, 0f, this);
             _listening = true;
             if (Status != LocationStatus.Running) Status = LocationStatus.Initializing;
         }
