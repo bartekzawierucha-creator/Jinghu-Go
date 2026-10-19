@@ -69,6 +69,12 @@ namespace JianghuGo.Android
             _ui.Text("TYTUŁY (" + _board.Titles.Count + ")", titles, 13, Ui.Gold, bold: true);
             var tb = StatsText(_board.TitleBonuses);
             _ui.Text(tb.Length > 0 ? tb : "Zdobądź tytuły za osiągnięcia — każdy daje stałą premię do cech w walce.", titles, 12, Ui.Ink, maxLines: 3);
+            if (_board.Zodiac is { } z)
+            {
+                var zc = _ui.Card(body, 0.8f, 8, z.LuckyToday ? Ui.Gold : Ui.GoldDim);
+                _ui.Text("ZNAK URODZENIA: " + z.Hanzi + " " + z.NamePl.ToUpperInvariant(), zc, 13, Ui.Gold, bold: true);
+                _ui.Text(z.DescriptionPl + " +" + z.Bonus + " " + StatName(z.Stat) + (z.LuckyToday ? " — dziś twój dzień (podwójnie)!" : " · dziś dzień: " + z.TodayNamePl), zc, 12, Ui.Ink, maxLines: 2);
+            }
         });
 
         // ---- Postać: the silhouette with five equipment slots ---------------------------------------------------

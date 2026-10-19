@@ -32,7 +32,7 @@ public sealed record CheckinView(int Streak, int BestStreak, bool CheckedInToday
 
 public sealed record QuestBoard(string Day, IReadOnlyList<QuestView> Daily, IReadOnlyList<QuestView> Achievements, CheckinView Checkin, IReadOnlyList<string> Titles,
     IReadOnlyDictionary<string, int>? TitleBonuses = null, IReadOnlyList<QuestView>? Seasonal = null, StoryView? Story = null, IReadOnlyList<TitleView>? AllTitles = null,
-    string? SelectedTitleId = null, int SecretsFound = 0, int SecretsTotal = 0, WeeklyView? Weekly = null, SeasonPassView? Pass = null, int DestinyTokens = 0);
+    string? SelectedTitleId = null, int SecretsFound = 0, int SecretsTotal = 0, WeeklyView? Weekly = null, SeasonPassView? Pass = null, int DestinyTokens = 0, ZodiacView? Zodiac = null);
 
 public sealed record ClaimResult(string QuestId, long Stones, long Balance, QuestBoard Board);
 
@@ -362,7 +362,14 @@ public sealed class QuestService(
             new CheckinView(checkedToday ? checkin!.Streak : checkin is not null && checkin.LastDay == today.AddDays(-1) ? checkin.Streak : 0, checkin?.BestStreak ?? 0, checkedToday,
                 RealmStones(QuestRules.CheckinStones(config, nextStreak), realm)), titleNames, titleBonuses, seasonal, story, all, all.FirstOrDefault(t => t.Selected)?.Id,
             config.Achievements.Count(q => q.Secret && (lifeRows.GetValueOrDefault("m_" + q.Metric)?.Progress ?? 0) >= q.Target), config.Achievements.Count(q => q.Secret), weekly, passView,
-            await characters.FindAsync(uow, id.Value, ct) is { } owner ? await tokens.BalanceAsync(uow, owner.AccountId, ct) : 0);
+            await characters.FindAsync(uow, id.Value, ct) is { } owner ? await tokens.BalanceAsync(uow, owner.AccountId, ct) : 0, ZodiacOf(id.Value, today));
+    }
+
+    private static ZodiacView ZodiacOf(Guid characterId, DateOnly today)
+    {
+        var s = Zodiac.Of(characterId);
+        var d = Zodiac.OfDay(today);
+        return new ZodiacView(s.Id, s.NamePl, s.Hanzi, s.Stat, d.Id == s.Id ? Zodiac.Bonus * 2 : Zodiac.Bonus, s.DescriptionPl, d.Id, d.NamePl, d.Id == s.Id);
     }
 
     private Task AuditAsync(IUnitOfWork uow, AccountId accountId, string action, Guid characterId, string json, DateTimeOffset now, CancellationToken ct) =>

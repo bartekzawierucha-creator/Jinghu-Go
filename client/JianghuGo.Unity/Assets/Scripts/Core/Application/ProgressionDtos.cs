@@ -86,6 +86,22 @@ namespace JianghuGo.Client.Application
         /// <summary>Season pass of this quarter (1.9) and the account's Destiny Tokens.</summary>
         public SeasonPassDto Pass { get; set; }
         public int DestinyTokens { get; set; }
+
+        /// <summary>Birth sign (2.2).</summary>
+        public ZodiacDto Zodiac { get; set; }
+    }
+
+    public sealed class ZodiacDto
+    {
+        public string Id { get; set; }
+        public string NamePl { get; set; }
+        public string Hanzi { get; set; }
+        public string Stat { get; set; }
+        public int Bonus { get; set; }
+        public string DescriptionPl { get; set; }
+        public string TodayId { get; set; }
+        public string TodayNamePl { get; set; }
+        public bool LuckyToday { get; set; }
     }
 
     public sealed class PassLevelDto
