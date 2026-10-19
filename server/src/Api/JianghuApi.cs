@@ -112,6 +112,7 @@ public static class JianghuApi
         app.MapQuestEndpoints();
         app.MapArtsEndpoints();
         app.MapEstateEndpoints();
+        app.MapOpsEndpoints();
         return app;
     }
 

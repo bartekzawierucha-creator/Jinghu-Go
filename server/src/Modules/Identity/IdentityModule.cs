@@ -33,6 +33,8 @@ public static class IdentityModule
             services.AddSingleton<ISessionRepository, InMemorySessionRepository>();
         }
         services.AddScoped<IdentityService>();
+        services.AddSingleton<JianghuGo.Application.IOpsMetric>(sp => new ActivePlayersMetric(sp.GetRequiredService<ISessionRepository>(), "active_players_24h", TimeSpan.FromDays(1)));
+        services.AddSingleton<JianghuGo.Application.IOpsMetric>(sp => new ActivePlayersMetric(sp.GetRequiredService<ISessionRepository>(), "active_players_7d", TimeSpan.FromDays(7)));
 
         services.AddAuthentication(JianghuClaims.Scheme)
             .AddScheme<AuthenticationSchemeOptions, OpaqueTokenAuthenticationHandler>(JianghuClaims.Scheme, null);

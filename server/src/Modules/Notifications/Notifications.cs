@@ -249,6 +249,7 @@ public static class NotificationsModule
         }
 
         services.AddSingleton<SocialService>();
+        services.AddSingleton<IOpsMetric, OpenReportsMetric>();
 
         services.AddSingleton<IOutboxHandler, CharacterCreatedHandler>();
         services.AddSingleton<IOutboxHandler, ChallengeReceivedHandler>();

@@ -81,6 +81,9 @@ internal sealed class InMemorySessionRepository : ISessionRepository
     public Task<Session?> FindByIdAsync(IUnitOfWork uow, SessionId id, CancellationToken ct) =>
         Task.FromResult(InMemoryUnitOfWork.From(uow).Table<SessionId, Session>(Sessions).GetValueOrDefault(id));
 
+    public Task<long> CountActiveAccountsSinceAsync(IUnitOfWork uow, DateTimeOffset since, CancellationToken ct) =>
+        Task.FromResult((long)InMemoryUnitOfWork.From(uow).Table<SessionId, Session>(Sessions).Values.Where(s => s.CreatedAt >= since).Select(s => s.AccountId).Distinct().Count());
+
     public Task<IReadOnlyList<Session>> ListActiveForAccountAsync(IUnitOfWork uow, AccountId accountId, CancellationToken ct)
     {
         IReadOnlyList<Session> list = [.. InMemoryUnitOfWork.From(uow).Table<SessionId, Session>(Sessions).Values.Where(s => s.AccountId == accountId && s.RevokedAt is null)];

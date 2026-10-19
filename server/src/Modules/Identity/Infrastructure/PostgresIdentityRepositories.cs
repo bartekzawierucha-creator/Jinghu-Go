@@ -84,6 +84,9 @@ internal sealed class PostgresSessionRepository : ISessionRepository
     public Task<Session?> FindByIdAsync(IUnitOfWork uow, SessionId id, CancellationToken ct) =>
         PostgresUnitOfWork.From(uow).QuerySingleOrDefaultAsync($"SELECT {Columns} FROM identity.sessions WHERE id = $1", Map, ct, id.Value);
 
+    public async Task<long> CountActiveAccountsSinceAsync(IUnitOfWork uow, DateTimeOffset since, CancellationToken ct) =>
+        (await PostgresUnitOfWork.From(uow).QueryAsync("SELECT count(DISTINCT account_id) FROM identity.sessions WHERE created_at >= $1", r => r.GetInt64(0), ct, since))[0];
+
     public async Task<IReadOnlyList<Session>> ListActiveForAccountAsync(IUnitOfWork uow, AccountId accountId, CancellationToken ct) =>
         await PostgresUnitOfWork.From(uow).QueryAsync($"SELECT {Columns} FROM identity.sessions WHERE account_id = $1 AND revoked_at IS NULL ORDER BY id", Map, ct, accountId.Value);
 

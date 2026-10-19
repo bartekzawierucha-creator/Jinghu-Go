@@ -77,6 +77,8 @@ public interface ISocialRepository
     Task<IReadOnlyList<Guid>> BlockedAsync(IUnitOfWork uow, CharacterId blocker, CancellationToken ct);
     Task AddReportAsync(IUnitOfWork uow, PlayerReport report, CancellationToken ct);
     Task<int> CountReportsSinceAsync(IUnitOfWork uow, CharacterId reporter, DateTimeOffset since, CancellationToken ct);
+    Task<IReadOnlyList<PlayerReport>> OpenReportsAsync(IUnitOfWork uow, int limit, CancellationToken ct);
+    Task<bool> DecideReportAsync(IUnitOfWork uow, Guid id, string decision, DateTimeOffset now, CancellationToken ct);
 }
 
 /// <summary>A player's report of another player (name, chat or message). Reviewed by moderators; only the reported text excerpt is kept.</summary>
@@ -513,6 +515,24 @@ internal sealed class InMemorySocialRepository : ISocialRepository
 
     public Task<int> CountReportsSinceAsync(IUnitOfWork uow, CharacterId reporter, DateTimeOffset since, CancellationToken ct) =>
         Task.FromResult(U(uow).Table<Guid, PlayerReport>(Reports).Values.Count(r => r.Reporter == reporter && r.CreatedAt >= since));
+
+    private const string Decisions = "social.report_decisions";
+
+    public Task<IReadOnlyList<PlayerReport>> OpenReportsAsync(IUnitOfWork uow, int limit, CancellationToken ct)
+    {
+        var decided = U(uow).Table<Guid, string>(Decisions);
+        IReadOnlyList<PlayerReport> list = [.. U(uow).Table<Guid, PlayerReport>(Reports).Values.Where(r => !decided.ContainsKey(r.Id)).OrderBy(r => r.CreatedAt).Take(limit)];
+        return Task.FromResult(list);
+    }
+
+    public Task<bool> DecideReportAsync(IUnitOfWork uow, Guid id, string decision, DateTimeOffset now, CancellationToken ct)
+    {
+        var u = U(uow);
+        var decided = u.Table<Guid, string>(Decisions);
+        if (!u.Table<Guid, PlayerReport>(Reports).ContainsKey(id) || decided.ContainsKey(id)) return Task.FromResult(false);
+        u.SetTable(Decisions, decided.Add(id, decision));
+        return Task.FromResult(true);
+    }
 }
 
 internal sealed class PostgresSocialRepository : ISocialRepository
@@ -599,6 +619,14 @@ internal sealed class PostgresSocialRepository : ISocialRepository
 
     public async Task<int> CountReportsSinceAsync(IUnitOfWork uow, CharacterId reporter, DateTimeOffset since, CancellationToken ct) =>
         (await P(uow).QueryAsync("SELECT count(*)::int FROM social.reports WHERE reporter_id = $1 AND created_at >= $2", r => r.GetInt32(0), ct, reporter.Value, since))[0];
+
+    public async Task<IReadOnlyList<PlayerReport>> OpenReportsAsync(IUnitOfWork uow, int limit, CancellationToken ct) =>
+        await P(uow).QueryAsync("SELECT id, reporter_id, reported_id, reason, excerpt, created_at FROM social.reports WHERE reviewed_at IS NULL ORDER BY created_at LIMIT $1",
+            r => new PlayerReport(r.GetGuid(0), new CharacterId(r.GetGuid(1)), new CharacterId(r.GetGuid(2)), r.GetString(3), r.IsDBNull(4) ? null : r.GetString(4),
+                r.GetFieldValue<DateTimeOffset>(5)), ct, limit);
+
+    public async Task<bool> DecideReportAsync(IUnitOfWork uow, Guid id, string decision, DateTimeOffset now, CancellationToken ct) =>
+        await P(uow).ExecuteAsync("UPDATE social.reports SET reviewed_at = $2, decision = $3 WHERE id = $1 AND reviewed_at IS NULL", ct, id, now, decision) == 1;
 }
 
 public static class SocialEndpoints
@@ -637,4 +665,11 @@ public static class SocialEndpoints
             ApiResults.From(await svc.ReportAsync(http.User.GetAccountId(), characterId, cmd, ct), _ => Results.NoContent()));
         return app;
     }
+}
+
+internal sealed class OpenReportsMetric(ISocialRepository repo) : IOpsMetric
+{
+    public string Name => "open_reports";
+
+    public async Task<long> ValueAsync(IUnitOfWork uow, DateTimeOffset now, CancellationToken ct) => (await repo.OpenReportsAsync(uow, 10_000, ct)).Count;
 }

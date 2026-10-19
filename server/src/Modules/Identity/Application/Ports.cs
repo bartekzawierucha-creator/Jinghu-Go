@@ -27,6 +27,9 @@ public interface ISessionRepository
     Task<Session?> FindByIdAsync(IUnitOfWork uow, SessionId id, CancellationToken ct);
     Task<IReadOnlyList<Session>> ListFamilyAsync(IUnitOfWork uow, Guid familyId, CancellationToken ct);
     Task<IReadOnlyList<Session>> ListActiveForAccountAsync(IUnitOfWork uow, AccountId accountId, CancellationToken ct);
+
+    /// <summary>Distinct accounts that started or refreshed a session since a moment (active players, analytics).</summary>
+    Task<long> CountActiveAccountsSinceAsync(IUnitOfWork uow, DateTimeOffset since, CancellationToken ct);
     Task AddAsync(IUnitOfWork uow, Session session, CancellationToken ct);
     Task UpdateAsync(IUnitOfWork uow, Session session, CancellationToken ct);
 }

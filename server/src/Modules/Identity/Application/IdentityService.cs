@@ -344,3 +344,10 @@ public static class RecoveryCodes
 
     public static string Normalize(string code) => new string(code.Where(char.IsLetterOrDigit).Select(char.ToUpperInvariant).ToArray());
 }
+
+internal sealed class ActivePlayersMetric(ISessionRepository sessions, string name, TimeSpan window) : IOpsMetric
+{
+    public string Name => name;
+
+    public Task<long> ValueAsync(IUnitOfWork uow, DateTimeOffset now, CancellationToken ct) => sessions.CountActiveAccountsSinceAsync(uow, now - window, ct);
+}

@@ -30,6 +30,32 @@ tags:
   - name: Estate
   - name: Social
 paths:
+  /ops/metrics:
+    get:
+      tags: [Operations]
+      summary: Aggregate analytics for operators (X-Ops-Key; 404 when not configured).
+      security: []
+      responses:
+        "200": { description: OK }
+        "404": { description: Disabled or wrong key }
+  /ops/reports:
+    get:
+      tags: [Operations]
+      summary: Open player reports (moderation queue).
+      security: []
+      responses:
+        "200": { description: OK }
+        "404": { description: Disabled or wrong key }
+  /ops/reports/{id}/decision:
+    post:
+      tags: [Operations]
+      summary: Record a moderation decision.
+      security: []
+      parameters: [{ name: id, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "204": { description: Decided }
+        "400": { description: Invalid decision }
+        "404": { description: Not found, disabled or wrong key }
   /health/live:
     get:
       tags: [Operations]
