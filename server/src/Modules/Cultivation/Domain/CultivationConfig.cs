@@ -260,7 +260,7 @@ public sealed class CultivationRoad(CultivationConfig c) : JianghuGo.Modules.Cha
 {
     public IReadOnlyList<JianghuGo.Modules.Characters.Contracts.RoadRealm> Realms { get; } =
         [.. c.Realms.Select((r, i) => new JianghuGo.Modules.Characters.Contracts.RoadRealm(i, r.NamePl, r.Hanzi, r.Era, c.Eras.FirstOrDefault(e => e.Era == r.Era)?.NamePl ?? string.Empty,
-            r.TribulationPl, r.UnlockPl))];
+            r.TribulationPl, r.UnlockPl, r.Id))];
 
     public IEnumerable<(int Realm, string TextPl)> Unlocks(string path) =>
         c.Methods.Where(m => m.MinRealm > 0 && (m.Path is null || m.Path == path)).Select(m => (m.MinRealm, "Metoda: " + m.NamePl));

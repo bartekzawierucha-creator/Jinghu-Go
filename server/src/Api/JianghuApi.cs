@@ -109,6 +109,7 @@ public static class JianghuApi
         app.MapTerritoryEndpoints();
         app.MapNotificationEndpoints();
         app.MapSocialEndpoints();
+        app.MapNewsEndpoints();
         app.MapQuestEndpoints();
         app.MapArtsEndpoints();
         app.MapEstateEndpoints();

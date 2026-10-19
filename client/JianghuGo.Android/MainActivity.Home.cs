@@ -461,6 +461,20 @@ namespace JianghuGo.Android
             _ui.Text("Jianghu Go " + (PackageManager?.GetPackageInfo(PackageName, 0)?.VersionName ?? string.Empty), body, 10, Ui.Muted, center: true);
         }
 
+        /// <summary>The Jianghu chronicle: notable deeds of all cultivators (2.3).</summary>
+        private async Task ShowChronicleAsync()
+        {
+            var news = (await _api.GetNewsAsync(Ct)).Items;
+            var body = Sheet("Kronika Jianghu", 0.8f, out _, "menu_notifications");
+            _ui.Pages(body, news.Count, 1, 6, (i, cell) =>
+            {
+                var n = news[i];
+                var card = _ui.Card(cell, 1f, 6, null, 0);
+                _ui.Text(n.TextPl, card, 12, Ui.Ink, maxLines: 2);
+                _ui.Text(n.At.ToLocalTime().ToString("dd.MM HH:mm"), card, 10, Ui.Muted);
+            }, empty: "Kronika jeszcze milczy.");
+        }
+
         private async Task ShowInboxAsync()
         {
             var c = _me;
@@ -469,7 +483,8 @@ namespace JianghuGo.Android
             var items = pageDto.Items;
             var bar = ui.HRow(ui.Content, 34, 4);
             ui.Btn("⚙ Ustawienia", ShowSettingsSheet, bar, secondary: true, sp: 12, heightDp: 34);
-            ui.Btn("👥 Przyjaciele i poczta", () => Run(ShowFriendsAsync), bar, secondary: true, sp: 12, heightDp: 34);
+            ui.Btn("👥 Przyjaciele", () => Run(ShowFriendsAsync), bar, secondary: true, sp: 12, heightDp: 34);
+            ui.Btn("📜 Kronika", () => Run(ShowChronicleAsync), bar, secondary: true, sp: 12, heightDp: 34);
             ui.Pages(ui.Content, items.Count, 1, 5, (i, cell) =>
             {
                 var n = items[i];

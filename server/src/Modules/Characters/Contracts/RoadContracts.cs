@@ -1,7 +1,7 @@
 namespace JianghuGo.Modules.Characters.Contracts;
 
 /// <summary>A realm on the Road of 66 Realms (1.9), provided by Cultivation.</summary>
-public sealed record RoadRealm(int Index, string NamePl, string Hanzi, int Era, string EraPl, string TribulationPl, string UnlockPl);
+public sealed record RoadRealm(int Index, string NamePl, string Hanzi, int Era, string EraPl, string TribulationPl, string UnlockPl, string Id = "");
 
 /// <summary>The realm ladder, provided by the module that owns it.</summary>
 public interface IRoadRealms

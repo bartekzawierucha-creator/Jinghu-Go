@@ -484,6 +484,13 @@ paths:
         "204": { description: Reported }
         "400": { $ref: "#/components/responses/Problem" }
         "429": { $ref: "#/components/responses/Problem" }
+  /api/v1/news:
+    get:
+      tags: [Social]
+      summary: Jianghu news — notable deeds of cultivators (public names, no locations).
+      parameters: [{ name: limit, in: query, required: false, schema: { type: integer } }]
+      responses:
+        "200": { description: OK }
   /api/v1/combat/catalog:
     get:
       tags: [Combat]

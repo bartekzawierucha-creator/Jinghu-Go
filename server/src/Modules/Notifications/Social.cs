@@ -78,11 +78,18 @@ public interface ISocialRepository
     Task AddReportAsync(IUnitOfWork uow, PlayerReport report, CancellationToken ct);
     Task<int> CountReportsSinceAsync(IUnitOfWork uow, CharacterId reporter, DateTimeOffset since, CancellationToken ct);
     Task<IReadOnlyList<PlayerReport>> OpenReportsAsync(IUnitOfWork uow, int limit, CancellationToken ct);
+
+    /// <summary>Jianghu news (2.3): false when this source was already reported.</summary>
+    Task<bool> TryAddNewsAsync(IUnitOfWork uow, NewsItem item, CancellationToken ct);
+    Task<IReadOnlyList<NewsItem>> NewsAsync(IUnitOfWork uow, int limit, CancellationToken ct);
     Task<bool> DecideReportAsync(IUnitOfWork uow, Guid id, string decision, DateTimeOffset now, CancellationToken ct);
 }
 
 /// <summary>A player's report of another player (name, chat or message). Reviewed by moderators; only the reported text excerpt is kept.</summary>
 public sealed record PlayerReport(Guid Id, CharacterId Reporter, CharacterId Reported, string Reason, string? Excerpt, DateTimeOffset CreatedAt);
+
+/// <summary>A line of the public Jianghu news feed: notable deeds (names are public in the game, no locations).</summary>
+public sealed record NewsItem(Guid Id, Guid SourceId, string Kind, Guid? CharacterId, string TextPl, DateTimeOffset At);
 
 public static class ReportReasons
 {
@@ -516,6 +523,23 @@ internal sealed class InMemorySocialRepository : ISocialRepository
     public Task<int> CountReportsSinceAsync(IUnitOfWork uow, CharacterId reporter, DateTimeOffset since, CancellationToken ct) =>
         Task.FromResult(U(uow).Table<Guid, PlayerReport>(Reports).Values.Count(r => r.Reporter == reporter && r.CreatedAt >= since));
 
+    private const string News = "social.news";
+
+    public Task<bool> TryAddNewsAsync(IUnitOfWork uow, NewsItem item, CancellationToken ct)
+    {
+        var u = U(uow);
+        var t = u.Table<Guid, NewsItem>(News);
+        if (t.Values.Any(n => n.SourceId == item.SourceId)) return Task.FromResult(false);
+        u.SetTable(News, t.Add(item.Id, item));
+        return Task.FromResult(true);
+    }
+
+    public Task<IReadOnlyList<NewsItem>> NewsAsync(IUnitOfWork uow, int limit, CancellationToken ct)
+    {
+        IReadOnlyList<NewsItem> list = [.. U(uow).Table<Guid, NewsItem>(News).Values.OrderByDescending(n => n.Id).Take(limit)];
+        return Task.FromResult(list);
+    }
+
     private const string Decisions = "social.report_decisions";
 
     public Task<IReadOnlyList<PlayerReport>> OpenReportsAsync(IUnitOfWork uow, int limit, CancellationToken ct)
@@ -620,6 +644,14 @@ internal sealed class PostgresSocialRepository : ISocialRepository
     public async Task<int> CountReportsSinceAsync(IUnitOfWork uow, CharacterId reporter, DateTimeOffset since, CancellationToken ct) =>
         (await P(uow).QueryAsync("SELECT count(*)::int FROM social.reports WHERE reporter_id = $1 AND created_at >= $2", r => r.GetInt32(0), ct, reporter.Value, since))[0];
 
+    public async Task<bool> TryAddNewsAsync(IUnitOfWork uow, NewsItem n, CancellationToken ct) =>
+        await P(uow).ExecuteAsync("INSERT INTO social.news (id, source_id, kind, character_id, text, created_at) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (source_id) DO NOTHING",
+            ct, n.Id, n.SourceId, n.Kind, n.CharacterId, n.TextPl, n.At) == 1;
+
+    public async Task<IReadOnlyList<NewsItem>> NewsAsync(IUnitOfWork uow, int limit, CancellationToken ct) =>
+        await P(uow).QueryAsync("SELECT id, source_id, kind, character_id, text, created_at FROM social.news ORDER BY id DESC LIMIT $1",
+            r => new NewsItem(r.GetGuid(0), r.GetGuid(1), r.GetString(2), r.IsDBNull(3) ? null : r.GetGuid(3), r.GetString(4), r.GetFieldValue<DateTimeOffset>(5)), ct, limit);
+
     public async Task<IReadOnlyList<PlayerReport>> OpenReportsAsync(IUnitOfWork uow, int limit, CancellationToken ct) =>
         await P(uow).QueryAsync("SELECT id, reporter_id, reported_id, reason, excerpt, created_at FROM social.reports WHERE reviewed_at IS NULL ORDER BY created_at LIMIT $1",
             r => new PlayerReport(r.GetGuid(0), new CharacterId(r.GetGuid(1)), new CharacterId(r.GetGuid(2)), r.GetString(3), r.IsDBNull(4) ? null : r.GetString(4),
@@ -672,4 +704,38 @@ internal sealed class OpenReportsMetric(ISocialRepository repo) : IOpsMetric
     public string Name => "open_reports";
 
     public async Task<long> ValueAsync(IUnitOfWork uow, DateTimeOffset now, CancellationToken ct) => (await repo.OpenReportsAsync(uow, 10_000, ct)).Count;
+}
+
+/// <summary>A cultivator entering a new realm makes the news (2.3).</summary>
+internal sealed class RealmNewsHandler(ISocialRepository repo, ICharacterDirectory characters, IRoadRealms ladder) : IOutboxHandler
+{
+    public string EventType => JianghuGo.Modules.Cultivation.Application.CultivationEvents.BreakthroughSucceeded;
+
+    public async Task HandleAsync(IUnitOfWork uow, OutboxMessage message, CancellationToken ct)
+    {
+        var e = message.Payload<JianghuGo.Modules.Cultivation.Application.CultivationEvents.BreakthroughV1>();
+        if (!e.Success || e.FromRealm == e.ToRealm) return;
+        var realm = ladder.Realms.FirstOrDefault(r => r.Id == e.ToRealm);
+        if (realm is null || realm.Index < 2) return;
+        var who = await characters.FindAsync(uow, e.CharacterId, ct);
+        if (who is null) return;
+        var text = realm.Index % 11 == 0
+            ? $"{who.Name} otwiera nową erę — {realm.EraPl}! Wkracza w królestwo {realm.NamePl} {realm.Hanzi}."
+            : $"{who.Name} wkracza w królestwo {realm.NamePl} {realm.Hanzi} ({realm.Index + 1}.).";
+        await repo.TryAddNewsAsync(uow, new NewsItem(Uuid7.New(), message.Id, "realm", e.CharacterId, text, message.OccurredAt), ct);
+    }
+}
+
+public static class NewsEndpoints
+{
+    public static IEndpointRouteBuilder MapNewsEndpoints(this IEndpointRouteBuilder app)
+    {
+        app.MapGet("/api/v1/news", async (int? limit, IUnitOfWorkFactory db, ISocialRepository repo, CancellationToken ct) =>
+        {
+            var take = Math.Clamp(limit ?? 30, 1, 100);
+            var items = await db.RunAsync(uow => repo.NewsAsync(uow, take, ct), ct);
+            return Results.Ok(new { items = items.Select(n => new { n.Id, n.Kind, n.CharacterId, n.TextPl, n.At }) });
+        }).WithTags("Social").RequireAuthorization();
+        return app;
+    }
 }

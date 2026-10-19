@@ -56,4 +56,18 @@ namespace JianghuGo.Client.Application
     {
         public List<MailDto> Items { get; set; } = new List<MailDto>();
     }
+
+    public sealed class NewsDto
+    {
+        public Guid Id { get; set; }
+        public string Kind { get; set; }
+        public Guid? CharacterId { get; set; }
+        public string TextPl { get; set; }
+        public DateTimeOffset At { get; set; }
+    }
+
+    public sealed class NewsPageDto
+    {
+        public List<NewsDto> Items { get; set; } = new List<NewsDto>();
+    }
 }
