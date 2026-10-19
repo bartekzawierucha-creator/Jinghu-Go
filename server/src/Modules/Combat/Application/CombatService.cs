@@ -92,7 +92,8 @@ public sealed partial class CombatService(
     CombatConfig config,
     TimeProvider clock,
     IItemCatalog items,
-    IEnumerable<ICombatRealm> realms) : ICombatEncounters
+    IEnumerable<ICombatRealm> realms,
+    IInventory inventory) : ICombatEncounters
 {
     /// <summary>Resonance of flat bonuses (gear, pets, titles) with the realm: (10 + realm) / 10, in ‰.</summary>
     public static int ResonancePermille(int realm) => (10 + Math.Clamp(realm, 0, 65)) * 100;
@@ -611,6 +612,8 @@ public sealed partial class CombatService(
                 reward = sc.TierQi(npc, stageQi) ?? sc.Qi(npc.RewardQi, sc.RealmsAbove(npc, await RealmOfAsync(uow, battle.CharacterA, ct)));
             }
         }
+
+        if (battle.Kind == BattleKinds.Pve && reward > 0 && config.Npc(battle.NpcId!) is { } dropper) await MaybeDropScrollAsync(uow, battle, dropper, at, ct);
 
         var finished = battle with
         {

@@ -106,6 +106,15 @@ namespace JianghuGo.Client.Application
         public Task<ArtsDto> ChooseCapstoneAsync(Guid characterId, string branchId, CancellationToken ct) =>
             SendAsync<ArtsDto>("POST", Arts(characterId) + "/capstone", new { branchId }, true, null, ct);
 
+        public Task<ForgedScrollDto> GetScrollInfoAsync(string techniqueId, CancellationToken ct) =>
+            SendAsync<ForgedScrollDto>("GET", "/api/v1/dao-lab/scrolls/" + techniqueId, null, true, null, ct);
+
+        public Task<ForgedScrollDto> MeditateOnDaoAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<ForgedScrollDto>("POST", Character(characterId) + "/dao-lab/meditate", null, true, NewIdempotencyKey(), ct);
+
+        public Task<ForgedScrollDto> TransmuteAsync(Guid characterId, string path, CancellationToken ct) =>
+            SendAsync<ForgedScrollDto>("POST", Character(characterId) + "/dao-lab/transmute", new { path }, true, NewIdempotencyKey(), ct);
+
         public Task<BonusBreakdownDto> GetBonusesAsync(Guid characterId, CancellationToken ct) =>
             SendAsync<BonusBreakdownDto>("GET", Character(characterId) + "/combat/bonuses", null, true, null, ct);
 

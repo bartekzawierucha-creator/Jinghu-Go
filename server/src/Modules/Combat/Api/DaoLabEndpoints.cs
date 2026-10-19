@@ -21,6 +21,9 @@ public static class DaoLabEndpoints
         // Stateless: lets the client show the budget while the player edits a design.
         g.MapPost("/preview", (DaoDesign body, DaoLabService svc) => Results.Ok(svc.Preview(body)));
 
+        g.MapGet("/scrolls/{techniqueId}", async (string techniqueId, CombatService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.ScrollInfoAsync(techniqueId, ct), Results.Ok));
+
         g.MapGet("/techniques/{techniqueId}", async (string techniqueId, DaoLabService svc, CancellationToken ct) =>
             ApiResults.From(await svc.GetAsync(techniqueId, ct), Results.Ok));
 
@@ -40,6 +43,11 @@ public static class DaoLabEndpoints
         c.MapPost("/scrolls/{instanceId:guid}/learn", async (Guid characterId, Guid instanceId, LearnCommand body, [FromHeader(Name = "Idempotency-Key")] string? key,
                 HttpContext http, DaoLabService svc, CancellationToken ct) =>
             await Guard(async () => ApiResults.From(await svc.LearnAsync(http.User.GetAccountId(), characterId, instanceId, key, body, ct), Results.Ok)));
+
+        c.MapPost("/meditate", async (Guid characterId, [FromHeader(Name = "Idempotency-Key")] string? key, HttpContext http, CombatService svc, CancellationToken ct) =>
+            await Guard(async () => ApiResults.From(await svc.MeditateOnDaoAsync(http.User.GetAccountId(), characterId, key, ct), Results.Ok)));
+        c.MapPost("/transmute", async (Guid characterId, TransmuteCommand body, [FromHeader(Name = "Idempotency-Key")] string? key, HttpContext http, CombatService svc, CancellationToken ct) =>
+            await Guard(async () => ApiResults.From(await svc.TransmuteAsync(http.User.GetAccountId(), characterId, key, body, ct), Results.Ok)));
 
         return app;
     }

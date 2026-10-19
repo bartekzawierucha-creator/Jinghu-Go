@@ -168,6 +168,9 @@ public sealed partial class CombatService
             : progress with { Name = name, BestFloor = floor, UpdatedAt = at, Version = progress.Version + 1 };
         if (!await repo.TrySaveTowerAsync(uow, next, progress?.Version ?? 0, ct)) throw new TransientConflictException("Tower progress changed concurrently.");
         if (Tower.RewardFor(floor) is { } reward) await EnqueueRewardAsync(uow, battle, "tower", "floor-" + floor, reward.Stones, reward.Items, at, ct);
+        // guardian floors give a forged technique of the era the floor stands for (1.8)
+        if (Tower.IsBossFloor(floor) && await characters.FindAsync(uow, battle.CharacterA.Value, ct) is { } climber)
+            await ForgeScrollAsync(uow, climber, TechniqueForge.EraOf(Tower.FloorsPerRealm > 0 ? floor / Tower.FloorsPerRealm : 0), null, 1, ForgedRules, "forge_tower", "floor-" + floor, at, ct);
         await AuditAsync(uow, battle.AccountA, "combat.tower_floor_cleared", battle.Id, new { floor }, at, ct);
         return TowerQi(floor);
     }
@@ -308,6 +311,7 @@ public sealed partial class CombatService
                 throw new TransientConflictException("World boss tally changed concurrently.");
             await outbox.EnqueueAsync(uow, OutboxMessage.Create(CombatEvents.ItemsRewarded,
                 new CombatEvents.ItemsRewardedV1(accountId.Value, c.Id.Value, "world_boss", "cycle-" + cycle, Boss.KillStones, Lines(Boss.KillItems)), now, correlation.CorrelationId), ct);
+            await ForgeScrollAsync(uow, c, TechniqueForge.EraOf(await RealmOfAsync(uow, c.Id, ct)), null, 2, ForgedRules, "forge_boss", "cycle-" + cycle, now, ct);
             await AuditAsync(uow, accountId, "combat.world_boss_claimed", Guid.Empty, new { characterId, cycle }, now, ct);
             var view = await BossViewAsync(uow, c, now, ct);
             await uow.CommitAsync(ct);

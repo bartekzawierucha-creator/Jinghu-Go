@@ -117,7 +117,16 @@ namespace JianghuGo.Android
                     body, 11, Ui.Jade, maxLines: 2);
             }
 
-            if (e.Item?.BoundRef != null) ui.Text("Zwój techniki: " + e.Item.BoundRef + " (przeczytaj w Bohater → Dao)", body, 12, Ui.Muted, maxLines: 2);
+            if (e.Item?.BoundRef != null)
+            {
+                var scrollText = ui.Text("Zwój techniki (przeczytaj w Bohater → Dao)", body, 12, Ui.Muted, maxLines: 4);
+                var boundRef = e.Item.BoundRef;
+                Run(async () =>
+                {
+                    var info = await _api.GetScrollInfoAsync(boundRef, Ct);
+                    scrollText.Text = info.NamePl + " · " + info.RarityPl + "\n" + info.DescriptionPl + "\n(przeczytaj w Bohater → Dao albo rozbierz na Esencję Dao)";
+                });
+            }
             ui.Box(body, 1f, marginDp: 0);
 
             async Task Done(string message)
@@ -162,9 +171,9 @@ namespace JianghuGo.Android
                         await Done(r == null ? "Odświeżono." : r.Success ? "Udane! Teraz +" + r.Level : "Nieudane — poziom +" + r.Level + " zachowany.");
                     }), r1, secondary: true, sp: 12, heightDp: 46);
                 if (!e.Item.IsEquipped)
-                    ui.Btn(e.Item.Slot != null ? "Rozbierz" : "Wyrzuć", () => Run(async () =>
+                    ui.Btn(e.Item.Slot != null || e.Item.BoundRef != null ? "Rozbierz" : "Wyrzuć", () => Run(async () =>
                     {
-                        if (e.Item.Slot != null)
+                        if (e.Item.Slot != null || e.Item.BoundRef != null)
                         {
                             var r = await _api.DismantleAsync(_me.Id, e.Item, Ct);
                             await economy.LoadAsync(Ct);

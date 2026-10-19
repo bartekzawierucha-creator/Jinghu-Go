@@ -267,7 +267,7 @@ public static class CombatEngine
             }
             else if (t.Attack is { } atk)
             {
-                var (hit, damage, reflected, stolen, applied, exploit, crit, mechanic) = Strike(me, foe, who, foeWho, eq, atk.Power, atk.Scaling, atk.AccuracyPermille, atk.Effect);
+                var (hit, damage, reflected, stolen, applied, exploit, crit, mechanic) = Strike(me, foe, who, foeWho, eq, atk.Power, atk.Scaling, atk.AccuracyPermille, atk.Effect, atk.Extra);
                 Log(side, "attack", t.Id, hit: hit, dmg: damage, reflected: reflected, stolen: stolen, fx: applied, exploit: exploit, crit: crit, mechanic: mechanic);
             }
         }
@@ -278,7 +278,7 @@ public static class CombatEngine
         // 1.6: the agility edge is relative, Focus (vs Willpower) gives critical strikes, Willpower (vs Focus) resists effects,
         // Elemental Affinity weights the element modifier and bleeding grows with the attacker's stat like damage does.
         (bool Hit, int Damage, int Reflected, int Stolen, string? Applied, bool Exploit, bool Crit, string? Mechanic) Strike(W me, W foe, Combatant who, Combatant foeWho, EquippedTechnique eq,
-            int power, string scaling, int accuracy, EffectSpec? effect)
+            int power, string scaling, int accuracy, EffectSpec? effect, EffectSpec? extra = null)
         {
             var chance = c.HitChance.BasePermille
                          + c.HitChance.AgilityTerm(who.Stat("agility"), foeWho.Stat("agility"))
@@ -370,6 +370,12 @@ public static class CombatEngine
             {
                 Apply(me, foe, who, fx, scaling);
                 applied = fx.Type;
+            }
+
+            if (extra is { } ex && foe.Hp > 0 && rng.NextInt(0, 1000) < Math.Min(1000, ex.ChancePermille + milestone) * (1000 - resist) / 1000)
+            {
+                Apply(me, foe, who, ex, scaling);
+                applied ??= ex.Type;
             }
 
             // an awakened technique (level 10) carries a second effect

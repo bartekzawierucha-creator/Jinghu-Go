@@ -41,6 +41,19 @@ namespace JianghuGo.Client.Application
         public int? DamageMax { get; set; }
     }
 
+    /// <summary>A scroll of a forged (or designed) technique (1.8).</summary>
+    public sealed class ForgedScrollDto
+    {
+        public Guid InstanceId { get; set; }
+        public string TechniqueId { get; set; }
+        public string NamePl { get; set; }
+        public string Rarity { get; set; }
+        public string RarityPl { get; set; }
+        public int Era { get; set; }
+        public string Path { get; set; }
+        public string DescriptionPl { get; set; }
+    }
+
     /// <summary>One source of combat stats and perks on the bonus screen (1.7).</summary>
     public sealed class BonusSourceDto
     {

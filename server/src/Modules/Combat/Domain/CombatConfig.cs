@@ -36,7 +36,8 @@ public sealed record CombatConfig(
     PerkCaps? PvpPerkCaps = null,
     MilestoneRules? Milestones = null,
     int PoisonHealBlockPermille = 0,
-    int EnragePermille = 0)
+    int EnragePermille = 0,
+    ForgeRules? Forge = null)
 {
     /// <summary>Combat perks of a cultivation path (none for an unknown path or a config without them).</summary>
     public PathPerks? Perks(string? path) => path is not null && PathPerks is not null && PathPerks.TryGetValue(path, out var p) ? p : null;
@@ -367,7 +368,8 @@ public sealed record TechniqueDefinition(
     public string Kind => Slot == "movement" ? SlotKinds.Special : Slot;
 }
 
-public sealed record AttackSpec(int Power, string Scaling, int RangeMin, int RangeMax, int AccuracyPermille, EffectSpec? Effect);
+/// <param name="Extra">1.8: a second on-hit effect (forged techniques of higher rarity).</param>
+public sealed record AttackSpec(int Power, string Scaling, int RangeMin, int RangeMax, int AccuracyPermille, EffectSpec? Effect, EffectSpec? Extra = null);
 
 public sealed record EffectSpec(string Type, int ChancePermille, int Magnitude, int Duration);
 

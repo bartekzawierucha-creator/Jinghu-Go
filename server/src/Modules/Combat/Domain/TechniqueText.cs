@@ -69,6 +69,7 @@ public static class TechniqueText
             parts.Add($"moc {a.Power} ({StatPl(a.Scaling)})");
             if (a.AccuracyPermille != 0) parts.Add("celność " + (a.AccuracyPermille > 0 ? "+" : string.Empty) + Pct(a.AccuracyPermille));
             if (a.Effect is { } fx) parts.Add(Effect(fx));
+            if (a.Extra is { } ex) parts.Add(Effect(ex));
         }
 
         if (t.Defense is { } d) parts.Add($"blok {Pct(d.BlockPermille)} obrażeń w tej turze");

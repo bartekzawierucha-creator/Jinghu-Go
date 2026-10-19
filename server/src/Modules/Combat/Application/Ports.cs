@@ -92,6 +92,9 @@ public interface ICombatRepository
     // ---- Dao Lab
     Task AddCustomTechniqueAsync(IUnitOfWork uow, CustomTechnique technique, CancellationToken ct);
     Task<CustomTechnique?> FindCustomTechniqueAsync(IUnitOfWork uow, string id, CancellationToken ct);
+
+    /// <summary>Forged techniques found by a character under a rules version since a moment (daily Dao meditation, 1.8).</summary>
+    Task<int> CountForgedSinceAsync(IUnitOfWork uow, CharacterId finder, string rulesVersion, DateTimeOffset since, CancellationToken ct);
     Task<int> CountDesignsAsync(IUnitOfWork uow, CharacterId author, CancellationToken ct);
 
     /// <summary>False if the character already knows the technique.</summary>

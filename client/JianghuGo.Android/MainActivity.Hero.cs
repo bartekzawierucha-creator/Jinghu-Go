@@ -444,15 +444,26 @@ namespace JianghuGo.Android
                         }), row, secondary: true, sp: 11, heightDp: 36).LayoutParameters = new LinearLayout.LayoutParams(Px(70), Px(36)) { Gravity = GravityFlags.CenterVertical, LeftMargin = Px(4) };
                 }, empty: "Jeszcze żadnej — stwórz pierwszą.");
             }, more, secondary: true, sp: 12, heightDp: 42);
-            ui.Btn("Zwoje (" + scrolls.Count + ")", () =>
+            ui.Btn("Zwoje (" + scrolls.Count + ")", () => Run(async () =>
             {
-                var body = Sheet("Zwoje technik", 0.55f, out var close, "menu_scroll");
-                ui.Pages(body, scrolls.Count, 1, 4, (i, cell) =>
+                // 1.8: what each scroll teaches (forged techniques have a rarity and a generated description)
+                var infos = new Dictionary<string, ForgedScrollDto>();
+                foreach (var id in scrolls.Select(x => x.BoundRef).Distinct())
+                {
+                    try { infos[id] = await _api.GetScrollInfoAsync(id, Ct); }
+                    catch (JianghuGo.Client.Application.ApiException) { }
+                }
+
+                var body = Sheet("Zwoje technik", 0.62f, out var close, "menu_scroll");
+                ui.Pages(body, scrolls.Count, 1, 3, (i, cell) =>
                 {
                     var scroll = scrolls[i];
+                    var info = infos.TryGetValue(scroll.BoundRef, out var inf) ? inf : null;
                     var row = ui.HRow(cell, 44, 0);
                     ui.Icon(row, "item_technique_scroll", 36);
-                    ui.Text(scroll.BoundRef, row, 13, Ui.Ink).LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f) { LeftMargin = Px(8), Gravity = GravityFlags.CenterVertical };
+                    var col = ui.Box(row, 1f, marginDp: 6);
+                    ui.Text(info != null ? info.NamePl + " · " + info.RarityPl : scroll.BoundRef, col, 13, info != null ? Ui.RarityOf(ForgeRarity(info.Rarity)).Color : Ui.Ink, bold: true);
+                    if (info != null) ui.Text(info.DescriptionPl, col, 10, Ui.Muted, maxLines: 2);
                     ui.Btn("Przeczytaj", () => Run(async () =>
                     {
                         var learned = await lab.LearnAsync(scroll, Ct);
@@ -461,7 +472,36 @@ namespace JianghuGo.Android
                         SetStatus("Poznano technikę: " + learned.Technique.NamePl);
                     }), row, sp: 12, heightDp: 38).LayoutParameters = new LinearLayout.LayoutParams(Px(100), Px(38)) { Gravity = GravityFlags.CenterVertical };
                 }, empty: "Brak zwojów w sakwie.");
-            }, more, secondary: true, sp: 12, heightDp: 42);
+            }), more, secondary: true, sp: 12, heightDp: 42);
+
+            // 1.8: the forge — a daily meditation and essence transmutation
+            var forge = ui.HRow(page, 42);
+            ui.Btn("☯ Medytacja nad Dao", () => Run(async () =>
+            {
+                var s = await _api.MeditateOnDaoAsync(c.Id, Ct);
+                Sfx.Play(Sfx.Breakthrough, 0.7f);
+                await ShowDaoLabAsync();
+                ShowBanner("ZWÓJ " + s.RarityPl.ToUpperInvariant(), s.NamePl, s.DescriptionPl, "item_technique_scroll");
+                RefreshHud();
+            }), forge, secondary: true, sp: 12, heightDp: 42);
+            var essence = economy.Inventory.Stacks.FirstOrDefault(x => x.ItemId == "dao_essence")?.Quantity ?? 0;
+            ui.Btn("Przemiana esencji (" + essence + "/10)", () => Run(async () =>
+            {
+                var s = await _api.TransmuteAsync(c.Id, null, Ct);
+                Sfx.Play(Sfx.Breakthrough, 0.7f);
+                await ShowDaoLabAsync();
+                ShowBanner("ZWÓJ " + s.RarityPl.ToUpperInvariant(), s.NamePl, s.DescriptionPl, "item_technique_scroll");
+            }), forge, secondary: true, sp: 12, heightDp: 42);
         }
+
+        /// <summary>Forge rarities on the item rarity palette (1.8).</summary>
+        private static string ForgeRarity(string r) => r switch
+        {
+            "rare" => "spirit",
+            "epic" => "earth",
+            "legendary" => "heavenly",
+            "mythic" => "divine",
+            _ => "mortal",
+        };
     }
 }

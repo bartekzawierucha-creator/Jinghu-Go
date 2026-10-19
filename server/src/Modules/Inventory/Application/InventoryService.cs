@@ -61,6 +61,9 @@ public sealed class InventoryService(
     TimeProvider clock)
 {
     public const int MaxUsePerRequest = 10;
+    public const string ScrollItem = "technique_scroll";
+    public const string EssenceItem = "dao_essence";
+    public const int EssencePerScroll = 2;
 
     private static readonly Error CharacterNotFound = Error.NotFound("character_not_found", "Character not found.");
     private static readonly Error ItemNotFound = Error.NotFound("item_not_found", "Item not found.");
@@ -186,9 +189,11 @@ public sealed class InventoryService(
                 if (item is null || item.CharacterId != c.Id || item.State == InstanceStates.Destroyed) return ItemNotFound;
                 if (item.Version != cmd.ExpectedVersion) return Concurrent;
                 if (item.State != InstanceStates.Bag) return Error.Conflict("item_not_in_bag", "Unequip the item (or cancel its listing) first.");
-                if (config.Find(item.ItemId)?.Equipment is null) return Error.Validation("item_not_dismantlable", "Only equipment can be dismantled.");
+                var scroll = item.ItemId == ScrollItem && item.BoundRef is not null && config.Find(EssenceItem) is not null;
+                if (config.Find(item.ItemId)?.Equipment is null && !scroll) return Error.Validation("item_not_dismantlable", "Only equipment and technique scrolls can be dismantled.");
                 if (!await MoveAsync(uow, item, InstanceStates.Destroyed, "dismantled", ct)) return Concurrent;
-                var materials = InventoryRules.Dismantle(config, item);
+                // 1.8: a technique scroll breaks into Dao essence (transmuted into new scrolls in the Dao Lab)
+                var materials = scroll ? [new LootLine(EssenceItem, EssencePerScroll)] : InventoryRules.Dismantle(config, item);
                 foreach (var m in materials)
                 {
                     var added = await ledger.AddItemsAsync(uow, c.Id, m.ItemId, m.Quantity, "dismantle", item.Id.ToString(), ct);

@@ -35,7 +35,10 @@ internal sealed class InMemoryCombatRepository : ICombatRepository
         Task.FromResult(U(uow).Table<string, CustomTechnique>(Custom).GetValueOrDefault(id));
 
     public Task<int> CountDesignsAsync(IUnitOfWork uow, CharacterId author, CancellationToken ct) =>
-        Task.FromResult(U(uow).Table<string, CustomTechnique>(Custom).Values.Count(t => t.AuthorCharacterId == author));
+        Task.FromResult(U(uow).Table<string, CustomTechnique>(Custom).Values.Count(t => t.AuthorCharacterId == author && !t.RulesVersion.StartsWith("forge", StringComparison.Ordinal)));
+
+    public Task<int> CountForgedSinceAsync(IUnitOfWork uow, CharacterId finder, string rulesVersion, DateTimeOffset since, CancellationToken ct) =>
+        Task.FromResult(U(uow).Table<string, CustomTechnique>(Custom).Values.Count(t => t.AuthorCharacterId == finder && t.RulesVersion == rulesVersion && t.CreatedAt >= since));
 
     public Task<bool> TryAddKnownAsync(IUnitOfWork uow, KnownTechnique known, CancellationToken ct)
     {
@@ -295,8 +298,13 @@ internal sealed class PostgresCombatRepository : ICombatRepository
         PostgresUnitOfWork.From(uow).QuerySingleOrDefaultAsync($"SELECT {CustomColumns} FROM combat.custom_techniques WHERE id = $1", r => MapCustom(r), ct, id);
 
     public async Task<int> CountDesignsAsync(IUnitOfWork uow, CharacterId author, CancellationToken ct) =>
-        (int)(await PostgresUnitOfWork.From(uow).QueryAsync("SELECT count(*) FROM combat.custom_techniques WHERE author_character_id = $1",
+        (int)(await PostgresUnitOfWork.From(uow).QueryAsync("SELECT count(*) FROM combat.custom_techniques WHERE author_character_id = $1 AND rules_version NOT LIKE 'forge%'",
             r => r.GetInt64(0), ct, author.Value)).Single();
+
+    public async Task<int> CountForgedSinceAsync(IUnitOfWork uow, CharacterId finder, string rulesVersion, DateTimeOffset since, CancellationToken ct) =>
+        (int)(await PostgresUnitOfWork.From(uow).QueryAsync(
+            "SELECT count(*) FROM combat.custom_techniques WHERE author_character_id = $1 AND rules_version = $2 AND created_at >= $3",
+            r => r.GetInt64(0), ct, finder.Value, rulesVersion, since)).Single();
 
     public async Task<bool> TryAddKnownAsync(IUnitOfWork uow, KnownTechnique k, CancellationToken ct) =>
         await PostgresUnitOfWork.From(uow).ExecuteAsync(

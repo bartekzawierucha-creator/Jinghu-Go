@@ -121,7 +121,8 @@
     {"id": "manual_eternal_flame", "namePl": "Zwój Wiecznego Płomienia", "nameEn": "Eternal Flame Scroll", "type": "material", "rarity": "divine", "tradable": true},
     {"id": "manual_dao_origin", "namePl": "Pismo Źródła Dao", "nameEn": "Dao Origin Script", "type": "material", "rarity": "divine", "tradable": true},
     {"id": "star_vine_seed", "namePl": "Nasiono Gwiezdnego Pnącza", "nameEn": "Star Vine Seed", "type": "material", "rarity": "heavenly", "tradable": true},
-    {"id": "blood_lily_bulb", "namePl": "Cebulka Krwawej Lilii", "nameEn": "Blood Lily Bulb", "type": "material", "rarity": "divine", "tradable": true}
+    {"id": "blood_lily_bulb", "namePl": "Cebulka Krwawej Lilii", "nameEn": "Blood Lily Bulb", "type": "material", "rarity": "divine", "tradable": true},
+    {"id": "dao_essence", "namePl": "Esencja Dao", "nameEn": "Dao Essence", "type": "material", "rarity": "heavenly", "tradable": true}
   ],
   "lootTables": {
     "training_dummy": {"stones": 2, "drops": []},
