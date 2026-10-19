@@ -80,7 +80,11 @@ public sealed record CultivationView(
     long LifetimeQi,
     SummaryView? Summary,
     bool CompressionAvailable,
-    int WeekendPermille = 1000);
+    int WeekendPermille = 1000,
+    int DemonPenaltyPermille = 0,
+    int DemonImmuneRealm = 0,
+    int DemonCalmPerHour = 0,
+    int KarmaFlowPermille = 0);
 
 public sealed record MeditationResult(long QiGained, int MinutesCounted, bool DailyCapReached, CultivationView State);
 
@@ -669,7 +673,9 @@ public sealed class CultivationService(
             p.AcceleratorDate != CultivationRules.WorldDate(config, now), AcceleratorHours(s.RealmIndex),
             CultivationRules.IsBottleneck(config, s.Stage) ? era.BottleneckItem : null,
             major && !peak, p.TribulationBattleId, p.Enlightenments, p.LifetimeQi, summary, s.RealmIndex >= config.Compression.MinRealm,
-            FlowRules.IsWeekend(now) ? config.Flow.WeekendPermille : 1000);
+            FlowRules.IsWeekend(now) ? config.Flow.WeekendPermille : 1000,
+            CultivationRules.DemonPenaltyPermille(config, s.RealmIndex, p), config.HeartDemons.ImmuneRealm, config.HeartDemons.CalmPerMeditationHour,
+            p.Karma * config.Karma.FlowPermillePerKarma);
     }
 
     private Task AuditAsync(IUnitOfWork uow, AccountId accountId, string action, Guid characterId, object data, DateTimeOffset now, CancellationToken ct) =>

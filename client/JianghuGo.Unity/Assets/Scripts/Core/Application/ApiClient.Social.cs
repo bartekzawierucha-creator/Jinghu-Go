@@ -8,6 +8,9 @@ namespace JianghuGo.Client.Application
     {
         private static string Social(Guid characterId) => "/api/v1/characters/" + characterId + "/social";
 
+        public Task<RoadDto> GetRoadAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<RoadDto>("GET", "/api/v1/characters/" + characterId + "/road", null, true, null, ct);
+
         public Task<FriendsDto> GetFriendsAsync(Guid characterId, CancellationToken ct) =>
             SendAsync<FriendsDto>("GET", Social(characterId) + "/friends", null, true, null, ct);
 

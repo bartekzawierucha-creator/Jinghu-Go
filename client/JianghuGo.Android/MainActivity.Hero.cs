@@ -64,6 +64,7 @@ namespace JianghuGo.Android
             var path = _ui.Card(body, 1.4f, 8, Ui.QiBlue);
             _ui.Text("ŚCIEŻKA " + PathName(c.Path).ToUpperInvariant(), path, 13, Ui.Gold, bold: true);
             _ui.Text(_catalog.Paths != null && _catalog.Paths.TryGetValue(c.Path, out var pp) ? pp.DescriptionPl : string.Empty, path, 12, Ui.Ink, maxLines: 4);
+            _ui.Btn("Droga 66 królestw — co otworzy każde", () => Run(ShowRoadSheetAsync), path, secondary: true, sp: 12, heightDp: 32);
             var titles = _ui.Card(body, 1f, 8, Ui.Violet);
             _ui.Text("TYTUŁY (" + _board.Titles.Count + ")", titles, 13, Ui.Gold, bold: true);
             var tb = StatsText(_board.TitleBonuses);
@@ -324,6 +325,28 @@ namespace JianghuGo.Android
         }
 
         // ---- Premie (1.7) -------------------------------------------------------------------------------------
+
+        /// <summary>The Road of 66 Realms: every realm with its tribulation and what it opens for this path, starting at the current one.</summary>
+        private async Task ShowRoadSheetAsync()
+        {
+            var road = await _api.GetRoadAsync(_me.Id, Ct);
+            var body = Sheet("Droga 66 królestw", 0.85f, out _, "menu_breakthrough");
+            _ui.Text("Jesteś w królestwie " + (road.Realm + 1) + " z " + road.Realms + ". Złote — przed tobą najbliższe progi.", body, 11, Ui.Muted, maxLines: 2);
+            var steps = road.Steps;
+            var start = Math.Max(0, steps.FindIndex(s => s.Current));
+            const int PerPage = 3;
+            _ui.Pages(body, steps.Count, 1, PerPage, (i, cell) =>
+            {
+                var s = steps[i];
+                var card = _ui.Card(cell, 1f, 6, s.Current ? Ui.Gold : s.Reached ? Ui.Jade : (Color?)null, 0);
+                _ui.Text((s.Index + 1) + ". " + s.NamePl + " " + s.Hanzi + " · " + s.EraPl, card, 13, s.Current ? Ui.Gold : s.Reached ? Ui.Muted : Ui.Ink, bold: true);
+                var lines = new List<string>();
+                if (!string.IsNullOrEmpty(s.TribulationPl)) lines.Add("⚡ " + s.TribulationPl);
+                if (!string.IsNullOrEmpty(s.UnlockPl)) lines.Add(s.UnlockPl);
+                lines.AddRange(s.Unlocks);
+                _ui.Text(lines.Count == 0 ? "—" : string.Join(" · ", lines), card, 11, Ui.Ink, maxLines: 4);
+            }, startPage: start / PerPage);
+        }
 
         private async Task ShowBonusesSheetAsync()
         {

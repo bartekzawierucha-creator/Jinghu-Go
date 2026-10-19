@@ -84,6 +84,28 @@ namespace JianghuGo.Client.Application
         public WeeklyDto Weekly { get; set; }
     }
 
+    /// <summary>One realm on the Road of 66 Realms (1.9).</summary>
+    public sealed class RoadRealmDto
+    {
+        public int Index { get; set; }
+        public string NamePl { get; set; }
+        public string Hanzi { get; set; }
+        public int Era { get; set; }
+        public string EraPl { get; set; }
+        public string TribulationPl { get; set; }
+        public string UnlockPl { get; set; }
+        public bool Reached { get; set; }
+        public bool Current { get; set; }
+        public List<string> Unlocks { get; set; } = new List<string>();
+    }
+
+    public sealed class RoadDto
+    {
+        public int Realm { get; set; }
+        public int Realms { get; set; }
+        public List<RoadRealmDto> Steps { get; set; } = new List<RoadRealmDto>();
+    }
+
     public sealed class ChallengeTierDto
     {
         public int Tier { get; set; }

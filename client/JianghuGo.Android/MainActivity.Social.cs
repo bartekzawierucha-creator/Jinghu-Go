@@ -37,7 +37,7 @@ namespace JianghuGo.Android
             {
                 var e = entries[i];
                 var card = ui.Card(cell, 1f, 8, e.Incoming ? Ui.Gold : e.Unread > 0 ? Ui.Jade : (Color?)null, 0);
-                var state = e.Incoming ? "zaprasza cię" : e.Status == "pending" ? "czeka na odpowiedź" : e.Unread > 0 ? e.Unread + " nowych wiadomości" : PathName(e.Path);
+                var state = e.Incoming ? "zaprasza cię" : e.Status == "pending" ? "czeka na odpowiedź" : e.Unread > 0 ? e.Unread + " nowych wiadomości" : "ścieżka " + PathName(e.Path);
                 ui.Text(e.Name, card, 15, e.Incoming ? Ui.Gold : Ui.Ink, bold: true);
                 ui.Text(state, card, 11, Ui.Muted);
                 var actions = ui.HRow(card, 34, 0);
@@ -68,15 +68,6 @@ namespace JianghuGo.Android
                 }
             }, empty: "Nie masz jeszcze przyjaciół — wpisz imię kultywatora.");
         }
-
-        private static string PathName(string path) => path switch
-        {
-            "qi" => "Ścieżka Qi",
-            "body" => "Ścieżka Ciała",
-            "flame" => "Ścieżka Płomienia",
-            "poison" => "Ścieżka Trucizny",
-            _ => path ?? string.Empty,
-        };
 
         /// <summary>Conversation with a friend in a sheet (newest at the bottom), polled while open.</summary>
         private void OpenConversation(FriendDto friend)

@@ -147,6 +147,12 @@ namespace JianghuGo.Client.Application
         public bool CompressionAvailable { get; set; }
         public int WeekendPermille { get; set; } = 1000;
 
+        /// <summary>Heart demons and karma in numbers (1.9): breakthrough chance lost, the immunity realm, calm per meditation hour, Qi flow from karma.</summary>
+        public int DemonPenaltyPermille { get; set; }
+        public int DemonImmuneRealm { get; set; }
+        public int DemonCalmPerHour { get; set; }
+        public int KarmaFlowPermille { get; set; }
+
         /// <summary>Client-side: when this state was received. The server settled the Qi flow up to then, so a running
         /// session only adds what flowed after it.</summary>
         public DateTimeOffset? ReceivedAt { get; set; }

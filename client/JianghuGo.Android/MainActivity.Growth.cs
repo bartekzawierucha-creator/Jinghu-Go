@@ -185,7 +185,9 @@ namespace JianghuGo.Android
 
             if (st.CanReincarnate)
                 ui.Btn("Reinkarnacja (+" + st.KarmaOnReincarnation + " karmy)", () => Run(() => Apply(_api.ReincarnateAsync, "Odrodzenie — karma " + (st.Karma + st.KarmaOnReincarnation))), last, sp: 11, heightDp: 40);
-            ui.Text("Karma " + st.Karma + " · reinkarnacje " + st.Reincarnations + " · oświecenia " + st.Enlightenments + " · Qi łącznie " + st.LifetimeQi.ToString("N0"), body, 10, Ui.Muted, center: true);
+            ui.Text("Demony " + st.Instability + "/100" + (st.DemonPenaltyPermille > 0 ? " (−" + (st.DemonPenaltyPermille / 10.0).ToString("0.#") + "% przełomu)" : string.Empty)
+                + " · karma " + st.Karma + " (+" + (st.KarmaFlowPermille / 10.0).ToString("0.#") + "% Qi) · reinkarnacje " + st.Reincarnations
+                + "\noświecenia " + st.Enlightenments + " · Qi łącznie " + st.LifetimeQi.ToString("N0"), body, 10, Ui.Muted, center: true, maxLines: 2);
         }
 
         /// <summary>Stage 12 (Perfection): the heavenly tribulation is a real battle against the sky.</summary>
@@ -613,9 +615,9 @@ namespace JianghuGo.Android
         private void ShowEstate(EstateDto e, int tab)
         {
             var c = _me;
-            Remind("crops", e.Plots.Where(p => p.Seed != null && !p.Ready).Select(p => p.ReadyAt).Where(t => t != null).DefaultIfEmpty(null).Min(),
+            Remind("crops", e.Plots.Where(pl => pl.Seed != null && !pl.Ready).Select(pl => pl.ReadyAt).Where(t0 => t0 != null).DefaultIfEmpty(null).Min(),
                 "Plony dojrzały", "Ogród posiadłości czeka na zbiór.");
-            Remind("expeditions", e.Disciples.Where(d => d.Expedition != null && !d.Returned).Select(d => d.Until).Where(t => t != null).DefaultIfEmpty(null).Max(),
+            Remind("expeditions", e.Disciples.Where(dd => dd.Expedition != null && !dd.Returned).Select(dd => dd.Until).Where(t1 => t1 != null).DefaultIfEmpty(null).Max(),
                 "Uczniowie wrócili", "Wyprawa zakończona — odbierz łupy.");
             var ui = NewScreen("Posiadłość", BackToTab, Resource.Drawable.loc_village, "OGRÓD · UCZNIOWIE · WYPRAWY");
             var page = ui.Content;
@@ -865,10 +867,10 @@ namespace JianghuGo.Android
             {
                 var q = await _api.GetCraftQueueAsync(c.Id, Ct);
                 if (gen != _screen) return;
-                foreach (var kind in new[] { "alchemy", "smithing" })
+                foreach (var craftKind in new[] { "alchemy", "smithing" })
                 {
-                    var last = q.Entries.Where(x => (x.Kind == "alchemy") == (kind == "alchemy") && !x.Ready).Select(x => (DateTimeOffset?)x.ReadyAt).DefaultIfEmpty(null).Max();
-                    Remind("craft_" + kind, last, kind == "alchemy" ? "Kocioł gotowy" : "Kuźnia gotowa", "Partia czeka na odbiór.");
+                    var lastReady = q.Entries.Where(qe => (qe.Kind == "alchemy") == (craftKind == "alchemy") && !qe.Ready).Select(qe => (DateTimeOffset?)qe.ReadyAt).DefaultIfEmpty(null).Max();
+                    Remind("craft_" + craftKind, lastReady, craftKind == "alchemy" ? "Kocioł gotowy" : "Kuźnia gotowa", "Partia czeka na odbiór.");
                 }
                 text.Text = q.Entries.Count == 0 ? "Kocioł i kuźnia wolne — ⏳ wytwarza partię sam, także offline." :
                     string.Join("  ·  ", q.Entries.Select(e => (e.Kind == "alchemy" ? "Kocioł" : "Kuźnia") + ": " + e.Times + "× " + e.OutputNamePl + " " + (e.Ready ? "gotowe" : Until(e.ReadyAt))));
