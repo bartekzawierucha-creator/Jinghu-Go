@@ -81,10 +81,19 @@ public sealed partial class CombatService
         var c = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
         if (c is null) return CharacterNotFound;
         if (config.Npc("heavenly_tribulation") is not { } template) return Error.NotFound("tribulation_unavailable", "Tribulations are not configured.");
+        // 2.2: the sky tests differently — lightning, fire or the heart demon, in turn by realm (each with its own techniques).
+        template = config.Npc(TribulationVariant(realm)) ?? template;
         var npc = TribulationNpc(config, template, realm, powerPermille, namePl);
         var started = await StartNpcBattleAsync(uow, c, BattleKinds.Tribulation, npc, "trib:" + realm, now, ct);
         return started.IsSuccess ? started.Value.Id : started.Error!;
     }
+
+    public static string TribulationVariant(int realm) => (realm % 3) switch
+    {
+        1 => "flame_tribulation",
+        2 => "heart_demon_tribulation",
+        _ => "heavenly_tribulation",
+    };
 
     public async Task<Result<Guid>> StartSpiritAsync(IUnitOfWork uow, AccountId accountId, Guid characterId, string npcId, int realm, int powerPermille, Guid reference, string namePl, CancellationToken ct)
     {
