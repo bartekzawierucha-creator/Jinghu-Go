@@ -175,6 +175,13 @@ namespace JianghuGo.Android
             ShowLogin();
             SetStatus("Sesja wygasła — zaloguj się ponownie.");
         });
+        /// <summary>(Re)schedules a local reminder when the player has them on (1.9).</summary>
+        private void Remind(string key, DateTimeOffset? when, string title, string text)
+        {
+            try { Alarms.Schedule(this, _prefs, key, when, title, text); }
+            catch (Exception) { /* reminders are a convenience; never break a screen */ }
+        }
+
         private async void Run(Func<Task> action)
         {
             SetStatus("…");

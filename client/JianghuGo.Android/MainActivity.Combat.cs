@@ -129,6 +129,7 @@ namespace JianghuGo.Android
             art.SetScaleType(ImageView.ScaleType.FitCenter);
             card.AddView(art, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0, 1f));
             ui.Text("Polowanie: " + hunt.NpcNamePl, card, 16, Ui.Gold, bold: true, center: true);
+            Remind("hunt", hunt.Finished ? null : hunt.EndsAt, "Polowanie zakończone", hunt.NpcNamePl + " — odbierz łupy.");
             var now = DateTimeOffset.UtcNow;
             var total = (hunt.EndsAt - hunt.StartedAt).TotalMinutes;
             var done = Math.Clamp((now - hunt.StartedAt).TotalMinutes, 0, total);

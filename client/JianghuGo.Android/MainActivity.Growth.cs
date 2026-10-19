@@ -87,6 +87,7 @@ namespace JianghuGo.Android
             if (st == null) return;
             var ui = _ui;
             var body = Sheet("Odosobnienie", 0.5f, out var close, "menu_meditate");
+            Remind("retreat", st.IsInRetreat ? st.RetreatUntil : null, "Odosobnienie zakończone", "Twoje Qi czeka — wróć do Jianghu.");
             if (st.IsInRetreat)
             {
                 ui.Text("Trwa odosobnienie (×8 Qi) do " + st.RetreatUntil?.ToLocalTime().ToString("dd.MM HH:mm") + " — zostało " + Until(st.RetreatUntil) + ".", body, 13, Ui.Ink, maxLines: 3);
@@ -612,6 +613,10 @@ namespace JianghuGo.Android
         private void ShowEstate(EstateDto e, int tab)
         {
             var c = _me;
+            Remind("crops", e.Plots.Where(p => p.Seed != null && !p.Ready).Select(p => p.ReadyAt).Where(t => t != null).DefaultIfEmpty(null).Min(),
+                "Plony dojrzały", "Ogród posiadłości czeka na zbiór.");
+            Remind("expeditions", e.Disciples.Where(d => d.Expedition != null && !d.Returned).Select(d => d.Until).Where(t => t != null).DefaultIfEmpty(null).Max(),
+                "Uczniowie wrócili", "Wyprawa zakończona — odbierz łupy.");
             var ui = NewScreen("Posiadłość", BackToTab, Resource.Drawable.loc_village, "OGRÓD · UCZNIOWIE · WYPRAWY");
             var page = ui.Content;
             ui.Tabs(page, new[] { "Ogród", "Uczniowie", "Wyprawy" }, tab, i => Run(() => ShowEstateAsync(i)),
@@ -860,6 +865,11 @@ namespace JianghuGo.Android
             {
                 var q = await _api.GetCraftQueueAsync(c.Id, Ct);
                 if (gen != _screen) return;
+                foreach (var kind in new[] { "alchemy", "smithing" })
+                {
+                    var last = q.Entries.Where(x => (x.Kind == "alchemy") == (kind == "alchemy") && !x.Ready).Select(x => (DateTimeOffset?)x.ReadyAt).DefaultIfEmpty(null).Max();
+                    Remind("craft_" + kind, last, kind == "alchemy" ? "Kocioł gotowy" : "Kuźnia gotowa", "Partia czeka na odbiór.");
+                }
                 text.Text = q.Entries.Count == 0 ? "Kocioł i kuźnia wolne — ⏳ wytwarza partię sam, także offline." :
                     string.Join("  ·  ", q.Entries.Select(e => (e.Kind == "alchemy" ? "Kocioł" : "Kuźnia") + ": " + e.Times + "× " + e.OutputNamePl + " " + (e.Ready ? "gotowe" : Until(e.ReadyAt))));
                 if (q.Entries.Any(e => e.Ready))

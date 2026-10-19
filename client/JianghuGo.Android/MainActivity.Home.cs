@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Android.Graphics;
+using Android.OS;
 using Android.Views;
 using Android.Widget;
 using JianghuGo.Client.Application;
@@ -340,6 +341,19 @@ namespace JianghuGo.Android
             var pageDto = await _api.GetNotificationsAsync(false, 40, null, Ct);
             var ui = NewScreen("Wieści", BackToTab, Resource.Drawable.place_altar, "Z CAŁEGO JIANGHU");
             var items = pageDto.Items;
+            var on = Alarms.Enabled(_prefs);
+            ui.Btn(on ? "🔔 Przypomnienia na telefonie: włączone" : "🔕 Przypomnienia na telefonie: wyłączone", () =>
+            {
+                var next = !Alarms.Enabled(_prefs);
+                _prefs.Edit().PutBoolean(Alarms.PrefKey, next).Apply();
+                if (next && Build.VERSION.SdkInt >= BuildVersionCodes.Tiramisu && !Alarms.Allowed(this))
+                    RequestPermissions(new[] { "android.permission.POST_NOTIFICATIONS" }, Alarms.PermissionRequestCode);
+                Run(async () =>
+                {
+                    await ShowInboxAsync();
+                    SetStatus(next ? "Przypomnę o końcu odosobnienia, partiach, plonach i wyprawach." : "Przypomnienia wyłączone.");
+                });
+            }, ui.Content, secondary: true, sp: 12, heightDp: 34);
             ui.Pages(ui.Content, items.Count, 1, 5, (i, cell) =>
             {
                 var n = items[i];
