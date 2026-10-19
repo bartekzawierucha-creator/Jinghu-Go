@@ -293,12 +293,13 @@ namespace JianghuGo.Android
                     if (e.Hit == true)
                     {
                         _cues.Add(new Cue { Hero = !mine, Anim = target["hit"], At = impact });
-                        var crit = e.Exploit || e.Momentum >= 3;
+                        var crit = e.Crit || e.Exploit || e.Momentum >= 3;
                         var light = crit ? "crit" : tech.Contains("fist") || tech.Contains("mountain") || tech.Contains("claw") ? "hit_heavy" : ranged ? "hit_qi" : "hit";
                         Impact(!mine, impact, mine ? TechniqueFx(tech) : _look.AttackFx, light, crit ? 1f : 0.55f);
                         if (mine) Sfx.Play(Sfx.Hit); else Sfx.Play(Sfx.Hurt);
                         _floaters.Add(new Floater { OnHero = !mine, Text = "-" + e.Damage, Color = mine ? Color.Rgb(255, 230, 140) : Color.Rgb(255, 110, 90), Size = crit ? 32 : 26, At = impact });
-                        if (e.Exploit) _floaters.Add(new Floater { OnHero = !mine, Text = "SŁABOŚĆ!", Color = Ui.Gold, Size = 15, At = impact + 160 });
+                        if (e.Crit) _floaters.Add(new Floater { OnHero = !mine, Text = "KRYTYK!", Color = Color.Rgb(255, 80, 60), Size = 16, At = impact + 120 });
+                        else if (e.Exploit) _floaters.Add(new Floater { OnHero = !mine, Text = "SŁABOŚĆ!", Color = Ui.Gold, Size = 15, At = impact + 160 });
                         else if (e.Momentum >= 2) _floaters.Add(new Floater { OnHero = mine, Text = "ROZPĘD ×" + e.Momentum, Color = Ui.Gold, Size = 14, At = impact + 160 });
                     }
                     else if (e.Hit == false)

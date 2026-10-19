@@ -64,7 +64,8 @@ public sealed record TurnEvent(
     int QiB,
     int Healed = 0,
     int Momentum = 0,
-    bool Exploit = false);
+    bool Exploit = false,
+    bool Crit = false);
 
 /// <summary>
 /// The whole combat ruleset as a pure function: (config, combatants, state, intents, rng) → (state', events).
@@ -136,9 +137,9 @@ public static class CombatEngine
         var distance = s.Distance;
         var events = new List<TurnEvent>();
         void Log(char actor, string action, string? tech = null, bool? hit = null, int dmg = 0, int reflected = 0, int stolen = 0, string? fx = null, int healed = 0,
-            bool exploit = false) =>
+            bool exploit = false, bool crit = false) =>
             events.Add(new TurnEvent(actor.ToString(), action, tech, hit, dmg, reflected, stolen, fx, distance, Math.Max(0, a.Hp), Math.Max(0, b.Hp), a.Qi, b.Qi, healed,
-                (actor == 'a' ? a : b).Momentum, exploit));
+                (actor == 'a' ? a : b).Momentum, exploit, crit));
 
         // 1. Effective intents: stun consumes the action; anything no longer legal degrades to rest (defence in depth).
         (Intent? Intent, bool Stunned) Effective(Combatant who, Fighter f, W w, Intent intent)
@@ -222,8 +223,8 @@ public static class CombatEngine
 
                 if (sp.Power > 0)
                 {
-                    var (hit, damage, reflected, stolen, applied, exploit) = Strike(me, foe, who, foeWho, eq, sp.Power, sp.Scaling!, sp.AccuracyPermille, sp.Effect);
-                    Log(side, "special", t.Id, hit: hit, dmg: damage, reflected: reflected, stolen: stolen, fx: applied, healed: healed, exploit: exploit);
+                    var (hit, damage, reflected, stolen, applied, exploit, crit) = Strike(me, foe, who, foeWho, eq, sp.Power, sp.Scaling!, sp.AccuracyPermille, sp.Effect);
+                    Log(side, "special", t.Id, hit: hit, dmg: damage, reflected: reflected, stolen: stolen, fx: applied, healed: healed, exploit: exploit, crit: crit);
                 }
                 else
                 {
@@ -232,19 +233,21 @@ public static class CombatEngine
             }
             else if (t.Attack is { } atk)
             {
-                var (hit, damage, reflected, stolen, applied, exploit) = Strike(me, foe, who, foeWho, eq, atk.Power, atk.Scaling, atk.AccuracyPermille, atk.Effect);
-                Log(side, "attack", t.Id, hit: hit, dmg: damage, reflected: reflected, stolen: stolen, fx: applied, exploit: exploit);
+                var (hit, damage, reflected, stolen, applied, exploit, crit) = Strike(me, foe, who, foeWho, eq, atk.Power, atk.Scaling, atk.AccuracyPermille, atk.Effect);
+                Log(side, "attack", t.Id, hit: hit, dmg: damage, reflected: reflected, stolen: stolen, fx: applied, exploit: exploit, crit: crit);
             }
         }
 
         // A strike (attack or special): hit roll, damage, counter-reflection, effect. Same RNG order as before 1.3.
         // Combo rules (1.4): every momentum stack adds damage; striking a bleeding/weakened/stunned foe exploits the opening.
         // A landed strike builds momentum, a miss loses it (as do resting and being stunned).
-        (bool Hit, int Damage, int Reflected, int Stolen, string? Applied, bool Exploit) Strike(W me, W foe, Combatant who, Combatant foeWho, EquippedTechnique eq,
+        // 1.6: the agility edge is relative, Focus (vs Willpower) gives critical strikes, Willpower (vs Focus) resists effects,
+        // Elemental Affinity weights the element modifier and bleeding grows with the attacker's stat like damage does.
+        (bool Hit, int Damage, int Reflected, int Stolen, string? Applied, bool Exploit, bool Crit) Strike(W me, W foe, Combatant who, Combatant foeWho, EquippedTechnique eq,
             int power, string scaling, int accuracy, EffectSpec? effect)
         {
             var chance = c.HitChance.BasePermille
-                         + ((who.Stat("agility") - foeWho.Stat("agility")) * c.HitChance.AgilityDiffPermille)
+                         + c.HitChance.AgilityTerm(who.Stat("agility"), foeWho.Stat("agility"))
                          + accuracy - foe.Sum(EffectTypes.Evasion);
             chance = Math.Clamp(chance, c.HitChance.MinPermille, c.HitChance.MaxPermille);
             var hit = rng.NextInt(0, 1000) < chance;
@@ -252,7 +255,7 @@ public static class CombatEngine
             if (!hit)
             {
                 me.SetMomentum(0);
-                return (false, 0, 0, 0, null, false);
+                return (false, 0, 0, 0, null, false, false);
             }
 
             var combo = c.Combo;
@@ -262,10 +265,13 @@ public static class CombatEngine
             dmg = dmg * (1000 + (who.Stat(scaling) * c.Damage.StatScalingPermille)) / 1000;
             dmg = dmg * (1000 + (who.Perks?.DamageBonus(scaling) ?? 0)) / 1000;
             if (combo is not null) dmg = dmg * (1000 + (me.Momentum * combo.MomentumPermillePerStack) + (exploit ? combo.ExploitPermille : 0)) / 1000;
-            if (c.Elements is { } el) dmg = dmg * (1000 + el.Modifier(el.OfTechnique(c.Technique(eq).Id) ?? who.Element, foeWho.Element)) / 1000;
+            if (c.Elements is { } el)
+                dmg = dmg * (1000 + el.Modifier(el.OfTechnique(c.Technique(eq).Id) ?? who.Element, foeWho.Element, who.Stat("elementalAffinity"), foeWho.Stat("elementalAffinity"))) / 1000;
             if (s.Turn == 1 && (who.Perks?.FirstStrikePermille ?? 0) > 0) dmg = dmg * (1000 + who.Perks!.FirstStrikePermille) / 1000;
             dmg = dmg * (1000 - me.Sum(EffectTypes.Weaken)) / 1000;
             dmg = dmg * (1000 + variance) / 1000;
+            var crit = c.Crit is { } cr && rng.NextInt(0, 1000) < cr.ChancePermille(who.Stat("focus"), foeWho.Stat("willpower"));
+            if (crit) dmg = dmg * (1000 + c.Crit!.DamagePermille) / 1000;
             dmg = dmg * (1000 - foe.Sum(EffectTypes.Guard)) / 1000;
             var damage = (int)Math.Max(1, dmg);
             foe.Hp -= damage;
@@ -288,15 +294,18 @@ public static class CombatEngine
             }
 
             string? applied = null;
-            if (effect is { } fx && foe.Hp > 0 && rng.NextInt(0, 1000) < Math.Min(1000, fx.ChancePermille + (who.Perks?.EffectChancePermille ?? 0)))
+            var resist = c.Resist?.ResistPermille(foeWho.Stat("willpower"), who.Stat("focus")) ?? 0;
+            if (effect is { } fx && foe.Hp > 0 && rng.NextInt(0, 1000) < Math.Min(1000, fx.ChancePermille + (who.Perks?.EffectChancePermille ?? 0)) * (1000 - resist) / 1000)
             {
                 var magnitude = fx.Type == EffectTypes.Bleed ? fx.Magnitude * (1000 + (who.Perks?.BleedPermille ?? 0)) / 1000 : fx.Magnitude;
+                if (fx.Type == EffectTypes.Bleed && c.Damage.BleedStatScalingPermille > 0)
+                    magnitude = (int)((long)magnitude * (1000 + ((long)who.Stat(scaling) * c.Damage.BleedStatScalingPermille)) / 1000); // bleeding grows with the stat (1.6)
                 foe.Effects.Add(new Effect(fx.Type, magnitude, 0, fx.Duration));
                 applied = fx.Type;
             }
 
             if (combo is not null) me.SetMomentum(Math.Min(combo.MaxMomentum, me.Momentum + 1));
-            return (true, damage, reflected, stolen, applied, exploit);
+            return (true, damage, reflected, stolen, applied, exploit, crit);
         }
 
         // "survive once" perk: the first lethal blow of the battle leaves 1 HP (remembered as a permanent effect)

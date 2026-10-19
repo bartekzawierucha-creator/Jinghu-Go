@@ -89,7 +89,10 @@ internal sealed class ArtsBattleHandler(IServiceScopeFactory scopes, ArtsConfig 
                         : p with { CoatingCharges = p.CoatingCharges - 1 };
 
                 // tempering from blows taken
-                var xp = (long)Math.Round(part.DamageTaken * config.Tempering.XpPerDamage * (c.Path == ArtsRules.BodyPath ? 1.5 : 1.0));
+                // 1.6: blows are measured against the fighter's health (as if they had TemperReferenceHp), so tempering does
+                // not speed up just because numbers grow with the realm
+                var taken = part.MaxHp > 0 ? (double)part.DamageTaken * ArtsRules.TemperReferenceHp / Math.Max(ArtsRules.TemperReferenceHp, part.MaxHp) : part.DamageTaken;
+                var xp = (long)Math.Round(taken * config.Tempering.XpPerDamage * (c.Path == ArtsRules.BodyPath ? 1.5 : 1.0));
                 if (e.Kind == "tribulation") xp *= config.Tempering.TribulationMultiplier;
                 p = ArtsRules.AddTemperXp(config, p, xp);
 

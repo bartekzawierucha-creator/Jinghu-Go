@@ -25,7 +25,11 @@ public sealed record CombatConfig(
     TowerRules? Tower = null,
     WorldBossRules? WorldBoss = null,
     ElementRules? Elements = null,
-    ArenaRules? Arena = null)
+    ArenaRules? Arena = null,
+    ScalingRules? Scaling = null,
+    CritRules? Crit = null,
+    ResistRules? Resist = null,
+    PerkCaps? PerkCaps = null)
 {
     /// <summary>Combat perks of a cultivation path (none for an unknown path or a config without them).</summary>
     public PathPerks? Perks(string? path) => path is not null && PathPerks is not null && PathPerks.TryGetValue(path, out var p) ? p : null;
@@ -43,6 +47,9 @@ public sealed record CombatConfig(
 
     /// <summary>Techniques a character of this path knows: all path-less ones plus its path's signature technique(s).</summary>
     public IEnumerable<TechniqueDefinition> KnownBy(string path) => Techniques.Where(t => t.Path is null || t.Path == path);
+
+    /// <summary>Techniques of the path already unlocked at this realm (1.6: techniques open realm by realm).</summary>
+    public IEnumerable<TechniqueDefinition> KnownBy(string path, int realm) => KnownBy(path).Where(t => t.MinRealm <= realm);
 }
 
 public sealed record DistanceRules(int Start, int Min, int Max);
@@ -65,20 +72,28 @@ public sealed record TowerReward(int Floor, long Stones, IReadOnlyList<RewardIte
 /// floors; every <see cref="BossEvery"/>-th floor is a guardian from <see cref="BossPool"/>. Stats and HP grow per floor.
 /// Rewards only for the first clear of each floor, so there is nothing to farm.
 /// </summary>
+/// <remarks>
+/// 1.6: with <see cref="FloorsPerRealm"/> &gt; 0 the tower goes on past the first <see cref="PoolSpanFloors"/> floors: the pool
+/// repeats every span and every <see cref="FloorsPerRealm"/> floors the opponents stand one realm higher (scaling rules), so the
+/// ladder reaches the last realm. Floors past the configured rewards pay <see cref="LateStonesPerFloor"/> × floor on guardian floors.
+/// </remarks>
 public sealed record TowerRules(int Floors, IReadOnlyList<string> Pool, IReadOnlyList<string> BossPool, int BossEvery, int StatPermillePerFloor, int HpPermillePerFloor,
-    int QiPerFloor, IReadOnlyList<TowerReward> Rewards)
+    int QiPerFloor, IReadOnlyList<TowerReward> Rewards, int FloorsPerRealm = 0, int SpanFloors = 0, int LateStonesPerFloor = 0, IReadOnlyList<RewardItem>? LateItems = null)
 {
+    public int PoolSpanFloors => SpanFloors > 0 ? Math.Min(SpanFloors, Floors) : Floors;
+
     public bool IsBossFloor(int floor) => BossEvery > 0 && floor % BossEvery == 0;
 
     public string NpcFor(int floor) => IsBossFloor(floor) && BossPool.Count > 0
         ? BossPool[((floor / BossEvery) - 1) % BossPool.Count]
-        : Pool[Math.Min(Pool.Count - 1, (floor - 1) * Pool.Count / Floors)];
+        : Pool[Math.Min(Pool.Count - 1, ((floor - 1) % PoolSpanFloors) * Pool.Count / PoolSpanFloors)];
 
-    /// <summary>The floor's opponent: the pool NPC with stats and HP raised for the floor.</summary>
+    /// <summary>The floor's opponent: the pool NPC with stats and HP raised for the floor (within its span).</summary>
     public NpcDefinition Scaled(NpcDefinition npc, int floor)
     {
-        var stat = 1000 + ((floor - 1) * StatPermillePerFloor);
-        var hp = 1000 + ((floor - 1) * HpPermillePerFloor);
+        var within = ((floor - 1) % PoolSpanFloors) + 1;
+        var stat = 1000 + ((within - 1) * StatPermillePerFloor);
+        var hp = 1000 + ((within - 1) * HpPermillePerFloor);
         return npc with
         {
             Stats = npc.Stats.ToDictionary(s => s.Key, s => (int)((long)s.Value * stat / 1000)),
@@ -86,7 +101,9 @@ public sealed record TowerRules(int Floors, IReadOnlyList<string> Pool, IReadOnl
         };
     }
 
-    public TowerReward? RewardFor(int floor) => Rewards.FirstOrDefault(r => r.Floor == floor);
+    public TowerReward? RewardFor(int floor) =>
+        Rewards.FirstOrDefault(r => r.Floor == floor)
+        ?? (LateStonesPerFloor > 0 && floor > PoolSpanFloors && IsBossFloor(floor) ? new TowerReward(floor, (long)LateStonesPerFloor * floor, LateItems ?? []) : null);
 }
 
 /// <summary>
@@ -130,6 +147,22 @@ public sealed record PathPerks(
     public int DamageBonus(string? scaling) =>
         DamagePermille + (scaling is not null && ScalingDamagePermille is not null ? ScalingDamagePermille.GetValueOrDefault(scaling) : 0);
 
+    /// <summary>Every perk limited by the caps (null = no limits).</summary>
+    public PathPerks Capped(PerkCaps? k) => k is null ? this : this with
+    {
+        QiPermille = Math.Min(QiPermille, k.QiPermille),
+        QiRegen = Math.Min(QiRegen, k.QiRegen),
+        GuardPermille = Math.Min(GuardPermille, k.GuardPermille),
+        EffectChancePermille = Math.Min(EffectChancePermille, k.EffectChancePermille),
+        BleedPermille = Math.Min(BleedPermille, k.BleedPermille),
+        HealPermille = Math.Min(HealPermille, k.HealPermille),
+        DamagePermille = Math.Min(DamagePermille, k.DamagePermille),
+        RegenPermille = Math.Min(RegenPermille, k.RegenPermille),
+        ReflectPermille = Math.Min(ReflectPermille, k.ReflectPermille),
+        LifestealPermille = Math.Min(LifestealPermille, k.LifestealPermille),
+        FirstStrikePermille = Math.Min(FirstStrikePermille, k.FirstStrikePermille),
+    };
+
     /// <summary>The path's perks plus perks earned outside combat (frozen into the battle snapshot).</summary>
     public PathPerks With(JianghuGo.Modules.Combat.Contracts.PerkBonus b) => this with
     {
@@ -159,7 +192,8 @@ public sealed record ElementRules(
     int AdvantagePermille,
     IReadOnlyDictionary<string, string> Paths,
     IReadOnlyDictionary<string, string> Npcs,
-    IReadOnlyDictionary<string, string> Techniques)
+    IReadOnlyDictionary<string, string> Techniques,
+    int AffinitySpreadPermille = 0)
 {
     public string? OfTechnique(string id) => Techniques.TryGetValue(id, out var e) ? e : null;
 
@@ -168,6 +202,19 @@ public sealed record ElementRules(
         : Overcomes.GetValueOrDefault(attack) == defender ? AdvantagePermille
         : Overcomes.GetValueOrDefault(defender) == attack ? -AdvantagePermille
         : 0;
+
+    /// <summary>
+    /// The element modifier weighted by Elemental Affinity: the attacker's share of both affinities moves an advantage between
+    /// ×(1 − spread) and ×(1 + spread), and softens or deepens a disadvantage the other way.
+    /// </summary>
+    public int Modifier(string? attack, string? defender, int affinity, int foeAffinity)
+    {
+        var m = Modifier(attack, defender);
+        if (m == 0 || AffinitySpreadPermille <= 0) return m;
+        var share = CombatMath.Share(affinity, foeAffinity);
+        var weight = m > 0 ? 1000 - AffinitySpreadPermille + (2 * AffinitySpreadPermille * share / 1000) : 1000 + AffinitySpreadPermille - (2 * AffinitySpreadPermille * share / 1000);
+        return m * weight / 1000;
+    }
 }
 
 /// <summary>One automatic battle every <see cref="MinutesPerBattle"/> minutes, for at most <see cref="MaxHours"/> hours per hunt.</summary>
@@ -175,11 +222,101 @@ public sealed record IdleRules(int MinutesPerBattle, int MaxHours);
 
 public sealed record VitalsRules(int BaseHp, int HpPerConstitution, int BaseQi, int QiPerSpirit, int QiRegenPerTurn, int RestQiGain);
 
-public sealed record HitChanceRules(int BasePermille, int AgilityDiffPermille, int MinPermille, int MaxPermille);
+/// <summary>
+/// Hit chance. With <see cref="AgilityRatioPermille"/> &gt; 0 the agility edge is relative ((mine − theirs) / max of both), so it
+/// stays meaningful from realm 0 to realm 65; otherwise (legacy) every point of difference counts <see cref="AgilityDiffPermille"/>.
+/// </summary>
+public sealed record HitChanceRules(int BasePermille, int AgilityDiffPermille, int MinPermille, int MaxPermille, int AgilityRatioPermille = 0)
+{
+    public int AgilityTerm(int mine, int theirs) => AgilityRatioPermille > 0
+        ? CombatMath.Ratio(mine, theirs, AgilityRatioPermille)
+        : (mine - theirs) * AgilityDiffPermille;
+}
 
-public sealed record DamageRules(int VariancePermille, int StatScalingPermille, int LevelScalingPermille);
+public static class CombatMath
+{
+    /// <summary>Relative edge: (mine − theirs) × k / max(mine, theirs, 10). Same result for 12 vs 10 as for 1200 vs 1000.</summary>
+    public static int Ratio(int mine, int theirs, int k) => (int)((long)(mine - theirs) * k / Math.Max(10, Math.Max(mine, theirs)));
 
-public sealed record ProgressionRules(int MaxTechniqueLevel, int XpPerUse, int XpPerLevel, int DailyRewardedPveWins);
+    /// <summary>Share of the pair (0-1000); 500 when both are zero.</summary>
+    public static int Share(int mine, int theirs) => mine + theirs <= 0 ? 500 : (int)((long)Math.Max(0, mine) * 1000 / (Math.Max(0, mine) + Math.Max(0, theirs)));
+}
+
+/// <summary>Critical strikes: Focus against the defender's Willpower decides the chance; a critical strike deals extra damage.</summary>
+public sealed record CritRules(int BasePermille, int RatioPermille, int MaxPermille, int DamagePermille)
+{
+    public int ChancePermille(int focus, int foeWillpower) => Math.Clamp(BasePermille + CombatMath.Ratio(focus, foeWillpower, RatioPermille), 0, MaxPermille);
+}
+
+/// <summary>Willpower against the attacker's Focus resists bleeding, stuns and weakening (‰ of the effect chance removed).</summary>
+public sealed record ResistRules(int RatioPermille, int MaxPermille)
+{
+    public int ResistPermille(int willpower, int foeFocus) => Math.Clamp(CombatMath.Ratio(willpower, foeFocus, RatioPermille), 0, MaxPermille);
+}
+
+/// <summary>
+/// Upper limits of the perks a character brings into battle (path + arts + sect + pet + Gu...), so that stacking every
+/// source never makes a character immortal or one-shotting. Applied when the battle snapshot is taken.
+/// </summary>
+public sealed record PerkCaps(int DamagePermille, int GuardPermille, int EffectChancePermille, int BleedPermille, int HealPermille, int QiRegen, int QiPermille,
+    int RegenPermille, int ReflectPermille, int LifestealPermille, int FirstStrikePermille, int HpPermille);
+
+/// <summary>
+/// Realm scaling. Opponents keep their difficulty as the cultivator grows: an NPC tuned for its home realm is raised to the
+/// fighter's realm by the ratio of the expected stat budgets (<see cref="StatBase"/> + <see cref="StatPerRealm"/> × realm),
+/// its techniques gain a level every <see cref="RealmsPerTechniqueLevel"/> realms, and its Qi and stones grow with it.
+/// </summary>
+public sealed record ScalingRules(int StatBase, int StatPerRealm, int QiGrowthPermille, int StonesPermillePerRealm, int RealmsPerTechniqueLevel,
+    IReadOnlyList<int> TierHomeRealm, int MaxRealm = 65)
+{
+    public int Home(NpcDefinition n) => n.HomeRealm ?? TierHomeRealm[Math.Clamp(n.Tier, 1, TierHomeRealm.Count) - 1];
+
+    public long Budget(int realm) => StatBase + ((long)StatPerRealm * Math.Clamp(realm, 0, MaxRealm));
+
+    /// <summary>The NPC at a realm (may be below its home: then it is weakened), times a power factor.</summary>
+    public NpcDefinition AtRealm(NpcDefinition n, int realm, int powerPermille = 1000)
+    {
+        var home = Home(n);
+        var num = Budget(realm) * powerPermille;
+        var den = Budget(home) * 1000;
+        var levels = RealmsPerTechniqueLevel > 0 ? (realm - home) / RealmsPerTechniqueLevel : 0;
+        return n with
+        {
+            Stats = n.Stats.ToDictionary(s => s.Key, s => (int)Math.Max(0, s.Value * num / den)),
+            HpOverride = n.HpOverride is { } h ? (int)Math.Max(1, h * num / den) : null,
+            Loadout = [.. n.Loadout.Select(s => s is null ? null : s with { Level = Math.Clamp(s.Level + levels, 1, 10) })],
+        };
+    }
+
+    /// <summary>A world opponent faced by a cultivator of this realm: never weaker than at home.</summary>
+    public NpcDefinition ForFighter(NpcDefinition n, int realm) => realm <= Home(n) ? n : AtRealm(n, realm);
+
+    public int RealmsAbove(NpcDefinition n, int realm) => Math.Max(0, Math.Min(realm, MaxRealm) - Home(n));
+
+    /// <summary>Qi grows with the cultivation curve (×QiGrowthPermille per realm above home).</summary>
+    public long Qi(long baseQi, int realmsAbove)
+    {
+        if (baseQi <= 0 || realmsAbove <= 0) return baseQi;
+        var v = baseQi * Math.Pow(QiGrowthPermille / 1000.0, realmsAbove);
+        return v >= long.MaxValue / 4 ? long.MaxValue / 4 : (long)v;
+    }
+
+    public int StonesPermille(int realmsAbove) => 1000 + (StonesPermillePerRealm * Math.Max(0, realmsAbove));
+}
+
+public sealed record DamageRules(int VariancePermille, int StatScalingPermille, int LevelScalingPermille, int BleedStatScalingPermille = 0);
+
+/// <remarks>
+/// 1.6: Insight speeds up mastery (+<see cref="InsightXpPermille"/>‰ per point, at most ×3), and the level a technique can be used at
+/// is capped by the realm: <see cref="LevelCapBase"/> + realm / <see cref="LevelCapRealmsPerLevel"/> (mastery beyond it waits).
+/// </remarks>
+public sealed record ProgressionRules(int MaxTechniqueLevel, int XpPerUse, int XpPerLevel, int DailyRewardedPveWins, int InsightXpPermille = 0, int LevelCapBase = 0,
+    int LevelCapRealmsPerLevel = 0)
+{
+    public int LevelCap(int realm) => LevelCapBase > 0 && LevelCapRealmsPerLevel > 0 ? Math.Min(MaxTechniqueLevel, LevelCapBase + (Math.Max(0, realm) / LevelCapRealmsPerLevel)) : MaxTechniqueLevel;
+
+    public int XpFor(int uses, int insight) => (int)Math.Min(int.MaxValue, (long)uses * XpPerUse * (1000 + Math.Clamp(Math.Max(0, insight) * InsightXpPermille, 0, 2000)) / 1000);
+}
 
 public sealed record TechniqueDefinition(
     string Id,
@@ -194,7 +331,8 @@ public sealed record TechniqueDefinition(
     DefenseSpec? Defense,
     MovementSpec? Movement,
     CounterSpec? Counter,
-    SpecialSpec? Special = null)
+    SpecialSpec? Special = null,
+    int MinRealm = 0)
 {
     /// <summary>The slot this technique goes in. The old "movement" slot is now the special-skill slot.</summary>
     public string Kind => Slot == "movement" ? SlotKinds.Special : Slot;
@@ -228,7 +366,8 @@ public sealed record NpcDefinition(
     int Tier = 1,
     bool Boss = false,
     bool WorldOnly = false,
-    bool Tameable = false);
+    bool Tameable = false,
+    int? HomeRealm = null);
 
 public sealed record NpcSlot(string Id, int Level);
 
@@ -290,6 +429,24 @@ public static class CombatConfigValidator
                 || (p.ScalingDamagePermille ?? new Dictionary<string, int>()).Any(kv => !ScalingStats.Contains(kv.Key) || kv.Value is < 0 or > 500))))
             e.Add("pathPerks must cover every path with values in range and a Polish description.");
 
+        if (c.HitChance is { AgilityRatioPermille: < 0 or > 1000 }) e.Add("hitChance.agilityRatioPermille must be 0-1000.");
+        if (c.Crit is { } crit && (crit.BasePermille is < 0 or > 500 || crit.RatioPermille is < 0 or > 1000 || crit.MaxPermille is < 0 or > 750 || crit.DamagePermille is < 0 or > 2000))
+            e.Add("crit: base 0-500‰, ratio 0-1000‰, max 0-750‰, damage 0-2000‰.");
+        if (c.Resist is { } resist && (resist.RatioPermille is < 0 or > 1000 || resist.MaxPermille is < 0 or > 900))
+            e.Add("resist: ratio 0-1000‰, max 0-900‰.");
+        if (c.Scaling is { } sc && (sc.StatBase < 1 || sc.StatPerRealm < 0 || sc.QiGrowthPermille is < 1000 or > 3000 || sc.StonesPermillePerRealm is < 0 or > 1000
+                || sc.RealmsPerTechniqueLevel < 0 || sc.TierHomeRealm is null || sc.TierHomeRealm.Count != 9 || sc.TierHomeRealm.Any(r => r < 0 || r > sc.MaxRealm) || sc.MaxRealm is < 1 or > 200))
+            e.Add("scaling: statBase >= 1, statPerRealm >= 0, qiGrowth 1000-3000‰, stones 0-1000‰ per realm, tierHomeRealm for tiers 1-9 within 0..maxRealm.");
+        if (c.Npcs is not null && c.Scaling is { } sc2 && c.Npcs.Any(n => n.HomeRealm is { } h && (h < 0 || h > sc2.MaxRealm)))
+            e.Add("npc homeRealm must be 0..maxRealm.");
+        if (c.PerkCaps is { } caps && new[] { caps.DamagePermille, caps.GuardPermille, caps.EffectChancePermille, caps.BleedPermille, caps.HealPermille, caps.QiRegen, caps.QiPermille,
+                caps.RegenPermille, caps.ReflectPermille, caps.LifestealPermille, caps.FirstStrikePermille, caps.HpPermille }.Any(v => v < 0)
+            || c.PerkCaps is { RegenPermille: > 200 } or { ReflectPermille: > 800 } or { LifestealPermille: > 800 } or { GuardPermille: > 900 })
+            e.Add("perkCaps: all >= 0; regen <= 200‰, reflect/lifesteal <= 800‰, guard <= 900‰.");
+        if (c.Elements is { AffinitySpreadPermille: < 0 or > 1000 }) e.Add("elements.affinitySpreadPermille must be 0-1000.");
+        if (c.Techniques is not null && c.Techniques.Any(t => t.MinRealm is < 0 or > 65)) e.Add("technique minRealm must be 0-65.");
+        if (c.Progression is { } pr && (pr.InsightXpPermille is < 0 or > 100 || pr.LevelCapBase is < 0 or > 10 || pr.LevelCapRealmsPerLevel is < 0 or > 20))
+            e.Add("progression: insightXpPermille 0-100, levelCapBase 0-10, levelCapRealmsPerLevel 0-20.");
         if (c.Combo is { } combo && (combo.MomentumPermillePerStack is < 0 or > 300 || combo.MaxMomentum is < 0 or > 10 || combo.ExploitPermille is < 0 or > 500))
             e.Add("combo: momentum 0-300‰ per stack, max 0-10 stacks, exploit 0-500‰.");
         if (c.Tower is { } tower)
@@ -365,7 +522,7 @@ public static class CombatConfigValidator
         {
             foreach (var (path, ids) in c.StarterLoadouts)
             {
-                var err = LoadoutRules.Validate(c, path, ids.Cast<string?>().ToList());
+                var err = LoadoutRules.Validate(c, path, ids.Cast<string?>().ToList(), null, 0); // a new character (realm 0) can use it
                 if (err is not null) e.Add($"starterLoadouts.{path}: {err}");
             }
         }
@@ -395,7 +552,10 @@ public static class LoadoutRules
 {
     /// <summary>Null = valid. 8 entries; each non-null technique must be known by the path and fit the slot; no duplicates; ≥1 attack.</summary>
     /// <param name="daoTechniques">Dao Lab techniques the character knows (designed or learned from scrolls).</param>
-    public static string? Validate(CombatConfig c, string path, IReadOnlyList<string?> slots, IReadOnlyDictionary<string, TechniqueDefinition>? daoTechniques = null)
+    /// <param name="realm">The character's realm: techniques that open later cannot be equipped yet.</param>
+    /// <param name="kept">Techniques already equipped (kept even if they would be locked now, e.g. after a rules change).</param>
+    public static string? Validate(CombatConfig c, string path, IReadOnlyList<string?> slots, IReadOnlyDictionary<string, TechniqueDefinition>? daoTechniques = null,
+        int realm = int.MaxValue, IReadOnlyCollection<string?>? kept = null)
     {
         if (slots.Count != 8) return "a loadout has exactly 8 slots.";
         var known = c.KnownBy(path).ToDictionary(t => t.Id);
@@ -404,6 +564,7 @@ public static class LoadoutRules
         {
             if (slots[i] is not { } id) continue;
             if (!known.TryGetValue(id, out var t)) return $"slot {i}: technique '{id}' is not known by the {path} path.";
+            if (t.MinRealm > realm && kept?.Contains(id) != true) return $"slot {i}: technique '{id}' unlocks at realm {t.MinRealm}.";
             if (t.Kind != SlotKinds.Layout[i]) return $"slot {i} accepts {SlotKinds.Layout[i]} techniques, '{id}' is {t.Kind}.";
         }
 

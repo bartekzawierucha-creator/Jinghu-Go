@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>JianghuGo.BalanceSim</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="../../src/Modules/Combat/JianghuGo.Modules.Combat.csproj" />
+    <ProjectReference Include="../../src/Modules/Cultivation/JianghuGo.Modules.Cultivation.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="../../../content/game-config/**/*.json" Link="game-config/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+</Project>

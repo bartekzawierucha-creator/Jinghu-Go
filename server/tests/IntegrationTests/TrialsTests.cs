@@ -94,7 +94,7 @@ public class TrialsTests : IAsyncLifetime
         var id = c.Str("id");
         var tower = await Ok(await p.GetAsync($"/api/v1/characters/{id}/combat/tower"));
         Assert.Equal(0, tower.Int("bestFloor"));
-        Assert.Equal(50, tower.Int("floors"));
+        Assert.Equal(330, tower.Int("floors"));
         Assert.Equal(1, tower["next"]!.AsObject().Int("floor"));
         Assert.Equal("training_dummy", tower["next"]!.AsObject().Str("npcId"));
         Assert.Equal(5, tower["nextMilestone"]!.AsObject().Int("floor"));
@@ -136,7 +136,7 @@ public class TrialsTests : IAsyncLifetime
         {
             var cid = new CharacterId(Guid.Parse(id));
             var mine = (await repo.FindTowerAsync(uow, cid, default))!;
-            Assert.True(await repo.TrySaveTowerAsync(uow, mine with { BestFloor = 50, Version = mine.Version + 1 }, mine.Version, default));
+            Assert.True(await repo.TrySaveTowerAsync(uow, mine with { BestFloor = 330, Version = mine.Version + 1 }, mine.Version, default));
         });
         await Problem(await p.PostAsync($"/api/v1/characters/{id}/combat/tower/start", null, Player.NewKey()), HttpStatusCode.Conflict, "tower_completed");
         Assert.Null((await Ok(await p.GetAsync($"/api/v1/characters/{id}/combat/tower")))["next"]);
@@ -158,17 +158,19 @@ public class TrialsTests : IAsyncLifetime
 
         var battle = await Ok(await p.PostAsync(url + "/start", null, Player.NewKey()), HttpStatusCode.Created);
         Assert.Equal("boss", battle.Str("kind"));
-        Assert.Equal(2500, battle["opponent"]!.AsObject().Int("maxHp"));
+        Assert.Equal(2500 * 10 / 40, battle["opponent"]!.AsObject().Int("maxHp"));   // a fresh cultivator fights the boss at realm 0 (budget 10 vs 40 at home)
         battle = await AutoToEndAsync(p, battle);
-        var dealt = battle.Int("damageDealt");
-        Assert.True(dealt > 0, battle.Compact());
+        Assert.True(battle.Int("damageDealt") > 0, battle.Compact());
+        // damage counts on the pool scale: a realm-0 cultivator's phase had a quarter of the HP, so each point is worth four
+        var dealt = (await Ok(await p.GetAsync(url))).Int("myDamage");
+        Assert.Equal(Math.Min(2500, battle.Int("damageDealt") * 40 / 10), dealt);
         Assert.Equal(Math.Min(200, dealt * 8 / 100), battle.Int("rewardQi"));
 
         // a second player hits the same pool
         var (q, d) = await NewAsync("flame");
         var other = await AutoToEndAsync(q, await Ok(await q.PostAsync($"/api/v1/characters/{d.Str("id")}/combat/world-boss/start", null, Player.NewKey()), HttpStatusCode.Created));
         boss = await Ok(await p.GetAsync(url));
-        Assert.Equal(pool - dealt - other.Int("damageDealt"), boss.Int("hpLeft"));
+        Assert.Equal(pool - dealt - Math.Min(2500, other.Int("damageDealt") * 40 / 10), boss.Int("hpLeft"));
         Assert.Equal(dealt, boss.Int("myDamage"));
         Assert.Equal(2, boss.Int("attemptsLeft"));
         Assert.Equal(2, boss["top"]!.AsArray().Count);

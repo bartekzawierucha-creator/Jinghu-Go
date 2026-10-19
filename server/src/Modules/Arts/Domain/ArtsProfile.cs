@@ -83,7 +83,19 @@ public static class ArtsRules
         Math.Clamp(c.FlameRules.AbsorbBasePermille + (c.FlameRules.AbsorbRealmPermille * realm) - ((18 - Math.Min(18, f.Rank)) * 15) - (Math.Max(0, f.MinRealm - realm) * 50), 250, 970);
 
     /// <summary>A flame's spirit grows with its rank (power ‰ for the battle).</summary>
-    public static int SpiritPower(FlameDefinition f) => 900 + ((18 - Math.Min(18, f.Rank)) * 45);
+    /// <summary>Health that damage-based tempering is measured against (a fresh cultivator's HP).</summary>
+    public const int TemperReferenceHp = 200;
+
+    /// <summary>
+    /// Power (‰) of a flame's spirit. 1.6: Combat raises the spirit to the fighter's realm, so the power only sets how fierce the
+    /// spirit is for its kind (lesser / greater / primal) with a small step by rank (rank 1 fiercest). Tuned with tools/BalanceSim.
+    /// </summary>
+    public static int SpiritPower(FlameDefinition f) => (f.Spirit switch
+    {
+        "flame_spirit_lesser" => 900,
+        "flame_spirit_greater" => 780,
+        _ => 680,
+    }) + ((9 - Math.Clamp(f.Rank, 1, 18)) * 4);
 
     public static bool IsFullMoon(DateTimeOffset at)
     {

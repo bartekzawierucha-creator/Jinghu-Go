@@ -96,13 +96,13 @@ public static class InventoryRules
     public static string? SlotOf(ItemsConfig c, string itemId) => c.Find(itemId)?.Equipment?.Slot;
 
     /// <summary>Deterministic loot for one rewarded victory. The seed is derived server-side and never exposed.</summary>
-    public static (long Stones, IReadOnlyList<LootLine> Items) RollLoot(LootTable table, ulong seed)
+    public static (long Stones, IReadOnlyList<LootLine> Items) RollLoot(LootTable table, ulong seed, int luckPermille = 0)
     {
         var rng = new DeterministicRandom(seed);
         var items = new List<LootLine>();
         foreach (var d in table.Drops)
         {
-            if (rng.NextInt(0, 1000) < d.ChancePermille)
+            if (rng.NextInt(0, 1000) < Math.Min(1000, d.ChancePermille * (1000 + Math.Clamp(luckPermille, 0, 500)) / 1000))
             {
                 items.Add(new LootLine(d.Item, rng.NextInt(d.Min, d.Max + 1)));
             }

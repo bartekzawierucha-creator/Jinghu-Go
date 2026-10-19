@@ -13,12 +13,16 @@ public class CombatEngineTests
     private static readonly CombatConfig Config =
         CombatModule.LoadConfig(Path.Combine(AppContext.BaseDirectory, "game-config", "combat.json"));
 
-    /// <summary>Variance 0 and fixed hit chance make damage exactly predictable.</summary>
+    /// <summary>Variance 0, fixed hit chance and no critical strikes make damage exactly predictable.</summary>
     private static readonly CombatConfig Exact = Config with
     {
         Damage = Config.Damage with { VariancePermille = 0 },
         HitChance = new HitChanceRules(999, 0, 999, 999),
+        Crit = null,
     };
+
+    /// <summary>A qi-path character with ten in every stat: 100 + 10 × 8 HP, +10 % qi path health (1.6).</summary>
+    private const int QiHp = 198;
 
     private static readonly Dictionary<string, int> Tens = new()
     {
@@ -75,7 +79,7 @@ public class CombatEngineTests
     public void Vitals_come_from_stats_and_npc_overrides()
     {
         var s = CombatEngine.Start(Config, Player("qi"), FromNpc("training_dummy"));
-        Assert.Equal(180, s.A.MaxHp);   // 100 + 10 × 8
+        Assert.Equal(QiHp, s.A.MaxHp);  // (100 + 10 × 8) × 1.1
         Assert.Equal(60, s.A.MaxQi);    // 30 + 10 × 3
         Assert.Equal(80, s.B.MaxHp);
         Assert.Equal(2, s.Distance);
@@ -110,7 +114,7 @@ public class CombatEngineTests
         var hit = ev.Single(e => e.Action == "attack");
         Assert.True(hit.Hit!.Value);
         Assert.Equal(10, hit.Damage);                                  // 12 × 1.3 = 15 → × (1 − 0.3 block) = 10
-        Assert.Equal(b.Stats["constitution"] * 8 + 100 - 10, s1.B.Hp);
+        Assert.Equal((b.Stats["constitution"] * 8 + 100) * 1100 / 1000 - 10, s1.B.Hp);
         Assert.Equal(2, s1.Turn);
     }
 
@@ -201,14 +205,14 @@ public class CombatEngineTests
         Assert.Equal(1, e1.Count(e => e.Action == "bleed"));
         Assert.Equal(1, e2.Count(e => e.Action == "bleed"));
         Assert.Equal(0, e3.Count(e => e.Action == "bleed"));
-        Assert.Equal(180 - 10, t3.B.Hp);
+        Assert.Equal(QiHp - 10, t3.B.Hp);
 
         var stunned = CombatEngine.Start(Exact, a, b) with { Distance = 1 };
         stunned = stunned with { B = stunned.B with { Effects = [new Effect(EffectTypes.Stun, 0, 0, 1)] } };
         var (s1, ev) = Resolve(Exact, a, b, stunned, Intent.Rest, new Intent(SlotOf(b, "palm_strike"), null));
         Assert.Equal("stunned", ev.Single(e => e.Actor == "b").Action);
         Assert.False(s1.B.IsStunned);
-        Assert.Equal(180, s1.A.Hp);
+        Assert.Equal(QiHp, s1.A.Hp);
     }
 
     [Fact]
@@ -268,15 +272,15 @@ public class CombatEngineTests
     /// deliberate rules-version bump (then update this hash). Replays of stored battles depend on it.
     /// </summary>
     [Fact]
-    public void Golden_battle_is_unchanged_for_rules_combat_4()
+    public void Golden_battle_is_unchanged_for_rules_combat_5()
     {
         var (final, log) = Simulate(FromNpc("mountain_bandit"), Player("poison"), 20261012);
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(final) + string.Join("\n", log))))[..16];
-        Assert.Equal("combat-4", Config.RulesVersion);
+        Assert.Equal("combat-5", Config.RulesVersion);
         Assert.Equal(GoldenHash, hash, $"outcome {final.Outcome} after {final.Turn} turns, {log.Count} events");
     }
 
-    private const string GoldenHash = "57BC866ADEA4723B"; // bandit vs poison starter, seed 20261012: b_won after 14 turns, 34 events (rules combat-3)
+    private const string GoldenHash = "08665E73D8CDEE93"; // bandit vs poison starter, seed 20261012: b_won after 14 turns, 35 events (rules combat-5)
 
     [Fact]
     public void Momentum_builds_on_landed_strikes_and_is_lost_by_resting()
@@ -369,8 +373,11 @@ public class CombatEngineTests
         Assert.Equal("blood_demon_lord", t.NpcFor(50));
         Assert.Equal("corpse_puppet", t.NpcFor(49));
         Assert.True(t.IsBossFloor(30) && !t.IsBossFloor(31));
-        var tiers = Enumerable.Range(1, t.Floors).Where(f => !t.IsBossFloor(f)).Select(f => Config.Npc(t.NpcFor(f))!.Tier).ToList();
-        Assert.True(tiers.Order().SequenceEqual(tiers), "never easier going up");
+        var tiers = Enumerable.Range(1, t.PoolSpanFloors).Where(f => !t.IsBossFloor(f)).Select(f => Config.Npc(t.NpcFor(f))!.Tier).ToList();
+        Assert.True(tiers.Order().SequenceEqual(tiers), "never easier going up within a span");
+        Assert.Equal(t.NpcFor(1), t.NpcFor(t.PoolSpanFloors + 1));             // the pool repeats every span…
+        Assert.True(t.Floors >= 66 * t.FloorsPerRealm);                        // …and the spans climb to the last realm
+        Assert.True(t.RewardFor(t.PoolSpanFloors + t.BossEvery) is { Stones: > 0 }, "late guardian floors pay");
         var wolf = Config.Npc("grey_wolf")!;
         var high = t.Scaled(wolf, 26);
         Assert.Equal(wolf.Stats["strength"] * (1000 + (25 * t.StatPermillePerFloor)) / 1000, high.Stats["strength"]);

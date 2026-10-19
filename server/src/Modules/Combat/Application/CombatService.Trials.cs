@@ -81,7 +81,7 @@ public sealed partial class CombatService
         var c = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
         if (c is null) return CharacterNotFound;
         if (config.Npc("heavenly_tribulation") is not { } template) return Error.NotFound("tribulation_unavailable", "Tribulations are not configured.");
-        var npc = TribulationNpc(template, realm, powerPermille, namePl);
+        var npc = TribulationNpc(config, template, realm, powerPermille, namePl);
         var started = await StartNpcBattleAsync(uow, c, BattleKinds.Tribulation, npc, "trib:" + realm, now, ct);
         return started.IsSuccess ? started.Value.Id : started.Error!;
     }
@@ -92,19 +92,26 @@ public sealed partial class CombatService
         var c = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
         if (c is null) return CharacterNotFound;
         if (config.Npc(npcId) is not { } template) return Error.NotFound("npc_not_found", "Unknown spirit.");
-        var npc = TribulationNpc(template, realm, powerPermille, namePl) with { Id = template.Id };
+        var npc = TribulationNpc(config, template, realm, powerPermille, namePl) with { Id = template.Id };
         var started = await StartNpcBattleAsync(uow, c, BattleKinds.Spirit, npc, "spirit:" + reference.ToString("D"), now, ct);
         return started.IsSuccess ? started.Value.Id : started.Error!;
     }
 
     /// <summary>The sky grows with the realm: every stat ≈ 9 per realm above the template, times the power (‰).</summary>
-    public static NpcDefinition TribulationNpc(NpcDefinition template, int realm, int powerPermille, string namePl) => template with
-    {
-        NamePl = namePl,
-        Stats = template.Stats.ToDictionary(s => s.Key, s => (int)((long)(s.Value + (9 * realm)) * powerPermille / 1000)),
-        HpOverride = null,
-        Loadout = [.. template.Loadout.Select(s => s is null ? null : s with { Level = Math.Clamp(1 + (realm / 6), 1, 10) })],
-    };
+    /// <summary>
+    /// A tribulation (or a flame spirit / sect boss avatar) at a realm: the template raised (or lowered) from its home realm to
+    /// that realm by the scaling rules, times the power factor. Legacy rule (+9 to every stat per realm) without scaling rules.
+    /// </summary>
+    public static NpcDefinition TribulationNpc(CombatConfig config, NpcDefinition template, int realm, int powerPermille, string namePl) =>
+        config.Scaling is { } sc
+            ? sc.AtRealm(template, realm, powerPermille) with { NamePl = namePl }
+            : template with
+            {
+                NamePl = namePl,
+                Stats = template.Stats.ToDictionary(s => s.Key, s => (int)((long)(s.Value + (9 * realm)) * powerPermille / 1000)),
+                HpOverride = null,
+                Loadout = [.. template.Loadout.Select(s => s is null ? null : s with { Level = Math.Clamp(1 + (realm / 6), 1, 10) })],
+            };
 
     // ---------------------------------------------------------------- Tower of Trials
 
@@ -143,6 +150,9 @@ public sealed partial class CombatService
     private NpcDefinition FloorNpc(int floor)
     {
         var npc = config.Npc(Tower.NpcFor(floor)) ?? throw new InvalidOperationException("Tower opponent missing.");
+        // past the first span the floors climb the realms: every FloorsPerRealm floors the opponents are a realm stronger
+        if (config.Scaling is { } sc && Tower.FloorsPerRealm > 0 && floor > Tower.PoolSpanFloors)
+            npc = sc.AtRealm(npc, sc.Home(npc) + ((floor - 1) / Tower.FloorsPerRealm));
         return Tower.Scaled(npc, floor);
     }
 
@@ -159,14 +169,20 @@ public sealed partial class CombatService
         if (!await repo.TrySaveTowerAsync(uow, next, progress?.Version ?? 0, ct)) throw new TransientConflictException("Tower progress changed concurrently.");
         if (Tower.RewardFor(floor) is { } reward) await EnqueueRewardAsync(uow, battle, "tower", "floor-" + floor, reward.Stones, reward.Items, at, ct);
         await AuditAsync(uow, battle.AccountA, "combat.tower_floor_cleared", battle.Id, new { floor }, at, ct);
-        return (long)Tower.QiPerFloor * floor;
+        return TowerQi(floor);
     }
+
+    /// <summary>Qi for a first clear; past the first span it follows the cultivation curve of the realm the floor stands for.</summary>
+    private long TowerQi(int floor) =>
+        config.Scaling is { } sc && Tower.FloorsPerRealm > 0 && floor > Tower.PoolSpanFloors
+            ? sc.Qi((long)Tower.QiPerFloor * Tower.PoolSpanFloors, (floor - 1) / Tower.FloorsPerRealm)
+            : (long)Tower.QiPerFloor * floor;
 
     private TowerFloorView FloorView(int floor)
     {
         var npc = FloorNpc(floor);
         var reward = Tower.RewardFor(floor);
-        return new TowerFloorView(floor, npc.Id, npc.NamePl, npc.Tier, Tower.IsBossFloor(floor), (long)Tower.QiPerFloor * floor, reward?.Stones ?? 0, Views(reward?.Items ?? []));
+        return new TowerFloorView(floor, npc.Id, npc.NamePl, npc.Tier, Tower.IsBossFloor(floor), TowerQi(floor), reward?.Stones ?? 0, Views(reward?.Items ?? []));
     }
 
     private async Task<TowerView> TowerViewAsync(IUnitOfWork uow, CharacterSummary c, CancellationToken ct)
@@ -225,8 +241,9 @@ public sealed partial class CombatService
                 if (boss.HpLeft <= 0) return Error.Conflict("world_boss_defeated", "The world boss of this cycle is already defeated.");
                 if (await AttemptsTodayAsync(uow, c.Id, cycle, now, ct) >= Boss.AttemptsPerDay)
                     return Error.LimitReached("world_boss_attempts", $"At most {Boss.AttemptsPerDay} attempts a day.");
-                var npc = config.Npc(Boss.NpcId)!;
-                var phase = npc with { HpOverride = Math.Min(Boss.PhaseHp, boss.HpLeft) };
+                var (npc, hpScale) = await BossAtRealmAsync(uow, c.Id, ct);
+                // the phase is as tough for everyone: its HP grows with the attacker's realm, the damage is counted back on the pool scale
+                var phase = npc with { HpOverride = (int)Math.Min(int.MaxValue, Math.Max(1, (long)Math.Min(Boss.PhaseHp, boss.HpLeft) * hpScale / 1000)) };
                 var started = await StartNpcBattleAsync(uow, c, BattleKinds.Boss, phase, "boss:" + cycle, now, ct);
                 return started.IsSuccess ? await ViewAsync(uow, started.Value, 'a', ct) : started.Error!;
             }, ct);
@@ -234,12 +251,24 @@ public sealed partial class CombatService
             return result;
         }, ct);
 
+    /// <summary>The boss raised to the attacker's realm and the HP factor (‰) that came with it.</summary>
+    private async Task<(NpcDefinition Npc, long HpScale)> BossAtRealmAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct)
+    {
+        // the world boss is a shared event: everyone fights it at their own realm (weaker below its home, stronger above)
+        var template = config.Npc(Boss.NpcId)!;
+        var npc = config.Scaling is { } sc ? sc.AtRealm(template, await RealmOfAsync(uow, characterId, ct)) : template;
+        var scale = template.HpOverride is { } baseHp && npc.HpOverride is { } hp && baseHp > 0 ? Math.Max(50L, (long)hp * 1000 / baseHp) : 1000L;
+        return (npc, scale);
+    }
+
     /// <summary>The damage dealt in the battle comes off the shared pool (never below zero) and is added to the player's tally; Qi for the damage.</summary>
     private async Task<long> BossFinishedAsync(IUnitOfWork uow, Battle battle, DateTimeOffset at, CancellationToken ct)
     {
         if (battle.BossCycle is not { } cycle || config.WorldBoss is null || battle.State is not { } state) return 0;
-        var dealt = Math.Max(0, state.B.MaxHp - Math.Max(0, state.B.Hp));
         var boss = await CurrentBossAsync(uow, cycle, ct);
+        // damage back on the pool scale (the phase's HP was raised by the attacker's realm)
+        var (_, hpScale) = await BossAtRealmAsync(uow, battle.CharacterA, ct);
+        var dealt = (int)Math.Min(int.MaxValue, (long)Math.Max(0, state.B.MaxHp - Math.Max(0, state.B.Hp)) * 1000 / hpScale);
         var counted = Math.Min(dealt, boss.HpLeft);
         if (counted > 0)
         {
@@ -255,7 +284,9 @@ public sealed partial class CombatService
             : mine with { Name = name, Damage = mine.Damage + counted, Attempts = mine.Attempts + 1, Version = mine.Version + 1 };
         if (!await repo.TrySaveBossDamageAsync(uow, row, mine?.Version ?? 0, ct)) throw new TransientConflictException("World boss tally changed concurrently.");
         await AuditAsync(uow, battle.AccountA, "combat.world_boss_hit", battle.Id, new { cycle, damage = counted }, at, ct);
-        return Boss.QiFor(counted);
+        var qi = Boss.QiFor(counted);
+        if (config.Scaling is { } sc) qi = sc.Qi(qi, sc.RealmsAbove(config.Npc(Boss.NpcId)!, await RealmOfAsync(uow, battle.CharacterA, ct)));
+        return qi;
     }
 
     /// <summary>Kill reward for a defeated boss, once per character and cycle (this cycle or an earlier one).</summary>

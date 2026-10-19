@@ -45,3 +45,9 @@ public interface ICombatPerkBonuses
 {
     Task<PerkBonus> BonusAsync(IUnitOfWork uow, Guid characterId, CancellationToken ct);
 }
+
+/// <summary>The cultivator's current realm index (0-65), so opponents and rewards can be raised to it.</summary>
+public interface ICombatRealm
+{
+    Task<int> RealmAsync(IUnitOfWork uow, Guid characterId, CancellationToken ct);
+}

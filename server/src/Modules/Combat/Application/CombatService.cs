@@ -13,7 +13,8 @@ namespace JianghuGo.Modules.Combat.Application;
 
 public sealed record SlotView(int Slot, string Kind, string? TechniqueId, string? NamePl, int Level, int QiCost, int Cooldown, string? Unavailable);
 
-public sealed record KnownTechniqueView(string Id, string NamePl, string Slot, int Level, int Xp, int XpToNextLevel);
+/// <summary>A technique of the path: locked ones (MinRealm above the character's realm) are listed so the player sees what is coming.</summary>
+public sealed record KnownTechniqueView(string Id, string NamePl, string Slot, int Level, int Xp, int XpToNextLevel, int MinRealm = 0, bool Locked = false, int LevelCap = 10);
 
 public sealed record LoadoutView(Guid CharacterId, int Version, IReadOnlyList<SlotView> Slots, IReadOnlyList<KnownTechniqueView> Known);
 
@@ -83,8 +84,21 @@ public sealed partial class CombatService(
     IRandomSeedSource seeds,
     CombatConfig config,
     TimeProvider clock,
-    IItemCatalog items) : ICombatEncounters
+    IItemCatalog items,
+    IEnumerable<ICombatRealm> realms) : ICombatEncounters
 {
+    /// <summary>Luck from Fate: +3‰ drop chance per point, at most +50 %.</summary>
+    public static int LuckPermille(int fate) => Math.Clamp(fate * 3, 0, 500);
+
+    private async Task<int> RealmOfAsync(IUnitOfWork uow, CharacterId id, CancellationToken ct)
+    {
+        foreach (var r in realms) return await r.RealmAsync(uow, id.Value, ct);
+        return 0;
+    }
+
+    /// <summary>A world opponent raised to the cultivator's realm (unchanged without scaling rules).</summary>
+    private NpcDefinition ForFighter(NpcDefinition npc, int realm) => config.Scaling is { } sc ? sc.ForFighter(npc, realm) : npc;
+
     public const int MaxConsecutiveTimeouts = 3;
     public const int MaxPendingChallenges = 3;
 
@@ -107,7 +121,10 @@ public sealed partial class CombatService(
             var c = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
             if (c is null) return CharacterNotFound;
             if (cmd.Slots is null) return Error.Validation("loadout_invalid", "slots are required.");
-            if (LoadoutRules.Validate(config, c.Path, cmd.Slots, await DaoTechniquesAsync(uow, c, ct)) is { } problem) return Error.Validation("loadout_invalid", problem);
+            var (current, _) = await CurrentLoadoutAsync(uow, c, ct);
+            var realm = await RealmOfAsync(uow, c.Id, ct);
+            if (LoadoutRules.Validate(config, c.Path, cmd.Slots, await DaoTechniquesAsync(uow, c, ct), realm, current) is { } problem)
+                return Error.Validation(problem.Contains("unlocks at realm", StringComparison.Ordinal) ? "technique_locked" : "loadout_invalid", problem);
 
             var stored = await repo.FindLoadoutAsync(uow, c.Id, ct);
             var version = stored?.Version ?? 0;
@@ -133,7 +150,9 @@ public sealed partial class CombatService(
         var (slots, version) = await CurrentLoadoutAsync(uow, c, ct);
         var mastery = (await repo.ListMasteryAsync(uow, c.Id, ct)).ToDictionary(m => m.TechniqueId);
         var dao = await DaoTechniquesAsync(uow, c, ct);
-        int Level(string id) => mastery.TryGetValue(id, out var m) ? m.Level : 1;
+        var realm = await RealmOfAsync(uow, c.Id, ct);
+        var cap = config.Progression.LevelCap(realm);
+        int Level(string id) => Math.Min(cap, mastery.TryGetValue(id, out var m) ? m.Level : 1);
         var slotViews = slots.Select((id, i) =>
         {
             var t = id is null ? null : dao.GetValueOrDefault(id) ?? config.Technique(id);
@@ -144,15 +163,16 @@ public sealed partial class CombatService(
             var m = mastery.GetValueOrDefault(t.Id);
             var level = m?.Level ?? 1;
             return new KnownTechniqueView(t.Id, t.NamePl, t.Kind, level, m?.Xp ?? 0,
-                level >= config.Progression.MaxTechniqueLevel ? 0 : level * config.Progression.XpPerLevel);
-        }).ToList();
+                level >= config.Progression.MaxTechniqueLevel ? 0 : level * config.Progression.XpPerLevel, t.MinRealm, t.MinRealm > realm, cap);
+        }).OrderBy(k => k.Locked).ThenBy(k => k.MinRealm).ToList();
         return new LoadoutView(c.Id.Value, version, slotViews, known);
     }
 
     private async Task<Combatant> SnapshotAsync(IUnitOfWork uow, CharacterSummary c, CancellationToken ct)
     {
         var (slots, _) = await CurrentLoadoutAsync(uow, c, ct);
-        var mastery = (await repo.ListMasteryAsync(uow, c.Id, ct)).ToDictionary(m => m.TechniqueId, m => m.Level);
+        var levelCap = config.Progression.LevelCap(await RealmOfAsync(uow, c.Id, ct));
+        var mastery = (await repo.ListMasteryAsync(uow, c.Id, ct)).ToDictionary(m => m.TechniqueId, m => Math.Min(levelCap, m.Level));
         var dao = await DaoTechniquesAsync(uow, c, ct);
         // Equipment bonuses are frozen into the snapshot: changing gear mid-battle has no effect.
         var bonuses = new Dictionary<string, int>(await equipment.BonusesAsync(uow, c.Id, ct));
@@ -170,10 +190,15 @@ public sealed partial class CombatService(
 
         var stats = c.Stats.ToDictionary(s => s.Key, s => s.Value + bonuses.GetValueOrDefault(s.Key));
         foreach (var provider in perkBonuses) perks += await provider.BonusAsync(uow, c.Id.Value, ct);
-        var path = (config.Perks(c.Path) ?? new PathPerks(string.Empty)).With(perks);
+        var path = (config.Perks(c.Path) ?? new PathPerks(string.Empty)).With(perks).Capped(config.PerkCaps);
+        // pets (and Gu pets) grow with their owner's realm like everything else
+        if (config.Scaling is { } sc && path.PetPower > 0)
+            path = path with { PetPower = (int)(path.PetPower * sc.Budget(await RealmOfAsync(uow, c.Id, ct)) / sc.Budget(0)) };
+        var hpBonus = config.PathHpBonusPermille[c.Path] + perks.HpPermille;
+        if (config.PerkCaps is { } caps) hpBonus = Math.Min(hpBonus, caps.HpPermille);
         var deco = await CharacterDecorations.ForAsync(decorations, uow, c.Id.Value, ct);
         return new Combatant(c.Name, stats, [.. slots.Select(id => id is null ? null : new EquippedTechnique(id, mastery.GetValueOrDefault(id, 1), dao.GetValueOrDefault(id)))],
-            null, config.PathHpBonusPermille[c.Path] + perks.HpPermille, path, config.Elements?.Paths.GetValueOrDefault(c.Path), deco.Title, deco.Badges, deco.TitleRarity);
+            null, hpBonus, path, config.Elements?.Paths.GetValueOrDefault(c.Path), deco.Title, deco.Badges, deco.TitleRarity);
     }
 
     private Combatant NpcCombatant(NpcDefinition n) =>
@@ -211,7 +236,7 @@ public sealed partial class CombatService(
         if (await HasActiveBattleAsync(uow, c.Id, now, ct)) return Error.Conflict("already_in_battle", "This character is already fighting.");
 
         var a = await SnapshotAsync(uow, c, ct);
-        var b = NpcCombatant(npc);
+        var b = NpcCombatant(ForFighter(npc, await RealmOfAsync(uow, c.Id, ct)));
         var battle = NewBattle(BattleKinds.Pve, BattleStatuses.Active, c, null, npc.Id, now) with
         {
             CombatantA = a,
@@ -486,10 +511,17 @@ public sealed partial class CombatService(
             BattleKinds.Arena => await ArenaFinishedAsync(uow, battle, outcome, at, ct),
             _ => 0,
         };
+        var stonesPermille = 1000;
+        if (battle.Kind == BattleKinds.Pve && config.Npc(battle.NpcId!) is { } scaledNpc && config.Scaling is { } scaling)
+        {
+            var above = scaling.RealmsAbove(scaledNpc, await RealmOfAsync(uow, battle.CharacterA, ct));
+            stonesPermille = scaling.StonesPermille(above);
+        }
+
         if (battle.Kind == BattleKinds.Pve && outcome == Outcomes.AWon && config.Npc(battle.NpcId!) is { } npc && npc.RewardQi > 0
             && await repo.CountRewardedPveWinsSinceAsync(uow, battle.CharacterA, at.AddDays(-1), ct) < config.Progression.DailyRewardedPveWins)
         {
-            reward = npc.RewardQi;
+            reward = config.Scaling is { } sc ? sc.Qi(npc.RewardQi, sc.RealmsAbove(npc, await RealmOfAsync(uow, battle.CharacterA, ct))) : npc.RewardQi;
         }
 
         var finished = battle with
@@ -530,10 +562,12 @@ public sealed partial class CombatService(
         var takenB = turns.SelectMany(t => t.Events).Where(e => e.Actor == "a" && e.Action != "bleed").Sum(e => e.Damage) + turns.SelectMany(t => t.Events).Where(e => e.Actor == "b" && e.Action == "bleed").Sum(e => e.Damage);
         var participants = new List<CombatEvents.Participant>
         {
-            new(battle.AccountA.Value, battle.CharacterA.Value, "a", ResultFor('a', outcome), reward, takenA),
+            new(battle.AccountA.Value, battle.CharacterA.Value, "a", ResultFor('a', outcome), reward, takenA, stonesPermille,
+                LuckPermille(battle.CombatantA?.Stat("fate") ?? 0), battle.State!.A.MaxHp),
         };
         if (battle.Kind == BattleKinds.Pvp)
-            participants.Add(new(battle.AccountB!.Value.Value, battle.CharacterB!.Value.Value, "b", ResultFor('b', outcome), 0, takenB));
+            participants.Add(new(battle.AccountB!.Value.Value, battle.CharacterB!.Value.Value, "b", ResultFor('b', outcome), 0, takenB, 1000,
+                LuckPermille(battle.CombatantB?.Stat("fate") ?? 0), battle.State!.B.MaxHp));
 
         await outbox.EnqueueAsync(uow, OutboxMessage.Create(CombatEvents.BattleFinished,
             new CombatEvents.BattleFinishedV1(battle.Id, battle.Kind, outcome, battle.NpcId, participants, battle.NpcId is { } nid && config.Npc(nid)?.Boss == true, battle.Context),
@@ -554,7 +588,7 @@ public sealed partial class CombatService(
         foreach (var (techniqueId, count) in uses)
         {
             var m = mastery.GetValueOrDefault(techniqueId) ?? new TechniqueMastery(characterId, techniqueId, 1, 0);
-            var (level, xp) = (m.Level, m.Xp + (count * p.XpPerUse));
+            var (level, xp) = (m.Level, m.Xp + p.XpFor(count, combatant.Stat("insight")));
             while (level < p.MaxTechniqueLevel && xp >= level * p.XpPerLevel)
             {
                 xp -= level * p.XpPerLevel;
@@ -709,7 +743,7 @@ public sealed partial class CombatService(
         if (hunt.SettledAt + interval > end || config.Npc(hunt.NpcId) is not { } npc) return hunt;
 
         var a = await SnapshotAsync(uow, c, ct);
-        var b = NpcCombatant(npc);
+        var b = NpcCombatant(ForFighter(npc, await RealmOfAsync(uow, c.Id, ct)));
         var h = hunt;
         for (var n = 0; n < MaxBattlesPerSettle && h.SettledAt + interval <= end; n++)
         {

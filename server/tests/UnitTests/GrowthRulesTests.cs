@@ -76,7 +76,8 @@ public class GrowthRulesTests
         var weak = Arts.Flame("soul_candle")!;
         var strong = Arts.Flame("first_dawn")!;
         Assert.True(ArtsRules.AbsorbChance(Arts, weak, 10) > ArtsRules.AbsorbChance(Arts, strong, 10));
-        Assert.True(ArtsRules.SpiritPower(strong) > ArtsRules.SpiritPower(weak));
+        Assert.True(ArtsRules.SpiritPower(strong) < ArtsRules.SpiritPower(weak)); // 1.6: primal spirits are raised by their realm; power only sets the kind
+        Assert.True(Arts.Flame("first_dawn")!.MinRealm > Arts.Flame("soul_candle")!.MinRealm);
     }
 
     [Fact]

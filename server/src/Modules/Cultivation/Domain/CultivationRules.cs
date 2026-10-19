@@ -5,6 +5,9 @@ namespace JianghuGo.Modules.Cultivation.Domain;
 /// <summary>Pure, deterministic cultivation formulas (rules cultivation-3). Every number comes from <see cref="CultivationConfig"/>.</summary>
 public static class CultivationRules
 {
+    /// <summary>Each realm's tribulation is a little fiercer than the last (on top of being raised to the realm by Combat's scaling).</summary>
+    public const int TribulationPowerPerRealmPermille = 3;
+
     public const int ChanceScale = 1_000_000; // chances are stored and rolled in parts-per-million
     public const int StagesPerRealm = 12;
 

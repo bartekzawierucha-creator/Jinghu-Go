@@ -113,6 +113,8 @@ namespace JianghuGo.Android
                 var tb = _board?.TitleBonuses != null && _board.TitleBonuses.TryGetValue(st.Id, out var tv) ? tv : 0;
                 var total = st.Value + eq + mer + pb + tb;
                 var cell = ui.Box(row, 1f, horizontal: true, marginDp: 4);
+                var statId = st.Id;
+                cell.Click += (_, _) => SetStatus(StatName(statId) + ": " + StatHint(statId));
                 ui.Icon(cell, "icon_" + st.Id, 18);
                 var name = StatName(st.Id);
                 ui.Text((name.Length > 9 ? name.Substring(0, 8) + "." : name) + " " + total, cell, 11, total > st.Value ? Ui.Gold : Ui.Ink, bold: total > st.Value)
@@ -273,8 +275,14 @@ namespace JianghuGo.Android
                     var row = _ui.HRow(card, 44, 0);
                     _ui.Icon(row, _ui.ArtId("tech_" + known.Id) != 0 ? "tech_" + known.Id : "tech_custom_" + (slot.Kind == "special" ? "movement" : slot.Kind == "attack" ? "attack" : "defense"), 38);
                     var col = _ui.Box(row, 1f, marginDp: 8);
-                    _ui.Text(known.NamePl, col, 13, Ui.Ink, bold: true);
-                    _ui.Text("poz. " + known.Level + " · " + known.Xp + "/" + known.XpToNextLevel + " XP", col, 11, Ui.Muted);
+                    _ui.Text(known.NamePl, col, 13, known.Locked ? Ui.Muted : Ui.Ink, bold: true);
+                    if (known.Locked)
+                    {
+                        _ui.Text("🔒 od " + (known.MinRealm + 1) + ". królestwa", col, 11, Ui.Muted);
+                        return;
+                    }
+
+                    _ui.Text("poz. " + known.Level + (known.LevelCap < 10 ? " (limit " + known.LevelCap + ")" : string.Empty) + " · " + known.Xp + "/" + known.XpToNextLevel + " XP", col, 11, Ui.Muted);
                     if (known.Id != slot.TechniqueId)
                         _ui.Btn("Wybierz", () => Run(() => Set(known.Id)), row, sp: 12, heightDp: 38).LayoutParameters = new LinearLayout.LayoutParams(Px(88), Px(38)) { Gravity = GravityFlags.CenterVertical };
                 }, empty: "Nie znasz jeszcze technik tego rodzaju — stwórz je w Laboratorium Dao.");

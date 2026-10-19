@@ -452,7 +452,7 @@ public sealed class CultivationService(
             if (s.InDeviation(now)) return Error.Conflict("qi_deviation_active", "Qi deviation: wait until it passes.");
             var required = CultivationRules.QiRequired(config, s.RealmIndex, s.Stage);
             if (s.Qi < required) return Error.InsufficientFunds("insufficient_qi", $"The tribulation needs {required} Qi (have {s.Qi}).");
-            var power = 1000 + (config.Method(loaded.Profile.MethodId)?.TribulationPermille ?? 0);
+            var power = 1000 + (CultivationRules.TribulationPowerPerRealmPermille * s.RealmIndex) + (config.Method(loaded.Profile.MethodId)?.TribulationPermille ?? 0);
             var started = await encounters.StartTribulationAsync(uow, accountId, characterId, s.RealmIndex, power, config.Realms[s.RealmIndex + 1].TribulationPl, ct);
             if (!started.IsSuccess) return started.Error!;
             var next = loaded with

@@ -380,6 +380,21 @@ namespace JianghuGo.Android
             _ => id,
         };
 
+        /// <summary>What a stat does (rules combat-5): shown when a stat is tapped.</summary>
+        private static string StatHint(string id) => id switch
+        {
+            "strength" => "obrażenia technik Siły (pięści, miecze, ciosy)",
+            "agility" => "trafienie i unik (liczy się przewaga względna), inicjatywa, techniki Zręczności",
+            "constitution" => "maksymalne życie",
+            "spirit" => "obrażenia technik Ducha i zapas Qi w walce",
+            "insight" => "szansa na przełom i na udaną alchemię",
+            "willpower" => "szansa na przełom, odporność na krwawienie/ogłuszenie/osłabienie i na trafienia krytyczne",
+            "focus" => "szansa na trafienie krytyczne (+50% obrażeń) i przebijanie odporności wroga",
+            "fate" => "szansa na przełom, oswojenie zwierzęcia i lepszy łup (do +50%)",
+            "elementalAffinity" => "siła przewagi żywiołów: wzmacnia przewagę i łagodzi słabość",
+            _ => string.Empty,
+        };
+
         private static string PathName(string id) => id switch
         {
             "qi" => "Qi",
@@ -488,6 +503,7 @@ namespace JianghuGo.Android
             "not_author" => "Tylko autor może spisywać zwoje tej techniki.",
             "technique_already_known" => "Znasz już tę technikę — zwój zostaje w sakwie.",
             "loadout_invalid" => "Ten zestaw technik jest niedozwolony.",
+            "technique_locked" => "Ta technika otworzy się w wyższym królestwie.",
             "sect_permission_denied" => "Twoja ranga w sekcie na to nie pozwala.",
             "not_in_sect" => "Nie należysz do sekty.",
             "already_in_sect" => "Należysz już do sekty.",

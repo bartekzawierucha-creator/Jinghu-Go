@@ -23,6 +23,13 @@ namespace JianghuGo.Client.Application
         public int Level { get; set; }
         public int Xp { get; set; }
         public int XpToNextLevel { get; set; }
+
+        /// <summary>Realm the technique opens at (1.6); locked ones are listed so the player sees what is coming.</summary>
+        public int MinRealm { get; set; }
+        public bool Locked { get; set; }
+
+        /// <summary>Highest level usable at the current realm (mastery beyond it waits).</summary>
+        public int LevelCap { get; set; } = 10;
     }
 
     public sealed class LoadoutDto

@@ -41,6 +41,7 @@ public static class CultivationModule
         services.AddSingleton<JianghuGo.Modules.Cultivation.Contracts.ICultivationStatus, CultivationStatusProvider>();
         services.AddSingleton<JianghuGo.Modules.Characters.Contracts.ITitleSource, CultivationTitles>();
         services.AddSingleton<JianghuGo.Modules.Combat.Contracts.ICombatStatBonuses, CultivationCombatBonuses>();
+        services.AddSingleton<JianghuGo.Modules.Combat.Contracts.ICombatRealm, CultivationCombatRealm>();
         services.AddSingleton<JianghuGo.Application.IOutboxHandler, CombatRewardHandler>();
         services.AddSingleton<JianghuGo.Application.IOutboxHandler, WorldRewardHandler>();
         services.AddSingleton<JianghuGo.Application.IOutboxHandler, ConsumableQiHandler>();

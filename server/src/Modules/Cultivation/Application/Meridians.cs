@@ -173,3 +173,10 @@ public sealed class RankingService(IUnitOfWorkFactory uowFactory, ICultivationRe
     private RankingEntry Entry(int rank, CharacterSummary c, CultivationState s) =>
         new(rank, c.Id.Value, c.Name, c.Path, config.Realms[s.RealmIndex].Id, config.Realms[s.RealmIndex].NamePl, s.Stage);
 }
+
+/// <summary>The realm Combat raises opponents and rewards to (the same realm other modules see).</summary>
+internal sealed class CultivationCombatRealm(ICultivationRepository repo, CultivationConfig config) : ICombatRealm
+{
+    public async Task<int> RealmAsync(IUnitOfWork uow, Guid characterId, CancellationToken ct) =>
+        (await new CultivationStatusProvider(repo, config).StatusAsync(uow, characterId, ct)).Realm;
+}
