@@ -66,6 +66,7 @@ namespace JianghuGo.Android
                 _cultivation = st;
                 RenderHud();
                 MaybeShowMilestone(st.RealmIndex);
+                Music.PlayEra(st.Era);
                 realm.Text = (string.IsNullOrEmpty(st.RealmHanzi) ? string.Empty : st.RealmHanzi + " ") + st.RealmNamePl + " · " + (st.StageName ?? "etap") + " " + st.Stage + "/" + st.StagesInRealm;
                 var id = ui.ArtId("emblem_" + st.RealmId);
                 if (id != 0) emblem.SetImageBitmap(Ui.Art(this, id));
@@ -402,26 +403,48 @@ namespace JianghuGo.Android
 
         // ---- Wieści -------------------------------------------------------------------------------------------
 
+        /// <summary>Sound, music and phone reminders (2.0).</summary>
+        private void ShowSettingsSheet()
+        {
+            var body = Sheet("Ustawienia", 0.55f, out var close, "menu_notifications");
+            void Toggle(string label, bool on, System.Action flip)
+            {
+                _ui.Btn(label + ": " + (on ? "włączone" : "wyłączone"), () =>
+                {
+                    flip();
+                    close();
+                    ShowSettingsSheet();
+                }, body, secondary: !on, sp: 13, heightDp: 42);
+            }
+
+            Toggle("Dźwięki", !Sfx.Muted, () =>
+            {
+                Sfx.Muted = !Sfx.Muted;
+                if (Sfx.Muted) Music.Stop();
+                else Music.Enabled = Music.Enabled;
+            });
+            Toggle("Muzyka er", Music.Enabled, () => Music.Enabled = !Music.Enabled);
+            Toggle("Przypomnienia na telefonie", Alarms.Enabled(_prefs), () =>
+            {
+                var next = !Alarms.Enabled(_prefs);
+                _prefs.Edit().PutBoolean(Alarms.PrefKey, next).Apply();
+                if (next && Build.VERSION.SdkInt >= BuildVersionCodes.Tiramisu && !Alarms.Allowed(this))
+                    RequestPermissions(new[] { "android.permission.POST_NOTIFICATIONS" }, Alarms.PermissionRequestCode);
+            });
+            _ui.Text("Przypomnienia: koniec odosobnienia, gotowe partie w kotle i kuźni, plony, powrót uczniów i koniec polowania. Nic nie opuszcza telefonu.",
+                body, 11, Ui.Muted, maxLines: 3);
+            _ui.Text("Jianghu Go " + (PackageManager?.GetPackageInfo(PackageName, 0)?.VersionName ?? string.Empty), body, 10, Ui.Muted, center: true);
+        }
+
         private async Task ShowInboxAsync()
         {
             var c = _me;
             var pageDto = await _api.GetNotificationsAsync(false, 40, null, Ct);
             var ui = NewScreen("Wieści", BackToTab, Resource.Drawable.place_altar, "Z CAŁEGO JIANGHU");
             var items = pageDto.Items;
-            var on = Alarms.Enabled(_prefs);
-            ui.Btn(on ? "🔔 Przypomnienia na telefonie: włączone" : "🔕 Przypomnienia na telefonie: wyłączone", () =>
-            {
-                var next = !Alarms.Enabled(_prefs);
-                _prefs.Edit().PutBoolean(Alarms.PrefKey, next).Apply();
-                if (next && Build.VERSION.SdkInt >= BuildVersionCodes.Tiramisu && !Alarms.Allowed(this))
-                    RequestPermissions(new[] { "android.permission.POST_NOTIFICATIONS" }, Alarms.PermissionRequestCode);
-                Run(async () =>
-                {
-                    await ShowInboxAsync();
-                    SetStatus(next ? "Przypomnę o końcu odosobnienia, partiach, plonach i wyprawach." : "Przypomnienia wyłączone.");
-                });
-            }, ui.Content, secondary: true, sp: 12, heightDp: 34);
-            ui.Btn("👥 Przyjaciele i poczta", () => Run(ShowFriendsAsync), ui.Content, secondary: true, sp: 12, heightDp: 34);
+            var bar = ui.HRow(ui.Content, 34, 4);
+            ui.Btn("⚙ Ustawienia", ShowSettingsSheet, bar, secondary: true, sp: 12, heightDp: 34);
+            ui.Btn("👥 Przyjaciele i poczta", () => Run(ShowFriendsAsync), bar, secondary: true, sp: 12, heightDp: 34);
             ui.Pages(ui.Content, items.Count, 1, 5, (i, cell) =>
             {
                 var n = items[i];

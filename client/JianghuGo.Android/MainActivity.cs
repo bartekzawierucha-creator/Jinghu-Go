@@ -67,6 +67,7 @@ namespace JianghuGo.Android
             _steps = new StepCounter(this);
             _compass = new Compass(this);
             Sfx.Init(this, _prefs);
+            Music.Init(this, _prefs);
             Ui.LoadFonts(this);
             BuildShell();
 
@@ -102,6 +103,7 @@ namespace JianghuGo.Android
         {
             base.OnPause();
             _paused = true;
+            Music.Pause();
             _location.Stop(); // battery: no GPS in the background
             _compass.Stop();
             _steps.Stop();
@@ -112,6 +114,7 @@ namespace JianghuGo.Android
         {
             base.OnResume();
             _paused = false;
+            Music.Resume();
             if (_worldOpen)
             {
                 _location.Start();

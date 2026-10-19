@@ -21,7 +21,7 @@ namespace JianghuGo.Android
         public const string Coin = "coin";
         public const string Click = "click";
 
-        private const int Rate = 22050;
+        internal const int Rate = 22050;
         private static SoundPool _pool;
         private static readonly Dictionary<string, int> Ids = new Dictionary<string, int>();
         private static ISharedPreferences _prefs;
@@ -102,7 +102,7 @@ namespace JianghuGo.Android
             return Math.Pow(1 - k, 2);
         }
 
-        private static short[] Render(double seconds, Func<double, double> f)
+        internal static short[] Render(double seconds, Func<double, double> f)
         {
             var n = (int)(seconds * Rate);
             var data = new short[n];
@@ -110,7 +110,7 @@ namespace JianghuGo.Android
             return data;
         }
 
-        private static void WriteWav(string path, short[] samples)
+        internal static void WriteWav(string path, short[] samples)
         {
             using var w = new BinaryWriter(File.Create(path));
             var bytes = samples.Length * 2;
