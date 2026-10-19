@@ -70,7 +70,24 @@ public interface ISocialRepository
     /// <summary>Marks claimed only if still unclaimed (no double claim under concurrency).</summary>
     Task<bool> TryClaimAsync(IUnitOfWork uow, Guid id, DateTimeOffset now, CancellationToken ct);
     Task<int> CountMailSinceAsync(IUnitOfWork uow, CharacterId from, DateTimeOffset since, CancellationToken ct);
+
+    // 2.0 moderation: blocks and reports
+    Task<bool> IsBlockedAsync(IUnitOfWork uow, CharacterId blocker, CharacterId blocked, CancellationToken ct);
+    Task SetBlockAsync(IUnitOfWork uow, CharacterId blocker, CharacterId blocked, bool on, DateTimeOffset now, CancellationToken ct);
+    Task<IReadOnlyList<Guid>> BlockedAsync(IUnitOfWork uow, CharacterId blocker, CancellationToken ct);
+    Task AddReportAsync(IUnitOfWork uow, PlayerReport report, CancellationToken ct);
+    Task<int> CountReportsSinceAsync(IUnitOfWork uow, CharacterId reporter, DateTimeOffset since, CancellationToken ct);
 }
+
+/// <summary>A player's report of another player (name, chat or message). Reviewed by moderators; only the reported text excerpt is kept.</summary>
+public sealed record PlayerReport(Guid Id, CharacterId Reporter, CharacterId Reported, string Reason, string? Excerpt, DateTimeOffset CreatedAt);
+
+public static class ReportReasons
+{
+    public static readonly string[] All = ["offensive_name", "harassment", "spam", "cheating", "other"];
+}
+
+public sealed record ReportCommand(Guid ReportedCharacterId, string? Reason, string? Excerpt);
 
 public sealed record FriendView(Guid CharacterId, string Name, string Path, string Status, bool Incoming, int Unread, DateTimeOffset Since);
 
@@ -116,6 +133,8 @@ public sealed class SocialService(
             var other = await characters.FindByNameAsync(uow, cmd.Name ?? string.Empty, ct);
             if (other is null) return Error.NotFound("character_not_found", "No cultivator with that name.");
             if (other.Id == me.Id) return Error.Validation("friend_self", "You cannot befriend yourself.");
+            if (await repo.IsBlockedAsync(uow, other.Id, me.Id, ct) || await repo.IsBlockedAsync(uow, me.Id, other.Id, ct))
+                return Error.Forbidden("blocked", "You cannot contact this cultivator.");
             var mine = await repo.LinkAsync(uow, me.Id, other.Id, ct);
             if (mine is not null) return Error.Conflict(mine.Status == SocialRules.Accepted ? "already_friends" : "request_pending", "Already requested or friends.");
             var links = await repo.LinksAsync(uow, me.Id, ct);
@@ -184,6 +203,7 @@ public sealed class SocialService(
             if (SocialRules.Clean(cmd.Text) is not { } text) return Error.Validation("message_invalid", $"A message has 1-{SocialRules.MaxText} characters and no control characters.");
             var other = new CharacterId(otherId);
             if (await repo.LinkAsync(uow, me.Id, other, ct) is not { Status: SocialRules.Accepted }) return NotFriends;
+            if (await repo.IsBlockedAsync(uow, other, me.Id, ct)) return Error.Forbidden("blocked", "You cannot contact this cultivator.");
             if (await repo.CountMessagesSinceAsync(uow, me.Id, now - SocialRules.BurstWindow, ct) >= SocialRules.BurstMessages
                 || await repo.CountMessagesSinceAsync(uow, me.Id, now.AddDays(-1), ct) >= SocialRules.MessagesPerDay)
                 return Error.LimitReached("message_rate_limited", "Too many messages — wait a moment.");
@@ -213,6 +233,7 @@ public sealed class SocialService(
             if (await repo.LinkAsync(uow, me.Id, to, ct) is not { Status: SocialRules.Accepted }) return NotFriends;
             var recipient = await characters.FindAsync(uow, cmd.ToCharacterId, ct);
             if (recipient is null) return CharacterNotFound;
+            if (await repo.IsBlockedAsync(uow, to, me.Id, ct)) return Error.Forbidden("blocked", "You cannot contact this cultivator.");
             if (await repo.CountMailSinceAsync(uow, me.Id, now.AddDays(-1), ct) >= SocialRules.MailPerDay)
                 return Error.LimitReached("mail_limit", $"At most {SocialRules.MailPerDay} letters a day.");
 
@@ -263,6 +284,47 @@ public sealed class SocialService(
 
             await AuditAsync(uow, accountId, "social.mail_claim", me.Id.Value, new { mailId, stones = mail.Stones, mail.ItemId, mail.Quantity }, now, ct);
             return View(mail with { ClaimedAt = now });
+        }, ct);
+
+    /// <summary>Blocks a cultivator: friendship ends, and they can no longer send requests, messages or letters.</summary>
+    public Task<Result<IReadOnlyList<Guid>>> BlockAsync(AccountId accountId, Guid characterId, Guid otherId, bool on, CancellationToken ct) =>
+        Write<IReadOnlyList<Guid>, object>(accountId, characterId, "social.block", null, new { otherId, on }, async (uow, me, now) =>
+        {
+            var other = new CharacterId(otherId);
+            if (other == me.Id) return Error.Validation("block_self", "You cannot block yourself.");
+            if (on && await characters.FindAsync(uow, otherId, ct) is null) return CharacterNotFound;
+            await repo.SetBlockAsync(uow, me.Id, other, on, now, ct);
+            if (on)
+            {
+                await repo.DeleteLinkAsync(uow, me.Id, other, ct);
+                await repo.DeleteLinkAsync(uow, other, me.Id, ct);
+            }
+
+            await AuditAsync(uow, accountId, on ? "social.blocked" : "social.unblocked", me.Id.Value, new { other = otherId }, now, ct);
+            return Result<IReadOnlyList<Guid>>.Success(await repo.BlockedAsync(uow, me.Id, ct));
+        }, ct);
+
+    /// <summary>Reports a player to the moderators (at most 10 a day); nothing changes for them until a moderator decides.</summary>
+    public Task<Result<bool>> ReportAsync(AccountId accountId, Guid characterId, ReportCommand cmd, CancellationToken ct) =>
+        Write<bool, ReportCommand>(accountId, characterId, "social.report", null, cmd, async (uow, me, now) =>
+        {
+            if (cmd.Reason is null || !ReportReasons.All.Contains(cmd.Reason)) return Error.Validation("reason_invalid", "Reason: " + string.Join(", ", ReportReasons.All) + ".");
+            var excerpt = string.IsNullOrWhiteSpace(cmd.Excerpt) ? null : SocialRules.Clean(cmd.Excerpt);
+            if (cmd.Excerpt is not null && excerpt is null && !string.IsNullOrWhiteSpace(cmd.Excerpt)) return Error.Validation("excerpt_invalid", "Excerpt: up to 300 characters.");
+            if (cmd.ReportedCharacterId == characterId) return Error.Validation("report_self", "You cannot report yourself.");
+            if (await characters.FindAsync(uow, cmd.ReportedCharacterId, ct) is null) return CharacterNotFound;
+            if (await repo.CountReportsSinceAsync(uow, me.Id, now.AddDays(-1), ct) >= 10) return Error.LimitReached("report_limit", "Too many reports today.");
+            await repo.AddReportAsync(uow, new PlayerReport(Uuid7.New(), me.Id, new CharacterId(cmd.ReportedCharacterId), cmd.Reason, excerpt, now), ct);
+            await AuditAsync(uow, accountId, "social.reported", me.Id.Value, new { reported = cmd.ReportedCharacterId, cmd.Reason }, now, ct);
+            return true;
+        }, ct);
+
+    public Task<Result<IReadOnlyList<Guid>>> BlockedAsync(AccountId accountId, Guid characterId, CancellationToken ct) =>
+        db.RunAsync<Result<IReadOnlyList<Guid>>>(async uow =>
+        {
+            var me = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
+            if (me is null) return CharacterNotFound;
+            return Result<IReadOnlyList<Guid>>.Success(await repo.BlockedAsync(uow, me.Id, ct));
         }, ct);
 
     private MailView View(Mail m) => new(m.Id, m.FromId.Value, m.FromName, m.Text, m.Stones, m.ItemId, m.ItemId is null ? null : catalog.Find(m.ItemId)?.NamePl ?? m.ItemId,
@@ -420,6 +482,37 @@ internal sealed class InMemorySocialRepository : ISocialRepository
 
     public Task<int> CountMailSinceAsync(IUnitOfWork uow, CharacterId from, DateTimeOffset since, CancellationToken ct) =>
         Task.FromResult(U(uow).Table<Guid, Mail>(Mails).Values.Count(m => m.FromId == from && m.CreatedAt >= since));
+
+    private const string Blocks = "social.blocks";
+    private const string Reports = "social.reports";
+
+    public Task<bool> IsBlockedAsync(IUnitOfWork uow, CharacterId blocker, CharacterId blocked, CancellationToken ct) =>
+        Task.FromResult(U(uow).Table<string, DateTimeOffset>(Blocks).ContainsKey(K(blocker, blocked)));
+
+    public Task SetBlockAsync(IUnitOfWork uow, CharacterId blocker, CharacterId blocked, bool on, DateTimeOffset now, CancellationToken ct)
+    {
+        var u = U(uow);
+        var t = u.Table<string, DateTimeOffset>(Blocks);
+        u.SetTable(Blocks, on ? t.SetItem(K(blocker, blocked), now) : t.Remove(K(blocker, blocked)));
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<Guid>> BlockedAsync(IUnitOfWork uow, CharacterId blocker, CancellationToken ct)
+    {
+        var prefix = blocker.Value + ":";
+        IReadOnlyList<Guid> list = [.. U(uow).Table<string, DateTimeOffset>(Blocks).Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal)).Select(k => Guid.Parse(k[prefix.Length..]))];
+        return Task.FromResult(list);
+    }
+
+    public Task AddReportAsync(IUnitOfWork uow, PlayerReport report, CancellationToken ct)
+    {
+        var u = U(uow);
+        u.SetTable(Reports, u.Table<Guid, PlayerReport>(Reports).Add(report.Id, report));
+        return Task.CompletedTask;
+    }
+
+    public Task<int> CountReportsSinceAsync(IUnitOfWork uow, CharacterId reporter, DateTimeOffset since, CancellationToken ct) =>
+        Task.FromResult(U(uow).Table<Guid, PlayerReport>(Reports).Values.Count(r => r.Reporter == reporter && r.CreatedAt >= since));
 }
 
 internal sealed class PostgresSocialRepository : ISocialRepository
@@ -488,6 +581,24 @@ internal sealed class PostgresSocialRepository : ISocialRepository
 
     public async Task<int> CountMailSinceAsync(IUnitOfWork uow, CharacterId from, DateTimeOffset since, CancellationToken ct) =>
         (await P(uow).QueryAsync("SELECT count(*)::int FROM social.mail WHERE from_id = $1 AND created_at >= $2", r => r.GetInt32(0), ct, from.Value, since))[0];
+
+    public async Task<bool> IsBlockedAsync(IUnitOfWork uow, CharacterId blocker, CharacterId blocked, CancellationToken ct) =>
+        (await P(uow).QueryAsync("SELECT 1 FROM social.blocks WHERE blocker_id = $1 AND blocked_id = $2", _ => 1, ct, blocker.Value, blocked.Value)).Count > 0;
+
+    public Task SetBlockAsync(IUnitOfWork uow, CharacterId blocker, CharacterId blocked, bool on, DateTimeOffset now, CancellationToken ct) =>
+        on
+            ? P(uow).ExecuteAsync("INSERT INTO social.blocks (blocker_id, blocked_id, created_at) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING", ct, blocker.Value, blocked.Value, now)
+            : P(uow).ExecuteAsync("DELETE FROM social.blocks WHERE blocker_id = $1 AND blocked_id = $2", ct, blocker.Value, blocked.Value);
+
+    public async Task<IReadOnlyList<Guid>> BlockedAsync(IUnitOfWork uow, CharacterId blocker, CancellationToken ct) =>
+        await P(uow).QueryAsync("SELECT blocked_id FROM social.blocks WHERE blocker_id = $1 ORDER BY created_at", r => r.GetGuid(0), ct, blocker.Value);
+
+    public Task AddReportAsync(IUnitOfWork uow, PlayerReport r, CancellationToken ct) =>
+        P(uow).ExecuteAsync("INSERT INTO social.reports (id, reporter_id, reported_id, reason, excerpt, created_at) VALUES ($1, $2, $3, $4, $5, $6)",
+            ct, r.Id, r.Reporter.Value, r.Reported.Value, r.Reason, r.Excerpt, r.CreatedAt);
+
+    public async Task<int> CountReportsSinceAsync(IUnitOfWork uow, CharacterId reporter, DateTimeOffset since, CancellationToken ct) =>
+        (await P(uow).QueryAsync("SELECT count(*)::int FROM social.reports WHERE reporter_id = $1 AND created_at >= $2", r => r.GetInt32(0), ct, reporter.Value, since))[0];
 }
 
 public static class SocialEndpoints
@@ -516,6 +627,14 @@ public static class SocialEndpoints
             ApiResults.From(await svc.SendMailAsync(http.User.GetAccountId(), characterId, key, cmd, ct), Results.Ok));
         g.MapPost("/mail/{mailId:guid}/claim", async (Guid characterId, Guid mailId, HttpContext http, SocialService svc, CancellationToken ct) =>
             ApiResults.From(await svc.ClaimMailAsync(http.User.GetAccountId(), characterId, mailId, ct), Results.Ok));
+        g.MapGet("/blocks", async (Guid characterId, HttpContext http, SocialService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.BlockedAsync(http.User.GetAccountId(), characterId, ct), list => Results.Ok(new { items = list })));
+        g.MapPut("/blocks/{otherId:guid}", async (Guid characterId, Guid otherId, HttpContext http, SocialService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.BlockAsync(http.User.GetAccountId(), characterId, otherId, true, ct), list => Results.Ok(new { items = list })));
+        g.MapDelete("/blocks/{otherId:guid}", async (Guid characterId, Guid otherId, HttpContext http, SocialService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.BlockAsync(http.User.GetAccountId(), characterId, otherId, false, ct), list => Results.Ok(new { items = list })));
+        g.MapPost("/reports", async (Guid characterId, ReportCommand cmd, HttpContext http, SocialService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.ReportAsync(http.User.GetAccountId(), characterId, cmd, ct), _ => Results.NoContent()));
         return app;
     }
 }

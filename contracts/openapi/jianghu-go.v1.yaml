@@ -428,6 +428,36 @@ paths:
         "200": { description: OK }
         "404": { $ref: "#/components/responses/Problem" }
         "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/social/blocks:
+    get:
+      tags: [Social]
+      summary: Blocked cultivators.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+  /api/v1/characters/{characterId}/social/blocks/{otherId}:
+    put:
+      tags: [Social]
+      summary: Block a cultivator (ends friendship; no requests, messages or letters from them).
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }, { name: otherId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+    delete:
+      tags: [Social]
+      summary: Unblock.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }, { name: otherId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK }
+  /api/v1/characters/{characterId}/social/reports:
+    post:
+      tags: [Social]
+      summary: Report a player to the moderators (10 a day).
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "204": { description: Reported }
+        "400": { $ref: "#/components/responses/Problem" }
+        "429": { $ref: "#/components/responses/Problem" }
   /api/v1/combat/catalog:
     get:
       tags: [Combat]

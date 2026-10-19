@@ -238,6 +238,7 @@ public static class NotificationsModule
             services.AddSingleton<INotificationRepository, PostgresNotificationRepository>();
             services.AddSingleton<ISocialRepository, PostgresSocialRepository>();
             services.AddSingleton(new JianghuGo.Application.RetentionPolicy("social.messages", "DELETE FROM social.messages WHERE ctid IN (SELECT ctid FROM social.messages WHERE created_at < $1 - interval '90 days' LIMIT 1000)"));
+            services.AddSingleton(new JianghuGo.Application.RetentionPolicy("social.reports", "DELETE FROM social.reports WHERE ctid IN (SELECT ctid FROM social.reports WHERE created_at < $1 - interval '180 days' LIMIT 1000)"));
             services.AddSingleton(new JianghuGo.Application.RetentionPolicy("social.mail", "DELETE FROM social.mail WHERE ctid IN (SELECT ctid FROM social.mail WHERE created_at < $1 - interval '90 days' AND (claimed_at IS NOT NULL OR (stones = 0 AND item_id IS NULL)) LIMIT 1000)"));
             services.AddSingleton(new JianghuGo.Application.RetentionPolicy("notifications.notifications", "DELETE FROM notifications.notifications WHERE ctid IN (SELECT ctid FROM notifications.notifications WHERE created_at < $1 - interval '90 days' LIMIT 1000)"));
         }

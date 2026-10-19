@@ -29,6 +29,12 @@ namespace JianghuGo.Client.Application
         public Task<DirectMessageDto> SendDirectMessageAsync(Guid characterId, Guid otherId, string text, CancellationToken ct) =>
             SendAsync<DirectMessageDto>("POST", Social(characterId) + "/messages/" + otherId, new { text }, true, NewIdempotencyKey(), ct);
 
+        public Task<object> BlockAsync(Guid characterId, Guid otherId, bool on, CancellationToken ct) =>
+            SendAsync<object>(on ? "PUT" : "DELETE", Social(characterId) + "/blocks/" + otherId, null, true, null, ct);
+
+        public Task ReportAsync(Guid characterId, Guid reportedCharacterId, string reason, string excerpt, CancellationToken ct) =>
+            SendAsync<object>("POST", Social(characterId) + "/reports", new { reportedCharacterId, reason, excerpt }, true, null, ct);
+
         public Task<MailPageDto> GetMailAsync(Guid characterId, CancellationToken ct) =>
             SendAsync<MailPageDto>("GET", Social(characterId) + "/mail", null, true, null, ct);
 

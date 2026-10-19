@@ -77,6 +77,26 @@ namespace JianghuGo.Android
             var list = new LinearLayout(this) { Orientation = Orientation.Vertical };
             list.SetGravity(GravityFlags.Bottom);
             body.AddView(list, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0, 1f));
+            var mod = _ui.HRow(body, 30, 2);
+            _ui.Btn("Zgłoś", () =>
+            {
+                var sheet = Sheet("Zgłoś: " + friend.Name, 0.55f, out var closeReport, "menu_notifications");
+                foreach (var (reason, label) in new[] { ("harassment", "Nękanie"), ("spam", "Spam"), ("offensive_name", "Obraźliwe imię"), ("cheating", "Oszustwo"), ("other", "Inne") })
+                    _ui.Btn(label, () => Run(async () =>
+                    {
+                        var last = lines.LastOrDefault(m => !m.Mine)?.Text;
+                        await _api.ReportAsync(c.Id, friend.CharacterId, reason, last, Ct);
+                        closeReport();
+                        SetStatus("Zgłoszenie wysłane do moderatorów. Dziękujemy.");
+                    }), sheet, secondary: true, sp: 13, heightDp: 40);
+            }, mod, secondary: true, sp: 11, heightDp: 30);
+            _ui.Btn("Zablokuj", () => Run(async () =>
+            {
+                await _api.BlockAsync(c.Id, friend.CharacterId, true, Ct);
+                close();
+                await ShowFriendsAsync();
+                SetStatus(friend.Name + " zablokowany — nie napisze ani nie wyśle zaproszenia.");
+            }), mod, secondary: true, sp: 11, heightDp: 30);
             var row = _ui.HRow(body, 46, 6);
             var field = _ui.Field("Napisz…", parent: row);
             field.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 1f);
