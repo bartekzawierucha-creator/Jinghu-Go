@@ -36,6 +36,24 @@ public interface ICombatRepository
     Task<IReadOnlyList<TowerProgress>> ListTowerTopAsync(IUnitOfWork uow, int limit, CancellationToken ct);
     Task<int> CountTowerAheadAsync(IUnitOfWork uow, TowerProgress mine, CancellationToken ct);
 
+    // ---- arena
+    Task<ArenaEntry?> FindArenaAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct);
+
+    /// <summary>Insert when <paramref name="expectedVersion"/> is 0, otherwise update only at that version.</summary>
+    Task<bool> TrySaveArenaAsync(IUnitOfWork uow, ArenaEntry entry, int expectedVersion, CancellationToken ct);
+
+    /// <summary>Entries with rating in [min, max], best first (the caller removes itself).</summary>
+    Task<IReadOnlyList<ArenaEntry>> ListArenaAsync(IUnitOfWork uow, int minRating, int maxRating, int limit, CancellationToken ct);
+    Task<int> CountArenaAheadAsync(IUnitOfWork uow, ArenaEntry mine, CancellationToken ct);
+
+    Task<bool> ArenaWeekClaimedAsync(IUnitOfWork uow, CharacterId characterId, string week, CancellationToken ct);
+
+    /// <summary>Battles of a kind the character started (side A) at or after <paramref name="since"/>.</summary>
+    Task<int> CountBattlesOfKindSinceAsync(IUnitOfWork uow, CharacterId characterId, string kind, DateTimeOffset since, CancellationToken ct);
+
+    /// <summary>False if the weekly reward of this week was already claimed.</summary>
+    Task<bool> TryClaimArenaWeekAsync(IUnitOfWork uow, CharacterId characterId, string week, DateTimeOffset at, CancellationToken ct);
+
     // ---- world boss
     Task<WorldBossState?> FindBossAsync(IUnitOfWork uow, int cycle, CancellationToken ct);
 

@@ -100,7 +100,7 @@ public class InventoryTests : IAsyncLifetime
         Assert.Equal(0, inv["stacks"]!.AsArray().Count);
 
         var catalog = await Ok(await p.GetAsync("/api/v1/items"));
-        Assert.Equal("items-1", catalog.Str("rulesVersion"));
+        Assert.Equal("items-2", catalog.Str("rulesVersion"));
         Assert.True(catalog["items"]!.AsArray().Any(i => i!.Str("id") == "spatial_ring" && i!["bagBonus"]!.GetValue<int>() == 20));
     }
 

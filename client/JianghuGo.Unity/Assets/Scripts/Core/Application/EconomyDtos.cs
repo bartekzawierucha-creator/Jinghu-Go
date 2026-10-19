@@ -29,8 +29,43 @@ namespace JianghuGo.Client.Application
         /// <summary>For scrolls: the Dao technique they teach.</summary>
         public string BoundRef { get; set; }
 
+        /// <summary>Random properties fixed forever by the item (more on rarer items) and the set it belongs to.</summary>
+        public List<AffixDto> Affixes { get; set; } = new List<AffixDto>();
+        public string SetId { get; set; }
+        public string SetNamePl { get; set; }
+
         public bool InBag => State == "bag";
         public bool IsEquipped => State == "equipped";
+    }
+
+    public sealed class AffixDto
+    {
+        public string Id { get; set; }
+        public string NamePl { get; set; }
+        public string Stat { get; set; }
+        public int Value { get; set; }
+    }
+
+    public sealed class SetBonusDto
+    {
+        public int Pieces { get; set; }
+        public Dictionary<string, int> Stats { get; set; } = new Dictionary<string, int>();
+    }
+
+    public sealed class SetDto
+    {
+        public string Id { get; set; }
+        public string NamePl { get; set; }
+        public int Worn { get; set; }
+        public int Pieces { get; set; }
+        public Dictionary<string, int> Active { get; set; } = new Dictionary<string, int>();
+        public List<SetBonusDto> Bonuses { get; set; } = new List<SetBonusDto>();
+    }
+
+    public sealed class DismantleResultDto
+    {
+        public List<StackDto> Materials { get; set; } = new List<StackDto>();
+        public InventoryDto Inventory { get; set; }
     }
 
     public sealed class InventoryDto
@@ -44,6 +79,7 @@ namespace JianghuGo.Client.Application
         public List<ItemInstanceDto> Items { get; set; } = new List<ItemInstanceDto>();
         public Dictionary<string, Guid> Equipped { get; set; } = new Dictionary<string, Guid>();
         public Dictionary<string, int> Bonuses { get; set; } = new Dictionary<string, int>();
+        public List<SetDto> Sets { get; set; } = new List<SetDto>();
 
         public long Count(string itemId)
         {

@@ -105,6 +105,15 @@ namespace JianghuGo.Android
             ui.Text(rarity.Name + (e.Stack != null ? "  ·  w sakwie: " + e.Stack.Quantity : e.Item.IsEquipped ? "  ·  założony" : e.Item.State == "listed" ? "  ·  na targu" : string.Empty), body, 12, rarity.Color, bold: true);
             if (e.Item != null && e.Item.Stats.Count > 0)
                 ui.Text(string.Join("  ·  ", e.Item.Stats.Select(x => StatName(x.Key) + " +" + x.Value)), body, 13, Ui.Ink, maxLines: 2);
+            if (e.Item != null && e.Item.Affixes != null && e.Item.Affixes.Count > 0)
+                ui.Text("Właściwości: " + string.Join("  ·  ", e.Item.Affixes.Select(a => a.NamePl + " (" + StatName(a.Stat) + " +" + a.Value + ")")), body, 12, Ui.Violet, maxLines: 2);
+            if (e.Item?.SetNamePl != null)
+            {
+                var set = economy.Inventory.Sets?.FirstOrDefault(s => s.Id == e.Item.SetId);
+                ui.Text("Zestaw: " + e.Item.SetNamePl + (set != null ? " (" + set.Worn + "/" + set.Pieces + ")  " + string.Join("  ", set.Bonuses.Select(b => b.Pieces + " cz.: " + StatsText(b.Stats, ", "))) : string.Empty),
+                    body, 11, Ui.Jade, maxLines: 2);
+            }
+
             if (e.Item?.BoundRef != null) ui.Text("Zwój techniki: " + e.Item.BoundRef + " (przeczytaj w Bohater → Dao)", body, 12, Ui.Muted, maxLines: 2);
             ui.Box(body, 1f, marginDp: 0);
 
@@ -150,8 +159,17 @@ namespace JianghuGo.Android
                         await Done(r == null ? "Odświeżono." : r.Success ? "Udane! Teraz +" + r.Level : "Nieudane — poziom +" + r.Level + " zachowany.");
                     }), r1, secondary: true, sp: 12, heightDp: 46);
                 if (!e.Item.IsEquipped)
-                    ui.Btn("Wyrzuć", () => Run(async () =>
+                    ui.Btn(e.Item.Slot != null ? "Rozbierz" : "Wyrzuć", () => Run(async () =>
                     {
+                        if (e.Item.Slot != null)
+                        {
+                            var r = await _api.DismantleAsync(_me.Id, e.Item, Ct);
+                            await economy.LoadAsync(Ct);
+                            Sfx.Play(Sfx.Coin, 0.6f);
+                            await Done(r.Materials.Count == 0 ? "Rozebrano — nic się nie ostało." : "Odzyskano: " + string.Join(", ", r.Materials.Select(m => m.Quantity + "× " + m.NamePl)));
+                            return;
+                        }
+
                         await economy.DiscardAsync(e.Item, Ct);
                         await Done(null);
                     }), r1, secondary: true, sp: 13, heightDp: 46);
@@ -196,6 +214,7 @@ namespace JianghuGo.Android
                     .LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f) { LeftMargin = Px(4), Gravity = GravityFlags.CenterVertical };
             }
 
+            CraftQueueRow(economy, ui, page);
             Pager pager = null;
             pager = ui.Pages(page, recipes.Count, 1, 3, (i, cell) =>
             {
@@ -240,6 +259,17 @@ namespace JianghuGo.Android
 
                     RefreshHud();
                 }), row, secondary: !can, sp: 12, heightDp: 38).LayoutParameters = new LinearLayout.LayoutParams(Px(86), Px(38)) { Gravity = GravityFlags.CenterVertical };
+                var batch = can && allowed && (recipe.Kind == "alchemy" || recipe.Output.Item == "refining_stone") ? QueueTimes(economy, recipe) : 0;
+                if (batch >= 2)
+                    ui.Btn("⏳×" + batch, () => Run(async () =>
+                    {
+                        await _api.QueueCraftAsync(_me.Id, recipe.Id, batch, Ct);
+                        await economy.LoadAsync(Ct);
+                        ShowBag(economy, 1, null, null, pager.Page);
+                        Sfx.Play(Sfx.Chime, 0.6f);
+                        SetStatus(batch + "× " + N(recipe.Output.Item) + " w kolejce — odbierz, gdy będzie gotowe.");
+                        RefreshHud();
+                    }), row, secondary: true, sp: 11, heightDp: 38).LayoutParameters = new LinearLayout.LayoutParams(Px(58), Px(38)) { Gravity = GravityFlags.CenterVertical, LeftMargin = Px(4) };
                 var inputs = string.Join("   ", recipe.Inputs.Select(x => N(x.Item) + " " + inv.Count(x.Item) + "/" + x.Quantity));
                 ui.Text(inputs, card, 11, can ? Ui.Jade : Ui.Cinnabar, maxLines: 1);
             }, empty: "Brak receptur.", startPage: startPage);

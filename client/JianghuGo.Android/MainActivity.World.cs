@@ -46,6 +46,8 @@ namespace JianghuGo.Android
             banner.Background = bannerBg;
             mapFrame.AddView(banner, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent, GravityFlags.Top) { LeftMargin = Px(8), RightMargin = Px(56), TopMargin = Px(8) });
             var status = ui.Text("…", banner, 12, Ui.Ink, maxLines: 1);
+            var regionLine = ui.Text(string.Empty, banner, 11, Ui.Jade, maxLines: 1);
+            regionLine.Visibility = ViewStates.Gone;
             var eventLine = ui.Text(string.Empty, banner, 12, Ui.Gold, bold: true, maxLines: 1);
 
             // context card: the chosen (or nearest) place
@@ -134,6 +136,13 @@ namespace JianghuGo.Android
                 var n = exploration.Nearby;
                 status.Text = (exploration.Problem == null ? "📍 Pozycja potwierdzona" : "📍 " + DescribeProblem(exploration.Problem)) +
                               (exploration.Session != null ? "  ·  " + Math.Round(exploration.Session.DistanceM) + " m" : string.Empty);
+                if (n?.Region is { } region)
+                {
+                    regionLine.Visibility = ViewStates.Visible;
+                    regionLine.Text = (region.Night ? "🌙 " : "☀ ") + region.NamePl + " · " + region.TerrainNamePl + (region.WeatherNamePl != null ? " · " + region.WeatherNamePl : string.Empty)
+                                      + (region.BossNamePl != null ? " · władca: " + region.BossNamePl : string.Empty);
+                }
+
                 eventLine.SetCompoundDrawables(null, null, null, null);
                 if (n?.Event != null)
                 {

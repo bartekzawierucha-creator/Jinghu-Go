@@ -1,16 +1,1043 @@
 {
-  "rulesVersion": "cultivation-2",
-  "worldTimeZone": "Europe/Warsaw",
-  "realms": [
-    {"id": "qi_condensation", "namePl": "Kondensacja Qi", "nameEn": "Qi Condensation", "stages": 9},
-    {"id": "foundation_establishment", "namePl": "Ustanowienie Fundamentu", "nameEn": "Foundation Establishment", "stages": 9},
-    {"id": "core_formation", "namePl": "Formowanie Rdzenia", "nameEn": "Core Formation", "stages": 9},
-    {"id": "nascent_soul", "namePl": "Narodziny Duszy", "nameEn": "Nascent Soul", "stages": 9},
-    {"id": "soul_transformation", "namePl": "Przemiana Duszy", "nameEn": "Soul Transformation", "stages": 9},
-    {"id": "void_refinement", "namePl": "Rafinacja Pustki", "nameEn": "Void Refinement", "stages": 9}
+ "rulesVersion": "cultivation-3",
+ "worldTimeZone": "Europe/Warsaw",
+ "stageNames": [
+  "Szczur",
+  "Wół",
+  "Tygrys",
+  "Królik",
+  "Smok",
+  "Wąż",
+  "Koń",
+  "Koza",
+  "Małpa",
+  "Kogut",
+  "Pies",
+  "Świnia"
+ ],
+ "eras": [
+  {
+   "era": 1,
+   "namePl": "Śmiertelna",
+   "bottleneckItem": "breakthrough_pill_mortal"
+  },
+  {
+   "era": 2,
+   "namePl": "Nieśmiertelna",
+   "bottleneckItem": "breakthrough_pill_immortal"
+  },
+  {
+   "era": 3,
+   "namePl": "Święta",
+   "bottleneckItem": "breakthrough_pill_saint"
+  },
+  {
+   "era": 4,
+   "namePl": "Boska",
+   "bottleneckItem": "breakthrough_pill_divine"
+  },
+  {
+   "era": 5,
+   "namePl": "Pierwotna",
+   "bottleneckItem": "breakthrough_pill_primal"
+  },
+  {
+   "era": 6,
+   "namePl": "Dao",
+   "bottleneckItem": "breakthrough_pill_dao"
+  }
+ ],
+ "realms": [
+  {
+   "id": "body_tempering",
+   "namePl": "Hartowanie Ciała",
+   "nameEn": "Body Tempering",
+   "hanzi": "煉體",
+   "era": 1,
+   "stages": 12,
+   "unlockPl": "Medytacja, trening, pierwsza technika ścieżki",
+   "tribulationPl": "Cień własnego lęku",
+   "titlePl": "Hartowany"
+  },
+  {
+   "id": "meridian_opening",
+   "namePl": "Otwarcie Meridianów",
+   "nameEn": "Meridian Opening",
+   "hanzi": "開脈",
+   "era": 1,
+   "stages": 12,
+   "unlockPl": "12 meridianów głównych i ich łańcuchy",
+   "tribulationPl": "Ból kanałów",
+   "titlePl": "Otwarty Kanał"
+  },
+  {
+   "id": "qi_condensation",
+   "namePl": "Kondensacja Qi",
+   "nameEn": "Qi Condensation",
+   "hanzi": "練氣",
+   "era": 1,
+   "stages": 12,
+   "unlockPl": "Łowy idle, ogród duchowy, Wieża Prób",
+   "tribulationPl": "3 pioruny",
+   "titlePl": "Zbieracz Mgły"
+  },
+  {
+   "id": "foundation_establishment",
+   "namePl": "Założenie Fundamentu",
+   "nameEn": "Foundation Establishment",
+   "hanzi": "築基",
+   "era": 1,
+   "stages": 12,
+   "unlockPl": "Jakość fundamentu, gałąź ścieżki, odosobnienie 8 h, kolejka alchemii",
+   "tribulationPl": "6 piorunów",
+   "titlePl": "Kamień Węgielny"
+  },
+  {
+   "id": "golden_core",
+   "namePl": "Złoty Rdzeń",
+   "nameEn": "Golden Core",
+   "hanzi": "金丹",
+   "era": 1,
+   "stages": 12,
+   "unlockPl": "Kolor rdzenia, pierwszy uczeń, wyprawy, kompresja Qi",
+   "tribulationPl": "9 piorunów i demon serca",
+   "titlePl": "Nosiciel Rdzenia"
+  },
+  {
+   "id": "nascent_soul",
+   "namePl": "Narodziny Duszy",
+   "nameEn": "Nascent Soul",
+   "hanzi": "元嬰",
+   "era": 1,
+   "stages": 12,
+   "unlockPl": "Dusza na wyprawach, odosobnienie 24 h, drugi uczeń",
+   "tribulationPl": "Powódź Qi",
+   "titlePl": "Dwa Serca"
+  },
+  {
+   "id": "spirit_transformation",
+   "namePl": "Transformacja Ducha",
+   "nameEn": "Spirit Transformation",
+   "hanzi": "化神",
+   "era": 1,
+   "stages": 12,
+   "unlockPl": "Zrozumienie Dao, trzeci uczeń",
+   "tribulationPl": "Próba ognia",
+   "titlePl": "Widzący Prawa"
+  },
+  {
+   "id": "void_refinement",
+   "namePl": "Oczyszczenie Pustki",
+   "nameEn": "Void Refinement",
+   "hanzi": "煉虛",
+   "era": 1,
+   "stages": 12,
+   "unlockPl": "Pierścień przestrzenny: +20 miejsc w sakwie",
+   "tribulationPl": "Niewidzialny przeciwnik",
+   "titlePl": "Wędrowiec Pustki"
+  },
+  {
+   "id": "body_integration",
+   "namePl": "Integracja Ciała",
+   "nameEn": "Body Integration",
+   "hanzi": "合體",
+   "era": 1,
+   "stages": 12,
+   "unlockPl": "Automatyczny przełom, druga gałąź ścieżki, czwarty uczeń",
+   "tribulationPl": "Trzy demony serca",
+   "titlePl": "Jedno z Niebem"
+  },
+  {
+   "id": "great_vehicle",
+   "namePl": "Wielki Pojazd",
+   "nameEn": "Great Vehicle",
+   "hanzi": "大乘",
+   "era": 1,
+   "stages": 12,
+   "unlockPl": "Nauczanie, piąty uczeń",
+   "tribulationPl": "18 piorunów",
+   "titlePl": "Mistrz Pojazdu"
+  },
+  {
+   "id": "tribulation_transcendence",
+   "namePl": "Przejście Próby",
+   "nameEn": "Tribulation Transcendence",
+   "hanzi": "渡劫",
+   "era": 1,
+   "stages": 12,
+   "unlockPl": "Wielka Próba 9×9",
+   "tribulationPl": "81 piorunów",
+   "titlePl": "Ten, Który Przetrwał Niebo"
+  },
+  {
+   "id": "earth_immortal",
+   "namePl": "Nieśmiertelny Ziemski",
+   "nameEn": "Earth Immortal",
+   "hanzi": "地仙",
+   "era": 2,
+   "stages": 12,
+   "unlockPl": "Qi Nieśmiertelne, niebiańskie pola",
+   "tribulationPl": "Zrzucenie śmiertelnego ciała",
+   "titlePl": "Ziemski Nieśmiertelny"
+  },
+  {
+   "id": "true_immortal",
+   "namePl": "Prawdziwy Nieśmiertelny",
+   "nameEn": "True Immortal",
+   "hanzi": "真仙",
+   "era": 2,
+   "stages": 12,
+   "unlockPl": "Odrodzenie w walce raz na bitwę",
+   "tribulationPl": "Wyrok niebios",
+   "titlePl": "Prawdziwy"
+  },
+  {
+   "id": "mystic_immortal",
+   "namePl": "Nieśmiertelny Tajemnic",
+   "nameEn": "Mystic Immortal",
+   "hanzi": "玄仙",
+   "era": 2,
+   "stages": 12,
+   "unlockPl": "Wieczne formacje",
+   "tribulationPl": "Labirynt formacji",
+   "titlePl": "Tkacz Szyków"
+  },
+  {
+   "id": "golden_immortal",
+   "namePl": "Złoty Nieśmiertelny",
+   "nameEn": "Golden Immortal",
+   "hanzi": "金仙",
+   "era": 2,
+   "stages": 12,
+   "unlockPl": "Złote ciało: odporność na jeden status",
+   "tribulationPl": "Złoty ogień",
+   "titlePl": "Złote Ciało"
+  },
+  {
+   "id": "taiyi_immortal",
+   "namePl": "Nieśmiertelny Taiyi",
+   "nameEn": "Taiyi Immortal",
+   "hanzi": "太乙",
+   "era": 2,
+   "stages": 12,
+   "unlockPl": "Klon: drugie łowy równolegle",
+   "tribulationPl": "Walka z klonem",
+   "titlePl": "Dwoisty"
+  },
+  {
+   "id": "daluo_immortal",
+   "namePl": "Nieśmiertelny Daluo",
+   "nameEn": "Daluo Immortal",
+   "hanzi": "大羅",
+   "era": 2,
+   "stages": 12,
+   "unlockPl": "Zbiór offline do 24 h",
+   "tribulationPl": "Pętla czasu",
+   "titlePl": "Poza Czasem"
+  },
+  {
+   "id": "immortal_king",
+   "namePl": "Król Nieśmiertelnych",
+   "nameEn": "Immortal King",
+   "hanzi": "仙王",
+   "era": 2,
+   "stages": 12,
+   "unlockPl": "Domena z pawilonami produkcji",
+   "tribulationPl": "Najazd na domenę",
+   "titlePl": "Król Domeny"
+  },
+  {
+   "id": "immortal_emperor",
+   "namePl": "Cesarz Nieśmiertelnych",
+   "nameEn": "Immortal Emperor",
+   "hanzi": "仙帝",
+   "era": 2,
+   "stages": 12,
+   "unlockPl": "Domena wzmacnia sektę",
+   "tribulationPl": "Bunt wasali",
+   "titlePl": "Cesarz Wysp"
+  },
+  {
+   "id": "source_immortal",
+   "namePl": "Nieśmiertelny Źródła",
+   "nameEn": "Source Immortal",
+   "hanzi": "源仙",
+   "era": 2,
+   "stages": 12,
+   "unlockPl": "Studnia Qi w domenie",
+   "tribulationPl": "Wysychające źródło",
+   "titlePl": "Strażnik Źródła"
+  },
+  {
+   "id": "half_saint",
+   "namePl": "Pół-Święty",
+   "nameEn": "Half Saint",
+   "hanzi": "半聖",
+   "era": 2,
+   "stages": 12,
+   "unlockPl": "Pierwsza Zasada walki",
+   "tribulationPl": "Sprzeczność zasad",
+   "titlePl": "Pół-Święty"
+  },
+  {
+   "id": "immortal_apex",
+   "namePl": "Szczyt Nieśmiertelnych",
+   "nameEn": "Immortal Apex",
+   "hanzi": "仙極",
+   "era": 2,
+   "stages": 12,
+   "unlockPl": "Zamknięcie ery",
+   "tribulationPl": "Echo samego siebie",
+   "titlePl": "Pan Nieba"
+  },
+  {
+   "id": "saint_step",
+   "namePl": "Pierwszy Krok Świętego",
+   "nameEn": "Saint's First Step",
+   "hanzi": "聖人",
+   "era": 3,
+   "stages": 12,
+   "unlockPl": "Święta Wola: premia dla sekty",
+   "tribulationPl": "Próba słowa",
+   "titlePl": "Głos Prawa"
+  },
+  {
+   "id": "saint_body",
+   "namePl": "Święte Ciało",
+   "nameEn": "Saint Body",
+   "hanzi": "聖體",
+   "era": 3,
+   "stages": 12,
+   "unlockPl": "Regeneracja 2% HP na turę",
+   "tribulationPl": "Krew nieba",
+   "titlePl": "Święte Ciało"
+  },
+  {
+   "id": "saint_soul",
+   "namePl": "Święta Dusza",
+   "nameEn": "Saint Soul",
+   "hanzi": "聖魂",
+   "era": 3,
+   "stages": 12,
+   "unlockPl": "Dusza walczy obok",
+   "tribulationPl": "Rozdarcie duszy",
+   "titlePl": "Podwójny Wojownik"
+  },
+  {
+   "id": "law_saint",
+   "namePl": "Święty Prawa",
+   "nameEn": "Saint of Law",
+   "hanzi": "法聖",
+   "era": 3,
+   "stages": 12,
+   "unlockPl": "Druga Zasada walki",
+   "tribulationPl": "Zderzenie praw",
+   "titlePl": "Prawodawca"
+  },
+  {
+   "id": "great_saint",
+   "namePl": "Wielki Święty",
+   "nameEn": "Great Saint",
+   "hanzi": "大聖",
+   "era": 3,
+   "stages": 12,
+   "unlockPl": "Rajdy na Święte Bestie",
+   "tribulationPl": "Bestia Granic",
+   "titlePl": "Pogromca Bestii"
+  },
+  {
+   "id": "primal_saint",
+   "namePl": "Święty Pierwotny",
+   "nameEn": "Primal Saint",
+   "hanzi": "元聖",
+   "era": 3,
+   "stages": 12,
+   "unlockPl": "Własne metody kultywacji",
+   "tribulationPl": "Pustka bez metody",
+   "titlePl": "Twórca Sutry"
+  },
+  {
+   "id": "sage_saint",
+   "namePl": "Święty Mędrzec",
+   "nameEn": "Sage Saint",
+   "hanzi": "聖賢",
+   "era": 3,
+   "stages": 12,
+   "unlockPl": "Uczniowie osiągają Złoty Rdzeń",
+   "tribulationPl": "Próba ucznia",
+   "titlePl": "Mędrzec"
+  },
+  {
+   "id": "saint_emperor",
+   "namePl": "Święty Cesarz",
+   "nameEn": "Saint Emperor",
+   "hanzi": "聖帝",
+   "era": 3,
+   "stages": 12,
+   "unlockPl": "Bitwy o Święte Góry",
+   "tribulationPl": "Oblężenie góry",
+   "titlePl": "Cesarz Gór"
+  },
+  {
+   "id": "heaven_saint",
+   "namePl": "Święty Niebios",
+   "nameEn": "Heaven Saint",
+   "hanzi": "天聖",
+   "era": 3,
+   "stages": 12,
+   "unlockPl": "Głos w wyborze Bossa Świata",
+   "tribulationPl": "Gniew niebios",
+   "titlePl": "Wybraniec Niebios"
+  },
+  {
+   "id": "eternal_saint",
+   "namePl": "Wieczny Święty",
+   "nameEn": "Eternal Saint",
+   "hanzi": "永聖",
+   "era": 3,
+   "stages": 12,
+   "unlockPl": "Trzecia Zasada walki",
+   "tribulationPl": "Erozja wieczności",
+   "titlePl": "Wieczny"
+  },
+  {
+   "id": "perfect_saint",
+   "namePl": "Doskonały Święty",
+   "nameEn": "Perfect Saint",
+   "hanzi": "至聖",
+   "era": 3,
+   "stages": 12,
+   "unlockPl": "Reinkarnacja z Karmą",
+   "tribulationPl": "Serce Świata",
+   "titlePl": "Święty"
+  },
+  {
+   "id": "divine_spark",
+   "namePl": "Iskra Boskości",
+   "nameEn": "Divine Spark",
+   "hanzi": "神火",
+   "era": 4,
+   "stages": 12,
+   "unlockPl": "Wyznawcy i Wiara",
+   "tribulationPl": "Pierwsza modlitwa",
+   "titlePl": "Iskra"
+  },
+  {
+   "id": "lesser_deity",
+   "namePl": "Bóstwo Pomniejsze",
+   "nameEn": "Lesser Deity",
+   "hanzi": "小神",
+   "era": 4,
+   "stages": 12,
+   "unlockPl": "Świątynia na mapie",
+   "tribulationPl": "Pusta świątynia",
+   "titlePl": "Opiekun Miejsca"
+  },
+  {
+   "id": "elemental_deity",
+   "namePl": "Bóstwo Żywiołu",
+   "nameEn": "Elemental Deity",
+   "hanzi": "元素神",
+   "era": 4,
+   "stages": 12,
+   "unlockPl": "Domena Boża: żywioł +30%",
+   "tribulationPl": "Bunt żywiołów",
+   "titlePl": "Bóg Żywiołu"
+  },
+  {
+   "id": "true_god",
+   "namePl": "Prawdziwy Bóg",
+   "nameEn": "True God",
+   "hanzi": "真神",
+   "era": 4,
+   "stages": 12,
+   "unlockPl": "Pierwsza boska technika",
+   "tribulationPl": "Zstąpienie",
+   "titlePl": "Prawdziwy Bóg"
+  },
+  {
+   "id": "office_god",
+   "namePl": "Bóg Urzędu",
+   "nameEn": "God of Office",
+   "hanzi": "神職",
+   "era": 4,
+   "stages": 12,
+   "unlockPl": "Urząd: Wojna, Los, Żniwa, Śmierć, Wiedza",
+   "tribulationPl": "Sąd urzędu",
+   "titlePl": "Bóg Urzędu"
+  },
+  {
+   "id": "law_god",
+   "namePl": "Bóg Prawa",
+   "nameEn": "God of Law",
+   "hanzi": "法神",
+   "era": 4,
+   "stages": 12,
+   "unlockPl": "Czwarta Zasada walki",
+   "tribulationPl": "Kodeks niebios",
+   "titlePl": "Strażnik Kodeksu"
+  },
+  {
+   "id": "star_god",
+   "namePl": "Bóg Gwiazd",
+   "nameEn": "Star God",
+   "hanzi": "星神",
+   "era": 4,
+   "stages": 12,
+   "unlockPl": "Gwiazdozbiór premii",
+   "tribulationPl": "Spadająca gwiazda",
+   "titlePl": "Gwiezdny"
+  },
+  {
+   "id": "time_god",
+   "namePl": "Bóg Czasu",
+   "nameEn": "Time God",
+   "hanzi": "時神",
+   "era": 4,
+   "stages": 12,
+   "unlockPl": "Codziennie dodatkowe 4 h kultywacji",
+   "tribulationPl": "Zatrzymany czas",
+   "titlePl": "Pan Godzin"
+  },
+  {
+   "id": "elder_god",
+   "namePl": "Starszy Bóg",
+   "nameEn": "Elder God",
+   "hanzi": "古神",
+   "era": 4,
+   "stages": 12,
+   "unlockPl": "Panteon ponad sektami",
+   "tribulationPl": "Rada bogów",
+   "titlePl": "Starszy"
+  },
+  {
+   "id": "god_above_gods",
+   "namePl": "Bóg nad Bogami",
+   "nameEn": "God Above Gods",
+   "hanzi": "神上神",
+   "era": 4,
+   "stages": 12,
+   "unlockPl": "Druga boska technika",
+   "tribulationPl": "Bóg-uzurpator",
+   "titlePl": "Nad Bogami"
+  },
+  {
+   "id": "perfect_deity",
+   "namePl": "Doskonałe Bóstwo",
+   "nameEn": "Perfect Deity",
+   "hanzi": "至神",
+   "era": 4,
+   "stages": 12,
+   "unlockPl": "Zmierzch Bogów",
+   "tribulationPl": "Zmierzch",
+   "titlePl": "Bóg"
+  },
+  {
+   "id": "chaos_child",
+   "namePl": "Dziecię Chaosu",
+   "nameEn": "Child of Chaos",
+   "hanzi": "混沌子",
+   "era": 5,
+   "stages": 12,
+   "unlockPl": "Wyprawy w Morze Chaosu",
+   "tribulationPl": "Pierwszy sztorm",
+   "titlePl": "Dziecię Chaosu"
+  },
+  {
+   "id": "chaos_smith",
+   "namePl": "Kowal Chaosu",
+   "nameEn": "Chaos Smith",
+   "hanzi": "混沌匠",
+   "era": 5,
+   "stages": 12,
+   "unlockPl": "Artefakty Pierwotne",
+   "tribulationPl": "Kuźnia bez ognia",
+   "titlePl": "Kowal Pierwotny"
+  },
+  {
+   "id": "five_elements_lord",
+   "namePl": "Władca Żywiołów",
+   "nameEn": "Lord of Five Elements",
+   "hanzi": "五行主",
+   "era": 5,
+   "stages": 12,
+   "unlockPl": "Wszystkie żywioły naraz",
+   "tribulationPl": "Cykl niszczenia",
+   "titlePl": "Pięć w Jednym"
+  },
+  {
+   "id": "star_devourer",
+   "namePl": "Pożeracz Gwiazd",
+   "nameEn": "Star Devourer",
+   "hanzi": "吞星",
+   "era": 5,
+   "stages": 12,
+   "unlockPl": "Kryształy chaosu na stałe statystyki",
+   "tribulationPl": "Gwiazda-pułapka",
+   "titlePl": "Pożeracz"
+  },
+  {
+   "id": "primal_form",
+   "namePl": "Pierwotna Forma",
+   "nameEn": "Primal Form",
+   "hanzi": "原形",
+   "era": 5,
+   "stages": 12,
+   "unlockPl": "Ostateczna forma ścieżki",
+   "tribulationPl": "Walka z formą",
+   "titlePl": "Pierwotna Forma"
+  },
+  {
+   "id": "world_creator",
+   "namePl": "Stwórca Małego Świata",
+   "nameEn": "Small World Creator",
+   "hanzi": "小世界",
+   "era": 5,
+   "stages": 12,
+   "unlockPl": "Własny mały świat",
+   "tribulationPl": "Narodziny świata",
+   "titlePl": "Stwórca"
+  },
+  {
+   "id": "fate_lord",
+   "namePl": "Władca Losu",
+   "nameEn": "Lord of Fate",
+   "hanzi": "命主",
+   "era": 5,
+   "stages": 12,
+   "unlockPl": "Przerzut wyniku raz na walkę",
+   "tribulationPl": "Nić losu",
+   "titlePl": "Tkacz Losu"
+  },
+  {
+   "id": "primal_sage",
+   "namePl": "Pierwotny Mędrzec",
+   "nameEn": "Primal Sage",
+   "hanzi": "原賢",
+   "era": 5,
+   "stages": 12,
+   "unlockPl": "Piąta Zasada walki",
+   "tribulationPl": "Pytanie bez odpowiedzi",
+   "titlePl": "Pierwotny Mędrzec"
+  },
+  {
+   "id": "primal_emperor",
+   "namePl": "Pierwotny Cesarz",
+   "nameEn": "Primal Emperor",
+   "hanzi": "原帝",
+   "era": 5,
+   "stages": 12,
+   "unlockPl": "Wojny Chaosu",
+   "tribulationPl": "Wojna światów",
+   "titlePl": "Cesarz Chaosu"
+  },
+  {
+   "id": "ancient_one",
+   "namePl": "Przedwieczny",
+   "nameEn": "Ancient One",
+   "hanzi": "太古",
+   "era": 5,
+   "stages": 12,
+   "unlockPl": "Zbiór offline do 72 h",
+   "tribulationPl": "Zapomnienie",
+   "titlePl": "Przedwieczny"
+  },
+  {
+   "id": "perfect_chaos",
+   "namePl": "Doskonały Chaos",
+   "nameEn": "Perfect Chaos",
+   "hanzi": "至混沌",
+   "era": 5,
+   "stages": 12,
+   "unlockPl": "Rajd na Pierwotną Bestię",
+   "tribulationPl": "Pierwotna Bestia",
+   "titlePl": "Pierwotny"
+  },
+  {
+   "id": "dao_touch",
+   "namePl": "Dotyk Dao",
+   "nameEn": "Touch of Dao",
+   "hanzi": "觸道",
+   "era": 6,
+   "stages": 12,
+   "unlockPl": "Dao bez limitu",
+   "tribulationPl": "Cisza",
+   "titlePl": "Dotknięty"
+  },
+  {
+   "id": "dao_word",
+   "namePl": "Słowo Dao",
+   "nameEn": "Word of Dao",
+   "hanzi": "道言",
+   "era": 6,
+   "stages": 12,
+   "unlockPl": "Nazwanie regionu",
+   "tribulationPl": "Imię",
+   "titlePl": "Nazywający"
+  },
+  {
+   "id": "dao_path",
+   "namePl": "Ścieżka Dao",
+   "nameEn": "Path of Dao",
+   "hanzi": "道途",
+   "era": 6,
+   "stages": 12,
+   "unlockPl": "Premie wszystkich ścieżek",
+   "tribulationPl": "Rozdroże",
+   "titlePl": "Wszechścieżkowy"
+  },
+  {
+   "id": "dao_heart",
+   "namePl": "Serce Dao",
+   "nameEn": "Heart of Dao",
+   "hanzi": "道心",
+   "era": 6,
+   "stages": 12,
+   "unlockPl": "Odporność na demony serca",
+   "tribulationPl": "Lustro serca",
+   "titlePl": "Niezłomne Serce"
+  },
+  {
+   "id": "dao_eye",
+   "namePl": "Oko Dao",
+   "nameEn": "Eye of Dao",
+   "hanzi": "道眼",
+   "era": 6,
+   "stages": 12,
+   "unlockPl": "Widzisz ukryte miejsca",
+   "tribulationPl": "Ślepota",
+   "titlePl": "Widzący"
+  },
+  {
+   "id": "dao_hand",
+   "namePl": "Ręka Dao",
+   "nameEn": "Hand of Dao",
+   "hanzi": "道手",
+   "era": 6,
+   "stages": 12,
+   "unlockPl": "Szósta Zasada walki",
+   "tribulationPl": "Ręka losu",
+   "titlePl": "Ręka Dao"
+  },
+  {
+   "id": "dao_body",
+   "namePl": "Ciało Dao",
+   "nameEn": "Body of Dao",
+   "hanzi": "道體",
+   "era": 6,
+   "stages": 12,
+   "unlockPl": "Przeżywasz śmiertelny cios raz dziennie",
+   "tribulationPl": "Śmierć",
+   "titlePl": "Nieumierający"
+  },
+  {
+   "id": "dao_soul",
+   "namePl": "Dusza Dao",
+   "nameEn": "Soul of Dao",
+   "hanzi": "道魂",
+   "era": 6,
+   "stages": 12,
+   "unlockPl": "Uczniowie jako mistrzowie dla innych",
+   "tribulationPl": "Rozproszenie",
+   "titlePl": "Nauczyciel Światów"
+  },
+  {
+   "id": "dao_master",
+   "namePl": "Pan Dao",
+   "nameEn": "Master of Dao",
+   "hanzi": "道主",
+   "era": 6,
+   "stages": 12,
+   "unlockPl": "Twoja technika jako legendarny zwój",
+   "tribulationPl": "Ostatni uczeń",
+   "titlePl": "Pan Dao"
+  },
+  {
+   "id": "dao_union",
+   "namePl": "Jedność z Dao",
+   "nameEn": "Union with Dao",
+   "hanzi": "合道",
+   "era": 6,
+   "stages": 12,
+   "unlockPl": "Posąg na mapie",
+   "tribulationPl": "Zatarcie",
+   "titlePl": "Legenda"
+  },
+  {
+   "id": "nameless_dao",
+   "namePl": "Dao Bez Imienia",
+   "nameEn": "Nameless Dao",
+   "hanzi": "無名之道",
+   "era": 6,
+   "stages": 12,
+   "unlockPl": "Wielkie Wniebowstąpienie",
+   "tribulationPl": "Bezimienne",
+   "titlePl": "Bezimienny"
+  }
+ ],
+ "qiRequired": {
+  "base": 100,
+  "stageGrowth": 1.15,
+  "realmGrowth": 1.6,
+  "majorMultiplier": 3
+ },
+ "breakthrough": {
+  "minorBaseChance": 0.95,
+  "minorDecayPerStage": 0.002,
+  "insightWeight": 0.004,
+  "willpowerWeight": 0.003,
+  "fateWeight": 0.002,
+  "minChance": 0.05,
+  "maxChance": 0.97,
+  "failureQiLossFraction": 0.3,
+  "deviationMinutes": 30,
+  "bottleneckStage": 11
+ },
+ "flow": {
+  "baseQiPerHour": 120,
+  "realmGrowth": 1.55,
+  "spiritBonusPerPoint": 0.02,
+  "meditationMultiplier": 5,
+  "retreatMultiplier": 8,
+  "retreatHours": [
+   8,
+   12,
+   24
   ],
-  "qiRequired": {"base": 100, "growth": 1.1, "majorMultiplier": 3},
-  "breakthrough": {"minorBaseChance": 0.92, "minorDecayPerStage": 0.01, "majorBaseChance": 0.55, "insightWeight": 0.004, "willpowerWeight": 0.003, "fateWeight": 0.002, "minChance": 0.05, "maxChance": 0.97, "failureQiLossFraction": 0.3, "deviationMinutes": 30},
-  "meditation": {"baseQiPerMinute": 2, "spiritBonusPerPoint": 0.02, "minMinutes": 1, "maxMinutes": 120, "dailyQiCap": 1500, "deviationMultiplier": 0.5},
-  "paths": {"qi": {"meditationMultiplier": 1.5}, "body": {"meditationMultiplier": 0.75, "stepsPerQi": 20, "maxStepsPerMinute": 220, "dailyStepCap": 30000}, "flame": {"meditationMultiplier": 1.0}, "poison": {"meditationMultiplier": 1.0, "nightMultiplier": 2.0, "nightStartHour": 21, "nightEndHour": 5}}
+  "retreatMinRealm": 3,
+  "longRetreatMinRealm": 5,
+  "offlineCapHours": 12,
+  "offlineCapBonuses": [
+   {
+    "realm": 16,
+    "hours": 24
+   },
+   {
+    "realm": 53,
+    "hours": 72
+   }
+  ],
+  "deviationMultiplier": 0.5,
+  "vesselBase": 6,
+  "vesselPerLevel": 1,
+  "vesselMaxLevel": 20,
+  "vesselCrystalCost": 10,
+  "dailyAcceleratorHours": 2,
+  "timeGodRealm": 40,
+  "timeGodHours": 4, "weekendPermille": 1500
+ },
+ "compression": {
+  "ratio": 100,
+  "minRealm": 4,
+  "bonusPermillePer100Crystals": 1,
+  "capPermillePerRealm": 50
+ },
+ "heartDemons": {
+  "perBreakthrough": 6,
+  "perPillUse": 3,
+  "fastBreakthroughMinutes": 30,
+  "fastBreakthroughExtra": 6,
+  "calmPerMeditationHour": 4,
+  "chancePenaltyFrom": 50,
+  "chancePenaltyPermillePerPoint": 8,
+  "immuneRealm": 58
+ },
+ "enlightenment": {
+  "chancePpmPerHour": 5000,
+  "fullMoonMultiplier": 2,
+  "qiFractionOfStage": 0.3
+ },
+ "quality": {
+  "perfectScore": 60,
+  "heavenlyScore": 85,
+  "perfectBonusPermille": 70,
+  "heavenlyBonusPermille": 150,
+  "peakHoursForFullScore": 72
+ },
+ "karma": {
+  "minRealm": 32,
+  "perRealm": 1,
+  "flowPermillePerKarma": 100
+ },
+ "autoBreakthrough": {
+  "minRealm": 8,
+  "maxPerSettle": 12
+ },
+ "methods": [
+  {
+   "id": "still_water_sutra",
+   "namePl": "Sutra Spokojnej Wody",
+   "descriptionPl": "Pasywne Qi +30%, obrażenia w walce −10%.",
+   "flowPermille": 300,
+   "meditationPermille": 0,
+   "combatPermille": -100,
+   "stepsPermille": 0,
+   "demonPermille": 0,
+   "nightPermille": 0,
+   "winQi": 0,
+   "path": null,
+   "minRealm": 0,
+   "item": null,
+   "gatherPermille": 0,
+   "tribulationPermille": 0
+  },
+  {
+   "id": "iron_body_canon",
+   "namePl": "Kanon Żelaznego Ciała",
+   "descriptionPl": "Qi z kroków ×3, pasywne Qi −10%, obrażenia +5%.",
+   "flowPermille": -100,
+   "meditationPermille": 0,
+   "combatPermille": 50,
+   "stepsPermille": 2000,
+   "demonPermille": 0,
+   "nightPermille": 0,
+   "winQi": 0,
+   "path": "body",
+   "minRealm": 0,
+   "item": null,
+   "gatherPermille": 0,
+   "tribulationPermille": 0
+  },
+  {
+   "id": "phoenix_song",
+   "namePl": "Pieśń Feniksa",
+   "descriptionPl": "Medytacja +40%, 15 Qi za każdą wygraną walkę.",
+   "flowPermille": 0,
+   "meditationPermille": 400,
+   "combatPermille": 0,
+   "stepsPermille": 0,
+   "demonPermille": 0,
+   "nightPermille": 0,
+   "winQi": 15,
+   "path": "flame",
+   "minRealm": 0,
+   "item": null,
+   "gatherPermille": 0,
+   "tribulationPermille": 0
+  },
+  {
+   "id": "blood_moon_book",
+   "namePl": "Księga Krwawego Księżyca",
+   "descriptionPl": "Nocą Qi ×2, 25 Qi za każdą wygraną; demony serca rosną szybciej.",
+   "flowPermille": 0,
+   "meditationPermille": 0,
+   "combatPermille": 50,
+   "stepsPermille": 0,
+   "demonPermille": 300,
+   "nightPermille": 1000,
+   "winQi": 25,
+   "path": "poison",
+   "minRealm": 0,
+   "item": null,
+   "gatherPermille": 0,
+   "tribulationPermille": 0
+  },
+  {
+   "id": "thousand_harvest_treatise",
+   "namePl": "Traktat Tysiąca Zbiorów",
+   "descriptionPl": "Ogród i wyprawy +40%, medytacja −20%.",
+   "flowPermille": 0,
+   "meditationPermille": -200,
+   "combatPermille": 0,
+   "stepsPermille": 0,
+   "demonPermille": 0,
+   "nightPermille": 0,
+   "winQi": 0,
+   "path": null,
+   "minRealm": 2,
+   "item": "manual_thousand_harvest",
+   "gatherPermille": 400,
+   "tribulationPermille": 0
+  },
+  {
+   "id": "storm_heaven_scroll",
+   "namePl": "Zwój Burzowego Nieba",
+   "descriptionPl": "Niebiańskie próby słabsze o 20%, Qi +15%.",
+   "flowPermille": 150,
+   "meditationPermille": 0,
+   "combatPermille": 0,
+   "stepsPermille": 0,
+   "demonPermille": 0,
+   "nightPermille": 0,
+   "winQi": 0,
+   "path": null,
+   "minRealm": 3,
+   "item": "manual_storm_heaven",
+   "gatherPermille": 0,
+   "tribulationPermille": -200
+  },
+  {
+   "id": "empty_heart_sutra",
+   "namePl": "Sutra Pustego Serca",
+   "descriptionPl": "Demony serca −50%, medytacja +10%, pasywne Qi −10%.",
+   "flowPermille": -100,
+   "meditationPermille": 100,
+   "combatPermille": 0,
+   "stepsPermille": 0,
+   "demonPermille": -500,
+   "nightPermille": 0,
+   "winQi": 0,
+   "path": null,
+   "minRealm": 2,
+   "item": "manual_empty_heart",
+   "gatherPermille": 0,
+   "tribulationPermille": 0
+  },
+  {
+   "id": "nine_swords_manual",
+   "namePl": "Podręcznik Dziewięciu Mieczy",
+   "descriptionPl": "Obrażenia +15%, pasywne Qi +10%, 10 Qi za wygraną.",
+   "flowPermille": 100,
+   "meditationPermille": 0,
+   "combatPermille": 150,
+   "stepsPermille": 0,
+   "demonPermille": 100,
+   "nightPermille": 0,
+   "winQi": 10,
+   "path": "qi",
+   "minRealm": 3,
+   "item": "manual_nine_swords",
+   "gatherPermille": 0,
+   "tribulationPermille": 0
+  },
+  {
+   "id": "primordial_breath",
+   "namePl": "Pierwotny Oddech",
+   "descriptionPl": "Wszystko +25%. Metoda mistrzów.",
+   "flowPermille": 250,
+   "meditationPermille": 250,
+   "combatPermille": 100,
+   "stepsPermille": 250,
+   "demonPermille": 0,
+   "nightPermille": 0,
+   "winQi": 20,
+   "path": null,
+   "minRealm": 10,
+   "item": "manual_primordial_breath",
+   "gatherPermille": 0,
+   "tribulationPermille": 0
+  }
+ ],
+ "methodMasteryMinutesPerLevel": 600,
+ "methodMasteryPermillePerLevel": 30,
+ "paths": {
+  "qi": {
+   "meditationMultiplier": 1.5
+  },
+  "body": {
+   "meditationMultiplier": 0.75,
+   "stepsPerQi": 20,
+   "maxStepsPerMinute": 220,
+   "dailyStepCap": 30000
+  },
+  "flame": {
+   "meditationMultiplier": 1.0
+  },
+  "poison": {
+   "meditationMultiplier": 1.0,
+   "nightMultiplier": 2.0,
+   "nightStartHour": 21,
+   "nightEndHour": 5
+  }
+ }
 }

@@ -26,6 +26,8 @@ tags:
   - name: DaoLab
   - name: Sects
   - name: Territory
+  - name: Arts
+  - name: Estate
 paths:
   /health/live:
     get:
@@ -1375,6 +1377,463 @@ paths:
       responses:
         "200": { description: OK }
         "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/cultivation/realms:
+    get:
+      tags: [Cultivation]
+      summary: "The ladder (rules cultivation-3): 66 realms × 12 stages in six eras, stage names, unlocks, tribulations, titles and methods."
+      responses:
+        "200": { description: OK }
+  /api/v1/characters/{characterId}/cultivation/tribulation:
+    post:
+      tags: [Cultivation]
+      summary: "Start the heavenly tribulation at Perfection (stage 12): a battle against the sky that opens the next great realm."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/cultivation/retreat:
+    post:
+      tags: [Cultivation]
+      summary: "Enter a closed-door retreat for 8, 12 or 24 hours (Qi flows ×8; no battles or gathering)."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/cultivation/retreat/leave:
+    post:
+      tags: [Cultivation]
+      summary: "Leave the retreat (early leave causes a Qi deviation)."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/cultivation/compress:
+    post:
+      tags: [Cultivation]
+      summary: "Compress Qi into crystals (permanent flow bonus, vessel upgrades)."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/cultivation/vessel:
+    post:
+      tags: [Cultivation]
+      summary: "Enlarge the vessel (how much Qi can flow in before it stops) for crystals."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/cultivation/accelerator:
+    post:
+      tags: [Cultivation]
+      summary: "Use the daily accelerator: hours of flow paid at once."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/cultivation/method:
+    post:
+      tags: [Cultivation]
+      summary: "Switch the active cultivation method (a known one)."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/cultivation/method/learn:
+    post:
+      tags: [Cultivation]
+      summary: "Learn a method from its manual (the item is consumed)."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/cultivation/auto-breakthrough:
+    post:
+      tags: [Cultivation]
+      summary: "Set (or clear) the minimum chance at which minor breakthroughs happen automatically."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/cultivation/reincarnate:
+    post:
+      tags: [Cultivation]
+      summary: "Reincarnate from a high realm: start over with karma (a permanent flow bonus)."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/cultivation/summary/ack:
+    post:
+      tags: [Cultivation]
+      summary: "Acknowledge the offline summary (what the flow did while the player was away)."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/combat/arena:
+    get:
+      tags: [Combat]
+      summary: "Ranked arena: rating, league, opponents near your rating, leaderboard and the weekly reward."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/combat/arena/challenge:
+    post:
+      tags: [Combat]
+      summary: "Fight the frozen copy of another cultivator (played by the server AI); Elo for both sides."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
+      responses:
+        "201": { description: Battle started }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/combat/arena/claim:
+    post:
+      tags: [Combat]
+      summary: "Collect this ISO week's league reward (once)."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/crafting/queue:
+    get:
+      tags: [Crafting]
+      summary: "Cauldron and forge batches in progress."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+    post:
+      tags: [Crafting]
+      summary: "Queue a batch: materials and stones are taken now, results are rolled when collected (one batch per workshop)."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/crafting/queue/collect:
+    post:
+      tags: [Crafting]
+      summary: "Collect every finished batch."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/inventory/dismantle:
+    post:
+      tags: [Inventory]
+      summary: "Dismantle a piece of equipment from the bag into materials."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/quests/titles:
+    get:
+      tags: [Quests]
+      summary: "Every title the character has earned (achievements, seasons, arena leagues, realms, arts) and the one shown."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/quests/titles/selected:
+    put:
+      tags: [Quests]
+      summary: "Choose the title shown above the character (null hides it)."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/arts:
+    get:
+      tags: [Arts]
+      summary: "Path arts: heavenly flames, toxin body, coatings, Gu, body tempering (+N), sword intent (⚔N), branch, notices and titles."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/arts/notices/dismiss:
+    post:
+      tags: [Arts]
+      summary: "Clear the arts notices."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/arts/flames/traces:
+    post:
+      tags: [Arts]
+      summary: "Follow ember traces (time of day and the moon decide which flames they lead to)."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/arts/flames/subdue:
+    post:
+      tags: [Arts]
+      summary: "Fight the spirit guarding a found flame (a battle of kind spirit)."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/arts/flames/absorb:
+    post:
+      tags: [Arts]
+      summary: "Start absorbing the subdued flame (hours; success or a burn is rolled when the time is up)."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/arts/flames/feed:
+    post:
+      tags: [Arts]
+      summary: "Feed a flame fire crystals (levels)."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/arts/flames/slots:
+    put:
+      tags: [Arts]
+      summary: "Choose which owned flames burn in the slots (their number grows with the realm)."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/arts/flames/fuse:
+    post:
+      tags: [Arts]
+      summary: "Fuse two mature flames (stronger while both are slotted)."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/arts/venoms/absorb:
+    post:
+      tags: [Arts]
+      summary: "Absorb venoms into the toxin body (a dose may fail and poison)."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/arts/venoms/cure:
+    post:
+      tags: [Arts]
+      summary: "Drink an antidote."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/arts/coatings:
+    post:
+      tags: [Arts]
+      summary: "Coat the weapon with venoms (lasts a number of battles)."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/arts/gu/hatch:
+    post:
+      tags: [Arts]
+      summary: "Hatch a Gu in a free nest slot."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/arts/gu/feed:
+    post:
+      tags: [Arts]
+      summary: "Feed a Gu (it grows a level when digested; may mutate to a higher rank)."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/arts/gu/release:
+    post:
+      tags: [Arts]
+      summary: "Release a Gu."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/arts/tempering/bath:
+    post:
+      tags: [Arts]
+      summary: "Start a tempering bath (ingredients taken now, tempering when it ends)."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/arts/tempering/advance:
+    post:
+      tags: [Arts]
+      summary: "Try to raise body tempering by one (+N); thresholds need a pill."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/arts/sword/echoes:
+    post:
+      tags: [Arts]
+      summary: "Offer sword echoes to grow sword intent."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/arts/branch:
+    post:
+      tags: [Arts]
+      summary: "Choose the path branch (changing it later costs stones)."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/estate:
+    get:
+      tags: [Estate]
+      summary: "The estate: garden plots, crops, disciples and expeditions."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/estate/garden/plant:
+    post:
+      tags: [Estate]
+      summary: "Plant a seed in a free plot."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/estate/garden/harvest:
+    post:
+      tags: [Estate]
+      summary: "Harvest every ripe plot."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/estate/disciples/recruit:
+    post:
+      tags: [Estate]
+      summary: "Recruit a disciple (stones; slots grow with the realm)."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/estate/disciples/dismiss:
+    post:
+      tags: [Estate]
+      summary: "Dismiss a disciple who is at home."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/estate/expeditions/start:
+    post:
+      tags: [Estate]
+      summary: "Send a disciple on an expedition."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/estate/expeditions/collect:
+    post:
+      tags: [Estate]
+      summary: "Collect every disciple who has come back (stones, loot, experience)."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/sects/{sectId}/development:
+    get:
+      tags: [Sects]
+      summary: "Sect development (members): buildings, this week's missions and the sect boss."
+      parameters: [{ name: sectId, in: path, required: true, schema: { type: string, format: uuid } }, { name: characterId, in: query, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/sects/{sectId}/buildings:
+    post:
+      tags: [Sects]
+      summary: "Build or upgrade a sect building from the treasury (leader and elders)."
+      parameters: [{ name: sectId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+        "422": { $ref: "#/components/responses/Problem" }
+  /api/v1/sects/{sectId}/missions/claim:
+    post:
+      tags: [Sects]
+      summary: "Claim a completed weekly mission (treasury and contribution)."
+      parameters: [{ name: sectId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/sects/{sectId}/boss/fight:
+    post:
+      tags: [Sects]
+      summary: "Fight the sect boss's avatar; each victory breaks one seal."
+      parameters: [{ name: sectId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK }
+        "403": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
 components:
   securitySchemes:
     bearer:

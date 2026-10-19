@@ -17,6 +17,20 @@ internal sealed class InMemoryCultivationRepository : ICultivationRepository
     public Task<CultivationState?> FindAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
         Task.FromResult(InMemoryUnitOfWork.From(uow).Table<CharacterId, CultivationState>(States).GetValueOrDefault(characterId));
 
+    private const string Profiles = "cultivation.profiles";
+
+    public Task<CultivationProfile?> FindProfileAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
+        Task.FromResult(InMemoryUnitOfWork.From(uow).Table<CharacterId, CultivationProfile>(Profiles).GetValueOrDefault(characterId));
+
+    public Task<bool> TrySaveProfileAsync(IUnitOfWork uow, CultivationProfile p, int expectedVersion, CancellationToken ct)
+    {
+        var u = InMemoryUnitOfWork.From(uow);
+        var t = u.Table<CharacterId, CultivationProfile>(Profiles);
+        if ((t.GetValueOrDefault(p.CharacterId)?.Version ?? 0) != expectedVersion || p.Version != expectedVersion + 1) return Task.FromResult(false);
+        u.SetTable(Profiles, t.SetItem(p.CharacterId, p));
+        return Task.FromResult(true);
+    }
+
     public Task<bool> TrySaveAsync(IUnitOfWork uow, CultivationState state, int expectedVersion, CancellationToken ct)
     {
         var u = InMemoryUnitOfWork.From(uow);
@@ -44,6 +58,15 @@ internal sealed class InMemoryCultivationRepository : ICultivationRepository
         var t = u.Table<(Guid, CharacterId), long>(Rewards);
         if (t.ContainsKey((sourceId, characterId))) return Task.FromResult(false);
         u.SetTable(Rewards, t.Add((sourceId, characterId), qi));
+        return Task.FromResult(true);
+    }
+
+    public Task<bool> TryMarkHandledAsync(IUnitOfWork uow, Guid guardId, CharacterId characterId, DateTimeOffset at, CancellationToken ct)
+    {
+        var u = InMemoryUnitOfWork.From(uow);
+        var t = u.Table<Guid, DateTimeOffset>("cultivation.handled_events");
+        if (t.ContainsKey(guardId)) return Task.FromResult(false);
+        u.SetTable("cultivation.handled_events", t.Add(guardId, at));
         return Task.FromResult(true);
     }
 
@@ -104,6 +127,23 @@ internal sealed class PostgresCultivationRepository : ICultivationRepository
     public Task<CultivationState?> FindAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
         PostgresUnitOfWork.From(uow).QuerySingleOrDefaultAsync($"SELECT {Columns} FROM cultivation.states WHERE character_id = $1", Map, ct, characterId.Value);
 
+    public Task<CultivationProfile?> FindProfileAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
+        PostgresUnitOfWork.From(uow).QuerySingleOrDefaultAsync("SELECT data::text FROM cultivation.profiles WHERE character_id = $1",
+            r => System.Text.Json.JsonSerializer.Deserialize<CultivationProfile>(r.GetString(0), Idempotency.Json), ct, characterId.Value);
+
+    public async Task<bool> TrySaveProfileAsync(IUnitOfWork uow, CultivationProfile p, int expectedVersion, CancellationToken ct)
+    {
+        if (p.Version != expectedVersion + 1) return false;
+        var json = System.Text.Json.JsonSerializer.Serialize(p, Idempotency.Json);
+        return expectedVersion == 0
+            ? await PostgresUnitOfWork.From(uow).ExecuteAsync(
+                "INSERT INTO cultivation.profiles (character_id, data, version, updated_at) VALUES ($1, $2::jsonb, $3, now()) ON CONFLICT (character_id) DO NOTHING",
+                ct, p.CharacterId.Value, json, p.Version) == 1
+            : await PostgresUnitOfWork.From(uow).ExecuteAsync(
+                "UPDATE cultivation.profiles SET data = $2::jsonb, version = $3, updated_at = now() WHERE character_id = $1 AND version = $4",
+                ct, p.CharacterId.Value, json, p.Version, expectedVersion) == 1;
+    }
+
     public async Task<bool> TrySaveAsync(IUnitOfWork uow, CultivationState s, int expectedVersion, CancellationToken ct)
     {
         if (s.Version != expectedVersion + 1) return false;
@@ -134,6 +174,10 @@ internal sealed class PostgresCultivationRepository : ICultivationRepository
         await PostgresUnitOfWork.From(uow).ExecuteAsync(
             "INSERT INTO cultivation.reward_grants (source_id, character_id, qi, granted_at) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING",
             ct, sourceId, characterId.Value, qi, at) == 1;
+
+    public async Task<bool> TryMarkHandledAsync(IUnitOfWork uow, Guid guardId, CharacterId characterId, DateTimeOffset at, CancellationToken ct) =>
+        await PostgresUnitOfWork.From(uow).ExecuteAsync(
+            "INSERT INTO cultivation.handled_events (id, character_id, handled_at) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING", ct, guardId, characterId.Value, at) == 1;
 
     public Task AddBreakthroughAsync(IUnitOfWork uow, BreakthroughAttempt a, CancellationToken ct) =>
         PostgresUnitOfWork.From(uow).ExecuteAsync(

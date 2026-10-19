@@ -44,6 +44,7 @@ public static class CombatModule
         else
             services.AddSingleton<ICombatRepository, InMemoryCombatRepository>();
         services.AddScoped<CombatService>();
+        services.AddSingleton<Contracts.INpcNames>(new NpcNames(combat));
         services.AddScoped<Contracts.ICombatEncounters>(sp => sp.GetRequiredService<CombatService>());
         services.AddScoped<DaoLabService>();
         return services;
@@ -78,4 +79,9 @@ public static class CombatModule
 
         return config!;
     }
+}
+
+internal sealed class NpcNames(JianghuGo.Modules.Combat.Domain.CombatConfig config) : Contracts.INpcNames
+{
+    public string? NamePl(string npcId) => config.Npc(npcId)?.NamePl;
 }

@@ -56,6 +56,12 @@ namespace JianghuGo.Client.Application
             return result;
         }
 
+        /// <summary>Applies a server call that returns the new cultivation state (retreat, vessel, method…).</summary>
+        public async Task ApplyAsync(Func<Guid, CancellationToken, Task<CultivationDto>> call, CancellationToken ct) =>
+            Set(await call(_characterId, ct).ConfigureAwait(false));
+
+        public void Replace(CultivationDto state) => Set(state);
+
         private void Set(CultivationDto state)
         {
             State = state;

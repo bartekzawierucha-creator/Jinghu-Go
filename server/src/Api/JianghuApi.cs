@@ -5,6 +5,7 @@ using JianghuGo.Domain;
 using JianghuGo.Composition;
 using JianghuGo.Infrastructure.Outbox;
 using JianghuGo.Infrastructure.Postgres;
+using JianghuGo.Modules.Arts.Api;
 using JianghuGo.Modules.Characters.Api;
 using JianghuGo.Modules.Combat.Api;
 using JianghuGo.Modules.Crafting.Api;
@@ -18,6 +19,7 @@ using JianghuGo.Modules.World.Api;
 using JianghuGo.Modules.Identity.Api;
 using JianghuGo.Modules.Notifications;
 using JianghuGo.Modules.Quests;
+using JianghuGo.Modules.Estate;
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Routing;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -107,6 +109,8 @@ public static class JianghuApi
         app.MapTerritoryEndpoints();
         app.MapNotificationEndpoints();
         app.MapQuestEndpoints();
+        app.MapArtsEndpoints();
+        app.MapEstateEndpoints();
         return app;
     }
 

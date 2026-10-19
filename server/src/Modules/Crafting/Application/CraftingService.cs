@@ -32,6 +32,11 @@ public interface ICraftingRepository
 
     /// <summary>Attempts and successes per (kind, subject) over the character's whole crafting history (profession XP).</summary>
     Task<IReadOnlyList<(string Kind, string Subject, long Attempts, long Successes)>> TotalsAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct);
+
+    /// <summary>One active batch per (character, kind): a second one throws DuplicateKeyException.</summary>
+    Task AddQueueAsync(IUnitOfWork uow, QueueEntry entry, CancellationToken ct);
+    Task<IReadOnlyList<QueueEntry>> ListQueueAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct);
+    Task<bool> RemoveQueueAsync(IUnitOfWork uow, Guid id, CancellationToken ct);
 }
 
 public sealed record ProfessionView(string Id, int Level, long Xp, long XpForLevel, long? XpForNextLevel, int SuccessBonusPermille, int StoneDiscountPermille, int MaxLevel);
@@ -45,7 +50,7 @@ public sealed record UpgradeCommand(Guid InstanceId, int ExpectedVersion);
 
 public sealed record UpgradeResult(Guid LogId, Guid InstanceId, bool Success, int ChancePermille, int FromLevel, int Level, int Version, long StonesSpent, long Balance);
 
-public sealed class CraftingService(
+public sealed partial class CraftingService(
     IUnitOfWorkFactory uowFactory,
     ICraftingRepository repo,
     ICharacterDirectory characters,
@@ -57,7 +62,8 @@ public sealed class CraftingService(
     ICorrelationContext correlation,
     IRandomSeedSource seeds,
     CraftingConfig config,
-    TimeProvider clock)
+    TimeProvider clock,
+    IEnumerable<JianghuGo.Modules.Crafting.Contracts.ICraftingBonuses> craftBonuses)
 {
     private static readonly Error CharacterNotFound = Error.NotFound("character_not_found", "Character not found.");
 
@@ -131,7 +137,9 @@ public sealed class CraftingService(
                     balance = debited.Value;
                 }
 
-                var chance = Math.Min(1000, CraftingRules.ChancePermille(config, recipe, c.Stats.GetValueOrDefault("insight")) + config.ProfessionRules.SuccessBonus(level));
+                var extra = await ExtraAsync(uow, c.Id.Value, ct);
+                var chance = Math.Min(1000, CraftingRules.ChancePermille(config, recipe, c.Stats.GetValueOrDefault("insight")) + config.ProfessionRules.SuccessBonus(level)
+                    + (recipe.Kind == "alchemy" ? extra.Alchemy : extra.Forge));
                 var seed = seeds.NextSeed();
                 var successes = CraftingRules.Rolls(seed, cmd.Times).Count(r => r < chance);
                 var outputQty = successes * recipe.Output.Quantity;
@@ -189,7 +197,7 @@ public sealed class CraftingService(
                 var debited = await inventory.DebitAsync(uow, c.Id, stones, "upgrade", reference, ct);
                 if (!debited.IsSuccess) return debited.Error!;
 
-                var chance = Math.Min(1000, CraftingRules.UpgradeChancePermille(config, target) + config.ProfessionRules.UpgradeBonus(smithing));
+                var chance = Math.Min(1000, CraftingRules.UpgradeChancePermille(config, target) + config.ProfessionRules.UpgradeBonus(smithing) + (await ExtraAsync(uow, c.Id.Value, ct)).Forge);
                 var seed = seeds.NextSeed();
                 var success = CraftingRules.Rolls(seed, 1)[0] < chance;
                 var level = item.UpgradeLevel;
@@ -224,4 +232,18 @@ public sealed class CraftingService(
     private Task AuditAsync(IUnitOfWork uow, AccountId accountId, string action, CharacterId characterId, object data, DateTimeOffset now, CancellationToken ct) =>
         audit.AppendAsync(uow, new AuditEntry(Uuid7.New(), accountId, action, "character", characterId.ToString(),
             JsonSerializer.Serialize(data, Idempotency.Json), correlation.CorrelationId, now), ct);
+
+    /// <summary>Bonuses from other modules (a Heavenly Flame as the cauldron or forge fire).</summary>
+    private async Task<(int Alchemy, int Forge)> ExtraAsync(IUnitOfWork uow, Guid characterId, CancellationToken ct)
+    {
+        int a = 0, f = 0;
+        foreach (var b in craftBonuses)
+        {
+            var (x, y) = await b.BonusAsync(uow, characterId, ct);
+            a += x;
+            f += y;
+        }
+
+        return (a, f);
+    }
 }

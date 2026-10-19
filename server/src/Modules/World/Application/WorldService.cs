@@ -24,13 +24,18 @@ public interface IWorldRepository
     Task SaveAttunementAsync(IUnitOfWork uow, FlameAttunement attunement, CancellationToken ct);
 }
 
-public sealed record NodeView(string Key, string Kind, string NamePl, double Lat, double Lon, int DistanceM, bool InRange, bool Harvested, long RewardQi, DateTimeOffset ExpiresAt);
+public sealed record NodeView(string Key, string Kind, string NamePl, double Lat, double Lon, int DistanceM, bool InRange, bool Harvested, long RewardQi, DateTimeOffset ExpiresAt,
+    string? NpcId = null, bool Hidden = false);
 
 public sealed record FlameSiteView(string Id, string NamePl, double Lat, double Lon, long DistanceM, bool InRange, DateTimeOffset? AvailableAt);
 
 public sealed record EventView(string Kind, string NamePl, int RewardMultiplierPermille, DateTimeOffset EndsAt);
 
-public sealed record NearbyView(bool PositionVerified, string? PositionProblem, EventView? Event, IReadOnlyList<NodeView> Nodes, FlameSiteView NearestFlameSite);
+public sealed record RegionView(string NamePl, string Terrain, string TerrainNamePl, string? Weather, string? WeatherNamePl, DateTimeOffset WeatherEndsAt, bool Night,
+    string? BossNpcId, string? BossNamePl);
+
+public sealed record NearbyView(bool PositionVerified, string? PositionProblem, EventView? Event, IReadOnlyList<NodeView> Nodes, FlameSiteView NearestFlameSite,
+    RegionView? Region = null);
 
 public sealed record InteractCommand(Guid CharacterId, string? NodeKey);
 
@@ -51,7 +56,8 @@ public sealed class WorldService(
     WorldConfig config,
     WorldSecret secret,
     IRandomSeedSource seeds,
-    TimeProvider clock)
+    TimeProvider clock,
+    INpcNames npcNames)
 {
     private static readonly Error CharacterNotFound = Error.NotFound("character_not_found", "Character not found.");
 
@@ -65,14 +71,18 @@ public sealed class WorldService(
             if (check.LastKnown is not { } at) return Error.Conflict("no_position", "Start exploring and send a location first.");
 
             var ev = WorldGenerator.EventAt(config, secret.Seed, at, now);
-            var nodes = WorldGenerator.Nearby(config, secret.Seed, at, now);
+            var region = config.Regions is null ? null : WorldGenerator.RegionAt(config, secret.Seed, at, now);
+            var reveal = config.Regions?.HiddenRevealM ?? 0;
+            var nodes = WorldGenerator.Nearby(config, secret.Seed, at, now)
+                .Where(n => !config.NodeKinds.First(k => k.Id == n.Kind).Hidden || GeoMath.DistanceM(at, n.Point) <= reveal).ToList();
             var claimed = await repo.ClaimedAmongAsync(uow, c.Id, [.. nodes.Select(n => n.Key)], ct);
             var views = nodes.Select(n =>
             {
                 var d = GeoMath.DistanceM(at, n.Point);
                 var kind = config.NodeKinds.First(k => k.Id == n.Kind);
                 return new NodeView(n.Key, n.Kind, kind.NamePl, n.Point.Lat, n.Point.Lon, (int)Math.Round(d), d <= config.InteractionRadiusM,
-                    claimed.Contains(n.Key), WorldGenerator.NodeReward(config, n.Kind, ev), n.ExpiresAt);
+                    claimed.Contains(n.Key), WorldGenerator.NodeReward(config, n.Kind, ev, region?.Weather), n.ExpiresAt,
+                    kind.NpcId == "@region" ? region?.BossNpcId : kind.NpcId, kind.Hidden);
             }).ToList();
 
             var site = config.Flame.Sites.MinBy(s => GeoMath.DistanceM(at, s.Point))!;
@@ -82,7 +92,9 @@ public sealed class WorldService(
             return new NearbyView(check.Verified is not null, check.Problem,
                 ev is null ? null : new EventView(ev.Kind, ev.NamePl, ev.RewardMultiplierPermille, ev.EndsAt), views,
                 new FlameSiteView(site.Id, site.NamePl, site.Lat, site.Lon, (long)Math.Round(siteDistance), siteDistance <= config.Flame.RadiusM,
-                    available > now ? available : null));
+                    available > now ? available : null),
+                region is null ? null : new RegionView(region.NamePl, region.Terrain.Id, region.Terrain.NamePl, region.Weather?.Id, region.Weather?.NamePl, region.WeatherEndsAt,
+                    WorldGenerator.IsNight(now, at.Lon), region.BossNpcId, region.BossNpcId is null ? null : npcNames.NamePl(region.BossNpcId) ?? region.BossNpcId));
         }, ct);
 
     /// <summary>
@@ -112,7 +124,8 @@ public sealed class WorldService(
                 Guid? battleId = null;
                 long reward = 0;
                 List<WorldEvents.GatheredItem> gathered = [];
-                if (kind.NpcId is { } npc)
+                var npcId = kind.NpcId == "@region" ? WorldGenerator.RegionAt(config, secret.Seed, node.Point, now).BossNpcId : kind.NpcId;
+                if (npcId is { } npc)
                 {
                     var battle = await encounters.StartEncounterAsync(uow, accountId, c.Id.Value, npc, ct);
                     if (!battle.IsSuccess) return battle.Error!; // rolls back the claim too
@@ -120,7 +133,8 @@ public sealed class WorldService(
                 }
                 else
                 {
-                    reward = WorldGenerator.NodeReward(config, node.Kind, WorldGenerator.EventAt(config, secret.Seed, node.Point, now));
+                    reward = WorldGenerator.NodeReward(config, node.Kind, WorldGenerator.EventAt(config, secret.Seed, node.Point, now),
+                        config.Regions is null ? null : WorldGenerator.RegionAt(config, secret.Seed, node.Point, now).Weather);
                     await PayAsync(uow, accountId, c.Id, reward, "node:" + node.Kind, now, ct);
                     gathered = [.. WorldGenerator.RollYields(kind, seeds.NextSeed()).Select(y => new WorldEvents.GatheredItem(y.Item, y.Quantity))];
                     if (gathered.Count > 0)

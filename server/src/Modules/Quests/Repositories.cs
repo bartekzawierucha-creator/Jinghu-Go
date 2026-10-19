@@ -23,6 +23,12 @@ public interface IQuestRepository
     Task<CheckinState?> FindCheckinAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct);
     Task SaveCheckinAsync(IUnitOfWork uow, CheckinState state, CancellationToken ct);
     Task<IReadOnlyList<(CharacterId CharacterId, long Value)>> TopLifeAsync(IUnitOfWork uow, string key, int limit, CancellationToken ct);
+
+    /// <summary>progress = max(progress, value) — for "best reached" metrics (realm, tempering...).</summary>
+    Task MaxProgressAsync(IUnitOfWork uow, CharacterId characterId, string period, string key, long value, CancellationToken ct);
+
+    Task<string?> FindSelectedTitleAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct);
+    Task SetSelectedTitleAsync(IUnitOfWork uow, CharacterId characterId, string? titleId, DateTimeOffset at, CancellationToken ct);
 }
 
 internal sealed class InMemoryQuestRepository : IQuestRepository
@@ -30,6 +36,27 @@ internal sealed class InMemoryQuestRepository : IQuestRepository
     private const string Progress = "quests.progress";
     private const string Counted = "quests.counted_events";
     private const string Checkins = "quests.checkins";
+    private const string Selected = "quests.selected_titles";
+
+    public Task MaxProgressAsync(IUnitOfWork uow, CharacterId characterId, string period, string key, long value, CancellationToken ct)
+    {
+        var u = InMemoryUnitOfWork.From(uow);
+        var t = u.Table<(CharacterId, string, string), ProgressRow>(Progress);
+        var cur = t.GetValueOrDefault((characterId, period, key)) ?? new ProgressRow(key, 0, null);
+        if (value > cur.Progress) u.SetTable(Progress, t.SetItem((characterId, period, key), cur with { Progress = value }));
+        return Task.CompletedTask;
+    }
+
+    public Task<string?> FindSelectedTitleAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
+        Task.FromResult(InMemoryUnitOfWork.From(uow).Table<CharacterId, string>(Selected).GetValueOrDefault(characterId));
+
+    public Task SetSelectedTitleAsync(IUnitOfWork uow, CharacterId characterId, string? titleId, DateTimeOffset at, CancellationToken ct)
+    {
+        var u = InMemoryUnitOfWork.From(uow);
+        var t = u.Table<CharacterId, string>(Selected);
+        u.SetTable(Selected, titleId is null ? t.Remove(characterId) : t.SetItem(characterId, titleId));
+        return Task.CompletedTask;
+    }
 
     public Task<bool> TryMarkCountedAsync(IUnitOfWork uow, CharacterId characterId, Guid messageId, DateTimeOffset at, CancellationToken ct)
     {
@@ -87,6 +114,22 @@ internal sealed class InMemoryQuestRepository : IQuestRepository
 
 internal sealed class PostgresQuestRepository : IQuestRepository
 {
+    public Task MaxProgressAsync(IUnitOfWork uow, CharacterId characterId, string period, string key, long value, CancellationToken ct) =>
+        PostgresUnitOfWork.From(uow).ExecuteAsync(
+            "INSERT INTO quests.progress (character_id, period, quest_id, progress) VALUES ($1, $2, $3, $4) " +
+            "ON CONFLICT (character_id, period, quest_id) DO UPDATE SET progress = GREATEST(quests.progress.progress, EXCLUDED.progress)",
+            ct, characterId.Value, period, key, value);
+
+    public Task<string?> FindSelectedTitleAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
+        PostgresUnitOfWork.From(uow).QuerySingleOrDefaultAsync("SELECT title_id FROM quests.selected_titles WHERE character_id = $1", r => r.GetString(0), ct, characterId.Value);
+
+    public Task SetSelectedTitleAsync(IUnitOfWork uow, CharacterId characterId, string? titleId, DateTimeOffset at, CancellationToken ct) =>
+        titleId is null
+            ? PostgresUnitOfWork.From(uow).ExecuteAsync("DELETE FROM quests.selected_titles WHERE character_id = $1", ct, characterId.Value)
+            : PostgresUnitOfWork.From(uow).ExecuteAsync(
+                "INSERT INTO quests.selected_titles (character_id, title_id, updated_at) VALUES ($1, $2, $3) " +
+                "ON CONFLICT (character_id) DO UPDATE SET title_id = EXCLUDED.title_id, updated_at = EXCLUDED.updated_at", ct, characterId.Value, titleId, at);
+
     public async Task<bool> TryMarkCountedAsync(IUnitOfWork uow, CharacterId characterId, Guid messageId, DateTimeOffset at, CancellationToken ct) =>
         await PostgresUnitOfWork.From(uow).ExecuteAsync(
             "INSERT INTO quests.counted_events (character_id, message_id, counted_at) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",

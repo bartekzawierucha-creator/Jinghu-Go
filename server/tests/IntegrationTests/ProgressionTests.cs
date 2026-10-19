@@ -156,9 +156,9 @@ public class ProgressionTests : IAsyncLifetime
         Assert.Equal(0, view.Int("pointsEarned"));
         await Problem(await p.PostAsync(url, new { stat = "strength", expectedSpent = 0 }), HttpStatusCode.Conflict, "no_meridian_points");
 
-        await SetCultivationAsync(p, c, 1, 1, 0); // second realm: 9 stages climbed
+        await SetCultivationAsync(p, c, 1, 1, 0); // second realm: 12 stages climbed
         view = await Ok(await p.GetAsync(url));
-        Assert.Equal(9, view.Int("pointsEarned"));
+        Assert.Equal(12, view.Int("pointsEarned"));
         Assert.Equal(2, view.Int("realmBonus"));
         view = await Ok(await p.PostAsync(url, new { stat = "strength", expectedSpent = 0 }));
         view = await Ok(await p.PostAsync(url, new { stat = "strength", expectedSpent = 1 }));

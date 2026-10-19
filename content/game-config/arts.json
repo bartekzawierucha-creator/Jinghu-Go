@@ -1,0 +1,1137 @@
+{
+ "rulesVersion": "arts-1",
+ "flames": [
+  {
+   "id": "soul_candle",
+   "rank": 18,
+   "namePl": "Płomień Świecy Dusz",
+   "sourcePl": "Miejsca kultu nocą; ślady żaru",
+   "spirit": "flame_spirit_lesser",
+   "discover": [
+    {
+     "kind": "trace",
+     "ref": "night"
+    }
+   ],
+   "absorbHours": 1,
+   "minRealm": 0,
+   "stats": {
+    "spirit": 2
+   },
+   "perks": {
+    "qiRegen": 1
+   },
+   "alchemyPermille": 30,
+   "forgePermille": 0
+  },
+  {
+   "id": "bamboo_smoke",
+   "rank": 17,
+   "namePl": "Ogień Bambusowego Dymu",
+   "sourcePl": "Lasy i bambusowe gaje; ślady żaru",
+   "spirit": "flame_spirit_lesser",
+   "discover": [
+    {
+     "kind": "trace",
+     "ref": "any"
+    },
+    {
+     "kind": "npc",
+     "ref": "bamboo_viper",
+     "chancePermille": 60
+    }
+   ],
+   "absorbHours": 1,
+   "minRealm": 0,
+   "stats": {
+    "agility": 2
+   },
+   "perks": {
+    "effectChancePermille": 20
+   },
+   "alchemyPermille": 40,
+   "forgePermille": 0
+  },
+  {
+   "id": "iron_red",
+   "rank": 16,
+   "namePl": "Czerwony Płomień Żelaza",
+   "sourcePl": "Górscy bandyci, żyły rudy",
+   "spirit": "flame_spirit_lesser",
+   "discover": [
+    {
+     "kind": "npc",
+     "ref": "mountain_bandit",
+     "chancePermille": 50
+    },
+    {
+     "kind": "trace",
+     "ref": "any"
+    }
+   ],
+   "absorbHours": 2,
+   "minRealm": 0,
+   "stats": {
+    "strength": 3
+   },
+   "perks": {
+    "damagePermille": 30
+   },
+   "alchemyPermille": 40,
+   "forgePermille": 50
+  },
+  {
+   "id": "fox_fire",
+   "rank": 15,
+   "namePl": "Płomień Lisiego Ognia",
+   "sourcePl": "Ognisty Lis",
+   "spirit": "flame_spirit_lesser",
+   "discover": [
+    {
+     "kind": "npc",
+     "ref": "fire_fox",
+     "chancePermille": 150
+    }
+   ],
+   "absorbHours": 2,
+   "minRealm": 1,
+   "stats": {
+    "agility": 3,
+    "spirit": 2
+   },
+   "perks": {
+    "effectChancePermille": 40
+   },
+   "alchemyPermille": 50,
+   "forgePermille": 0
+  },
+  {
+   "id": "salt_sea",
+   "rank": 14,
+   "namePl": "Słony Płomień Morza",
+   "sourcePl": "Ślady żaru nad wodą",
+   "spirit": "flame_spirit_lesser",
+   "discover": [
+    {
+     "kind": "trace",
+     "ref": "any"
+    }
+   ],
+   "absorbHours": 3,
+   "minRealm": 1,
+   "stats": {
+    "constitution": 3
+   },
+   "perks": {
+    "guardPermille": 30
+   },
+   "alchemyPermille": 50,
+   "forgePermille": 0
+  },
+  {
+   "id": "thunder_feather",
+   "rank": 13,
+   "namePl": "Płomień Gromowego Pióra",
+   "sourcePl": "Gromowy Orzeł",
+   "spirit": "flame_spirit_greater",
+   "discover": [
+    {
+     "kind": "npc",
+     "ref": "thunder_eagle",
+     "chancePermille": 120
+    }
+   ],
+   "absorbHours": 4,
+   "minRealm": 2,
+   "stats": {
+    "agility": 4
+   },
+   "perks": {
+    "firstStrikePermille": 80
+   },
+   "alchemyPermille": 60,
+   "forgePermille": 30
+  },
+  {
+   "id": "bone_ash",
+   "rank": 12,
+   "namePl": "Popielny Płomień Kości",
+   "sourcePl": "Trupia Marionetka",
+   "spirit": "flame_spirit_greater",
+   "discover": [
+    {
+     "kind": "npc",
+     "ref": "corpse_puppet",
+     "chancePermille": 120
+    }
+   ],
+   "absorbHours": 4,
+   "minRealm": 2,
+   "stats": {
+    "willpower": 4
+   },
+   "perks": {
+    "lifestealPermille": 30
+   },
+   "alchemyPermille": 60,
+   "forgePermille": 0
+  },
+  {
+   "id": "blood_moon",
+   "rank": 11,
+   "namePl": "Płomień Krwawego Księżyca",
+   "sourcePl": "Tylko przy pełni (ślady żaru)",
+   "spirit": "flame_spirit_greater",
+   "discover": [
+    {
+     "kind": "moon"
+    }
+   ],
+   "absorbHours": 6,
+   "minRealm": 2,
+   "stats": {
+    "strength": 4,
+    "agility": 2
+   },
+   "perks": {
+    "bleedPermille": 200
+   },
+   "alchemyPermille": 70,
+   "forgePermille": 0
+  },
+  {
+   "id": "void_ice",
+   "rank": 10,
+   "namePl": "Lodowy Płomień Pustki",
+   "sourcePl": "Wieża Prób, piętro 25",
+   "spirit": "flame_spirit_greater",
+   "discover": [
+    {
+     "kind": "tower",
+     "ref": "25"
+    }
+   ],
+   "absorbHours": 8,
+   "minRealm": 3,
+   "stats": {
+    "spirit": 5,
+    "willpower": 3
+   },
+   "perks": {
+    "guardPermille": 50
+   },
+   "alchemyPermille": 80,
+   "forgePermille": 40
+  },
+  {
+   "id": "dragon_breath",
+   "rank": 9,
+   "namePl": "Płomień Smoczego Oddechu",
+   "sourcePl": "Smok Jiao",
+   "spirit": "flame_spirit_greater",
+   "discover": [
+    {
+     "kind": "npc",
+     "ref": "jiao_dragon",
+     "chancePermille": 200
+    }
+   ],
+   "absorbHours": 10,
+   "minRealm": 3,
+   "stats": {
+    "constitution": 6
+   },
+   "perks": {
+    "hpPermille": 120
+   },
+   "alchemyPermille": 90,
+   "forgePermille": 0
+  },
+  {
+   "id": "golden_sun",
+   "rank": 8,
+   "namePl": "Złoty Płomień Słońca",
+   "sourcePl": "W południe (ślady żaru 11-13)",
+   "spirit": "flame_spirit_greater",
+   "discover": [
+    {
+     "kind": "noon"
+    }
+   ],
+   "absorbHours": 10,
+   "minRealm": 3,
+   "stats": {
+    "spirit": 6
+   },
+   "perks": {
+    "damagePermille": 60
+   },
+   "alchemyPermille": 100,
+   "forgePermille": 60
+  },
+  {
+   "id": "black_lotus",
+   "rank": 7,
+   "namePl": "Płomień Czarnego Lotosu",
+   "sourcePl": "Demoniczny Kultywator",
+   "spirit": "flame_spirit_greater",
+   "discover": [
+    {
+     "kind": "npc",
+     "ref": "demonic_cultivator",
+     "chancePermille": 120
+    }
+   ],
+   "absorbHours": 12,
+   "minRealm": 4,
+   "stats": {
+    "spirit": 5,
+    "insight": 4
+   },
+   "perks": {
+    "effectChancePermille": 60
+   },
+   "alchemyPermille": 110,
+   "forgePermille": 0
+  },
+  {
+   "id": "storm_qilin",
+   "rank": 6,
+   "namePl": "Płomień Burzowego Qilina",
+   "sourcePl": "Nagroda za Bossa Świata",
+   "spirit": "flame_spirit_primal",
+   "discover": [
+    {
+     "kind": "boss"
+    }
+   ],
+   "absorbHours": 16,
+   "minRealm": 4,
+   "stats": {
+    "agility": 6,
+    "spirit": 5
+   },
+   "perks": {
+    "firstStrikePermille": 150,
+    "damagePermille": 50
+   },
+   "alchemyPermille": 120,
+   "forgePermille": 80
+  },
+  {
+   "id": "violet_heaven",
+   "rank": 5,
+   "namePl": "Płomień Fioletowego Nieba",
+   "sourcePl": "Wędrujący: rzadkie ślady żaru",
+   "spirit": "flame_spirit_primal",
+   "discover": [
+    {
+     "kind": "trace",
+     "ref": "rare"
+    }
+   ],
+   "absorbHours": 20,
+   "minRealm": 5,
+   "stats": {
+    "spirit": 8
+   },
+   "perks": {
+    "qiPermille": 150,
+    "qiRegen": 2
+   },
+   "alchemyPermille": 140,
+   "forgePermille": 0
+  },
+  {
+   "id": "phoenix",
+   "rank": 4,
+   "namePl": "Płomień Feniksa",
+   "sourcePl": "Wieża Prób, piętro 50",
+   "spirit": "flame_spirit_primal",
+   "discover": [
+    {
+     "kind": "tower",
+     "ref": "50"
+    }
+   ],
+   "absorbHours": 24,
+   "minRealm": 5,
+   "stats": {
+    "constitution": 6,
+    "spirit": 6
+   },
+   "perks": {
+    "surviveOnce": 1,
+    "healPermille": 50
+   },
+   "alchemyPermille": 160,
+   "forgePermille": 0
+  },
+  {
+   "id": "colorless",
+   "rank": 3,
+   "namePl": "Płomień Bez Koloru",
+   "sourcePl": "Władca Krwawych Demonów",
+   "spirit": "flame_spirit_primal",
+   "discover": [
+    {
+     "kind": "npc",
+     "ref": "blood_demon_lord",
+     "chancePermille": 100
+    }
+   ],
+   "absorbHours": 30,
+   "minRealm": 7,
+   "stats": {
+    "spirit": 10
+   },
+   "perks": {
+    "bleedPermille": 400,
+    "damagePermille": 60
+   },
+   "alchemyPermille": 180,
+   "forgePermille": 100
+  },
+  {
+   "id": "chaos",
+   "rank": 2,
+   "namePl": "Płomień Chaosu",
+   "sourcePl": "Era Pierwotna: przełom do Dziecięcia Chaosu",
+   "spirit": "flame_spirit_primal",
+   "discover": [
+    {
+     "kind": "realm",
+     "ref": "44"
+    }
+   ],
+   "absorbHours": 36,
+   "minRealm": 44,
+   "stats": {
+    "spirit": 12,
+    "strength": 8
+   },
+   "perks": {
+    "effectChancePermille": 120,
+    "damagePermille": 100
+   },
+   "alchemyPermille": 220,
+   "forgePermille": 120
+  },
+  {
+   "id": "first_dawn",
+   "rank": 1,
+   "namePl": "Płomień Pierwszego Świtu",
+   "sourcePl": "Dao: Jedność z Dao",
+   "spirit": "flame_spirit_primal",
+   "discover": [
+    {
+     "kind": "realm",
+     "ref": "64"
+    }
+   ],
+   "absorbHours": 48,
+   "minRealm": 64,
+   "stats": {
+    "spirit": 15,
+    "strength": 10,
+    "constitution": 10
+   },
+   "perks": {
+    "damagePermille": 250,
+    "regenPermille": 20
+   },
+   "alchemyPermille": 300,
+   "forgePermille": 200
+  }
+ ],
+ "flameRules": {
+  "feedItem": "fire_crystal",
+  "xpPerFeed": 10,
+  "xpPerLevel": 40,
+  "maxLevel": 10,
+  "levelPermille": 100,
+  "slotRealms": [
+   0,
+   4,
+   5
+  ],
+  "otherPathPowerPermille": 300,
+  "absorbBasePermille": 750,
+  "absorbRealmPermille": 15,
+  "burnHours": 12,
+  "fusionBonusPermille": 200,
+  "traceItem": "ember_trace",
+  "tracesPerUse": 5,
+  "codex": [
+   {
+    "count": 3,
+    "titlePl": "Zbieracz Iskier"
+   },
+   {
+    "count": 6,
+    "titlePl": "Władca Ognisk"
+   },
+   {
+    "count": 9,
+    "titlePl": "Serce Pożogi"
+   },
+   {
+    "count": 12,
+    "titlePl": "Cesarz Płomieni"
+   },
+   {
+    "count": 18,
+    "titlePl": "Ten, W Którym Płonie Niebo"
+   }
+  ]
+ },
+ "venoms": [
+  {
+   "item": "viper_venom",
+   "rarity": "spirit",
+   "xp": 8,
+   "element": "wood"
+  },
+  {
+   "item": "spider_venom",
+   "rarity": "spirit",
+   "xp": 8,
+   "element": "water"
+  },
+  {
+   "item": "scorpion_venom",
+   "rarity": "spirit",
+   "xp": 10,
+   "element": "fire"
+  },
+  {
+   "item": "toad_venom",
+   "rarity": "mortal",
+   "xp": 4,
+   "element": "water"
+  },
+  {
+   "item": "nightshade",
+   "rarity": "mortal",
+   "xp": 4,
+   "element": "wood"
+  },
+  {
+   "item": "ghost_orchid",
+   "rarity": "earth",
+   "xp": 14,
+   "element": "metal"
+  },
+  {
+   "item": "demon_blood",
+   "rarity": "earth",
+   "xp": 16,
+   "element": "fire"
+  },
+  {
+   "item": "frost_silk_venom",
+   "rarity": "earth",
+   "xp": 14,
+   "element": "water"
+  },
+  {
+   "item": "corpse_moss",
+   "rarity": "spirit",
+   "xp": 9,
+   "element": "earth"
+  },
+  {
+   "item": "blood_lotus_sap",
+   "rarity": "earth",
+   "xp": 16,
+   "element": "wood"
+  },
+  {
+   "item": "thunder_eel_venom",
+   "rarity": "heavenly",
+   "xp": 24,
+   "element": "metal"
+  },
+  {
+   "item": "jiao_bile",
+   "rarity": "heavenly",
+   "xp": 28,
+   "element": "water"
+  },
+  {
+   "item": "seven_step_snake",
+   "rarity": "heavenly",
+   "xp": 26,
+   "element": "wood"
+  },
+  {
+   "item": "heart_eater_root",
+   "rarity": "divine",
+   "xp": 40,
+   "element": "earth"
+  },
+  {
+   "item": "phoenix_ash_venom",
+   "rarity": "divine",
+   "xp": 40,
+   "element": "fire"
+  },
+  {
+   "item": "void_mold",
+   "rarity": "divine",
+   "xp": 44,
+   "element": "metal"
+  }
+ ],
+ "toxin": {
+  "levels": [
+   10,
+   25,
+   45,
+   70,
+   100,
+   140,
+   190,
+   250,
+   320,
+   400,
+   500,
+   620,
+   760,
+   920,
+   1100,
+   1300,
+   1550,
+   1850,
+   2200,
+   2600
+  ],
+  "perks": [
+   {
+    "level": 1,
+    "descriptionPl": "Odporność na krwawienie: krwawienie wroga +10%",
+    "perks": {
+     "bleedPermille": 100
+    }
+   },
+   {
+    "level": 3,
+    "descriptionPl": "Twoje trucizny dłużej działają: efekty +5%",
+    "perks": {
+     "effectChancePermille": 50
+    }
+   },
+   {
+    "level": 5,
+    "descriptionPl": "Krew trucizny: kto cię uderzy, traci 5% obrażeń zwrotnie",
+    "perks": {
+     "reflectPermille": 50
+    }
+   },
+   {
+    "level": 7,
+    "descriptionPl": "Paraliż: ogłuszenia częstsze (+5% efektów)",
+    "perks": {
+     "effectChancePermille": 50
+    }
+   },
+   {
+    "level": 9,
+    "descriptionPl": "Korozja: obrażenia +8%",
+    "perks": {
+     "damagePermille": 80
+    }
+   },
+   {
+    "level": 12,
+    "descriptionPl": "Spalanie Qi: +2 Qi co turę",
+    "perks": {
+     "qiRegen": 2
+    }
+   },
+   {
+    "level": 15,
+    "descriptionPl": "Odporność na trucizny: leczenie +5%",
+    "perks": {
+     "healPermille": 50,
+     "regenPermille": 10
+    }
+   },
+   {
+    "level": 20,
+    "descriptionPl": "Zjadacz Serca: krwawienie +50%, obrażenia +10%",
+    "perks": {
+     "bleedPermille": 500,
+     "damagePermille": 100
+    }
+   }
+  ],
+  "failPermille": 120,
+  "antidoteItem": "antidote_pill",
+  "poisonedHours": 2,
+  "poisonedStatMalus": 3,
+  "codex": [
+   {
+    "count": 5,
+    "titlePl": "Truciciel"
+   },
+   {
+    "count": 10,
+    "titlePl": "Mistrz Kotła"
+   },
+   {
+    "count": 16,
+    "titlePl": "Król Stu Jadów"
+   }
+  ]
+ },
+ "coatings": [
+  {
+   "id": "viper_coating",
+   "namePl": "Powłoka Żmii",
+   "venoms": [
+    "viper_venom",
+    "nightshade"
+   ],
+   "battles": 5,
+   "perks": {
+    "effectChancePermille": 80
+   }
+  },
+  {
+   "id": "scorpion_coating",
+   "namePl": "Powłoka Skorpiona",
+   "venoms": [
+    "scorpion_venom",
+    "toad_venom"
+   ],
+   "battles": 5,
+   "perks": {
+    "bleedPermille": 300
+   }
+  },
+  {
+   "id": "ghost_coating",
+   "namePl": "Widmowa Powłoka",
+   "venoms": [
+    "ghost_orchid",
+    "spider_venom"
+   ],
+   "battles": 5,
+   "perks": {
+    "effectChancePermille": 120,
+    "damagePermille": 40
+   }
+  },
+  {
+   "id": "demon_coating",
+   "namePl": "Demoniczna Powłoka",
+   "venoms": [
+    "demon_blood",
+    "blood_lotus_sap",
+    "corpse_moss"
+   ],
+   "battles": 6,
+   "perks": {
+    "bleedPermille": 500,
+    "lifestealPermille": 40
+   }
+  },
+  {
+   "id": "seven_step_coating",
+   "namePl": "Powłoka Siedmiu Kroków",
+   "venoms": [
+    "seven_step_snake",
+    "jiao_bile"
+   ],
+   "battles": 6,
+   "perks": {
+    "damagePermille": 120,
+    "effectChancePermille": 100
+   }
+  },
+  {
+   "id": "heart_eater_coating",
+   "namePl": "Powłoka Zjadacza Serc",
+   "venoms": [
+    "heart_eater_root",
+    "phoenix_ash_venom",
+    "void_mold"
+   ],
+   "battles": 8,
+   "perks": {
+    "damagePermille": 200,
+    "bleedPermille": 600
+   }
+  }
+ ],
+ "gu": {
+  "types": [
+   {
+    "id": "thief",
+    "namePl": "Gu Złodziej",
+    "descriptionPl": "Kradnie Qi wroga: +Qi co turę",
+    "perLevel": {
+     "qiRegen": 1
+    }
+   },
+   {
+    "id": "guardian",
+    "namePl": "Gu Strażnik",
+    "descriptionPl": "Twarda skorupa: garda +",
+    "perLevel": {
+     "guardPermille": 15
+    }
+   },
+   {
+    "id": "spy",
+    "namePl": "Gu Szpieg",
+    "descriptionPl": "Widzi słabe punkty: pierwszy cios +",
+    "perLevel": {
+     "firstStrikePermille": 30
+    }
+   },
+   {
+    "id": "healer",
+    "namePl": "Gu Uzdrowiciel",
+    "descriptionPl": "Leczy rany: regeneracja co turę",
+    "perLevel": {
+     "regenPermille": 4
+    }
+   },
+   {
+    "id": "warrior",
+    "namePl": "Gu Bitewny",
+    "descriptionPl": "Walczy obok: atakuje co kilka tur",
+    "perLevel": {
+     "petPower": 6,
+     "petEvery": 3
+    }
+   }
+  ],
+  "slotsBase": 3,
+  "realmsPerSlot": 3,
+  "maxSlots": 9,
+  "hoursPerLevel": 6,
+  "maxLevel": 5,
+  "maxRank": 3,
+  "mutationPermille": 30,
+  "herbItem": "spirit_herb"
+ },
+ "tempering": {
+  "maxLevel": 99,
+  "stepsPerXp": 100,
+  "xpPerDamage": 0.2,
+  "tribulationMultiplier": 2,
+  "baths": [
+   {
+    "id": "herbal_bath",
+    "namePl": "Kąpiel Ziołowa",
+    "items": [
+     {
+      "item": "spirit_herb",
+      "quantity": 5
+     }
+    ],
+    "hours": 2,
+    "xp": 40
+   },
+   {
+    "id": "iron_bath",
+    "namePl": "Kąpiel Żelaznego Szpiku",
+    "items": [
+     {
+      "item": "iron_ore",
+      "quantity": 6
+     },
+     {
+      "item": "boar_tusk",
+      "quantity": 2
+     }
+    ],
+    "hours": 4,
+    "xp": 110
+   },
+   {
+    "id": "jade_bath",
+    "namePl": "Kąpiel Jadeitowa",
+    "items": [
+     {
+      "item": "jade",
+      "quantity": 3
+     },
+     {
+      "item": "lotus_seed",
+      "quantity": 2
+     }
+    ],
+    "hours": 6,
+    "xp": 220
+   },
+   {
+    "id": "dragon_blood_bath",
+    "namePl": "Kąpiel Smoczej Krwi",
+    "items": [
+     {
+      "item": "dragon_scale",
+      "quantity": 1
+     },
+     {
+      "item": "demon_blood",
+      "quantity": 2
+     }
+    ],
+    "hours": 8,
+    "xp": 600
+   }
+  ],
+  "xpBase": 50,
+  "xpGrowth": 1.07,
+  "chanceStart": 950,
+  "chanceDecay": 6,
+  "chanceMin": 300,
+  "pillEvery": 10,
+  "pillItem": "body_transcendence_pill",
+  "stages": [
+   {
+    "from": 1,
+    "namePl": "Skóra",
+    "hpPermillePerLevel": 10,
+    "perks": {}
+   },
+   {
+    "from": 10,
+    "namePl": "Mięśnie",
+    "hpPermillePerLevel": 10,
+    "perks": {
+     "damagePermille": 40
+    }
+   },
+   {
+    "from": 20,
+    "namePl": "Ścięgna",
+    "hpPermillePerLevel": 10,
+    "perks": {
+     "firstStrikePermille": 300
+    }
+   },
+   {
+    "from": 30,
+    "namePl": "Kości",
+    "hpPermillePerLevel": 15,
+    "perks": {
+     "guardPermille": 40
+    }
+   },
+   {
+    "from": 40,
+    "namePl": "Szpik",
+    "hpPermillePerLevel": 15,
+    "perks": {
+     "regenPermille": 20
+    }
+   },
+   {
+    "from": 50,
+    "namePl": "Krew",
+    "hpPermillePerLevel": 20,
+    "perks": {
+     "lifestealPermille": 50
+    }
+   },
+   {
+    "from": 60,
+    "namePl": "Organy",
+    "hpPermillePerLevel": 20,
+    "perks": {
+     "healPermille": 60
+    }
+   },
+   {
+    "from": 70,
+    "namePl": "Złote Ciało",
+    "hpPermillePerLevel": 20,
+    "perks": {
+     "guardPermille": 80
+    }
+   },
+   {
+    "from": 80,
+    "namePl": "Diamentowe Ciało",
+    "hpPermillePerLevel": 25,
+    "perks": {
+     "reflectPermille": 100
+    }
+   },
+   {
+    "from": 90,
+    "namePl": "Ciało Wadżry",
+    "hpPermillePerLevel": 30,
+    "perks": {
+     "surviveOnce": 1
+    }
+   },
+   {
+    "from": 99,
+    "namePl": "Ciało Nieśmiertelne",
+    "hpPermillePerLevel": 30,
+    "perks": {
+     "damagePermille": 200,
+     "regenPermille": 30
+    }
+   }
+  ]
+ },
+ "swordIntent": {
+  "echoItem": "sword_echo",
+  "xpPerEcho": 12,
+  "xpPerSwordsman": 4,
+  "swordsmen": [
+   "mountain_bandit",
+   "sect_traitor",
+   "bandit_chief",
+   "demonic_cultivator"
+  ],
+  "levels": [
+   30,
+   80,
+   160,
+   280,
+   450,
+   700,
+   1050,
+   1500,
+   2100
+  ],
+  "damagePermillePerLevel": 25,
+  "firstStrikePermillePerLevel": 30,
+  "fullArrayPerks": {
+   "damagePermille": 120,
+   "effectChancePermille": 60
+  }
+ },
+ "branches": {
+  "tierRealms": [
+   3,
+   8,
+   21
+  ],
+  "paths": {
+   "qi": [
+    {
+     "id": "sword",
+     "namePl": "Miecz",
+     "descriptionPl": "Obrażenia i pierwszy cios.",
+     "perTier": {
+      "damagePermille": 60,
+      "firstStrikePermille": 60
+     }
+    },
+    {
+     "id": "formations",
+     "namePl": "Formacje",
+     "descriptionPl": "Osłony i więcej Qi.",
+     "perTier": {
+      "guardPermille": 50,
+      "qiPermille": 100
+     }
+    },
+    {
+     "id": "soul",
+     "namePl": "Dusza",
+     "descriptionPl": "Kontrola: efekty i regeneracja Qi.",
+     "perTier": {
+      "effectChancePermille": 60,
+      "qiRegen": 2
+     }
+    }
+   ],
+   "body": [
+    {
+     "id": "iron_skin",
+     "namePl": "Żelazna Skóra",
+     "descriptionPl": "Garda i odbicie.",
+     "perTier": {
+      "guardPermille": 60,
+      "reflectPermille": 50
+     }
+    },
+    {
+     "id": "giant",
+     "namePl": "Gigant",
+     "descriptionPl": "Życie i ogłuszenia.",
+     "perTier": {
+      "hpPermille": 100,
+      "effectChancePermille": 40
+     }
+    },
+    {
+     "id": "wolf",
+     "namePl": "Wilk",
+     "descriptionPl": "Krwawienie i regeneracja.",
+     "perTier": {
+      "bleedPermille": 200,
+      "regenPermille": 10
+     }
+    }
+   ],
+   "flame": [
+    {
+     "id": "phoenix",
+     "namePl": "Feniks",
+     "descriptionPl": "Leczenie i odrodzenie.",
+     "perTier": {
+      "healPermille": 60,
+      "regenPermille": 8
+     }
+    },
+    {
+     "id": "sun",
+     "namePl": "Słońce",
+     "descriptionPl": "Czyste obrażenia.",
+     "perTier": {
+      "damagePermille": 80
+     }
+    },
+    {
+     "id": "ash",
+     "namePl": "Popiół",
+     "descriptionPl": "Oparzenia i osłabienie.",
+     "perTier": {
+      "bleedPermille": 250,
+      "effectChancePermille": 40
+     }
+    }
+   ],
+   "poison": [
+    {
+     "id": "venom",
+     "namePl": "Jad",
+     "descriptionPl": "Siła trucizn.",
+     "perTier": {
+      "bleedPermille": 250,
+      "effectChancePermille": 50
+     }
+    },
+    {
+     "id": "shadow",
+     "namePl": "Cień",
+     "descriptionPl": "Pierwsze uderzenie i uniki.",
+     "perTier": {
+      "firstStrikePermille": 120,
+      "damagePermille": 30
+     }
+    },
+    {
+     "id": "puppeteer",
+     "namePl": "Lalkarz",
+     "descriptionPl": "Gu walczy obok.",
+     "perTier": {
+      "petPower": 10,
+      "petEvery": 3
+     }
+    }
+   ]
+  }
+ }
+}

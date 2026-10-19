@@ -32,6 +32,10 @@ public static class SpiritPetRules
     /// <summary>XP for a victory with the pet at your side; bosses teach more.</summary>
     public static int XpForWin(NpcDefinition foe) => foe.Boss ? 5 : 1 + Math.Max(0, foe.Tier - 1);
 
+    /// <summary>The pet fights at your side: it strikes every 3 turns for (4 × tier + 2 × level)% of a basic blow.</summary>
+    public static JianghuGo.Modules.Combat.Contracts.PerkBonus Companion(NpcDefinition species, int level) =>
+        new(PetPower: (4 * Math.Max(1, species.Tier)) + (2 * level), PetEvery: 3);
+
     /// <summary>Stat bonus: the species' three strongest stats, (5 + level)% of their value each, at least +1.</summary>
     public static IReadOnlyDictionary<string, int> Bonuses(NpcDefinition species, int level) =>
         species.Stats.OrderByDescending(s => s.Value).ThenBy(s => s.Key, StringComparer.Ordinal).Take(3)

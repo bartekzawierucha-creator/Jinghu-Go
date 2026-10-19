@@ -9,6 +9,31 @@ namespace JianghuGo.Modules.Crafting.Infrastructure;
 internal sealed class InMemoryCraftingRepository : ICraftingRepository
 {
     private const string Log = "crafting.log";
+    private const string Queue = "crafting.queue";
+
+    public Task AddQueueAsync(IUnitOfWork uow, QueueEntry entry, CancellationToken ct)
+    {
+        var u = InMemoryUnitOfWork.From(uow);
+        var t = u.Table<Guid, QueueEntry>(Queue);
+        if (t.Values.Any(e => e.CharacterId == entry.CharacterId && e.Kind == entry.Kind)) throw new DuplicateKeyException("crafting.queue (character_id, kind)");
+        u.SetTable(Queue, t.Add(entry.Id, entry));
+        return Task.CompletedTask;
+    }
+
+    public Task<IReadOnlyList<QueueEntry>> ListQueueAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct)
+    {
+        IReadOnlyList<QueueEntry> list = [.. InMemoryUnitOfWork.From(uow).Table<Guid, QueueEntry>(Queue).Values.Where(e => e.CharacterId == characterId).OrderBy(e => e.ReadyAt)];
+        return Task.FromResult(list);
+    }
+
+    public Task<bool> RemoveQueueAsync(IUnitOfWork uow, Guid id, CancellationToken ct)
+    {
+        var u = InMemoryUnitOfWork.From(uow);
+        var t = u.Table<Guid, QueueEntry>(Queue);
+        if (!t.ContainsKey(id)) return Task.FromResult(false);
+        u.SetTable(Queue, t.Remove(id));
+        return Task.FromResult(true);
+    }
 
     public Task AddAsync(IUnitOfWork uow, CraftLogEntry entry, CancellationToken ct)
     {
@@ -35,6 +60,22 @@ internal sealed class InMemoryCraftingRepository : ICraftingRepository
 
 internal sealed class PostgresCraftingRepository : ICraftingRepository
 {
+    private const string QueueColumns = "id, character_id, account_id, recipe_id, kind, times, chance_permille, seed, stones, started_at, ready_at";
+
+    public Task AddQueueAsync(IUnitOfWork uow, QueueEntry e, CancellationToken ct) =>
+        PostgresUnitOfWork.From(uow).ExecuteAsync(
+            $"INSERT INTO crafting.queue ({QueueColumns}) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)",
+            ct, e.Id, e.CharacterId.Value, e.AccountId.Value, e.RecipeId, e.Kind, e.Times, e.ChancePermille, (decimal)e.Seed, e.Stones, e.StartedAt, e.ReadyAt);
+
+    public async Task<IReadOnlyList<QueueEntry>> ListQueueAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
+        await PostgresUnitOfWork.From(uow).QueryAsync(
+            $"SELECT {QueueColumns} FROM crafting.queue WHERE character_id = $1 ORDER BY ready_at",
+            r => new QueueEntry(r.GetGuid(0), new CharacterId(r.GetGuid(1)), new AccountId(r.GetGuid(2)), r.GetString(3), r.GetString(4), r.GetInt32(5), r.GetInt32(6),
+                (ulong)r.GetDecimal(7), r.GetInt64(8), r.GetFieldValue<DateTimeOffset>(9), r.GetFieldValue<DateTimeOffset>(10)), ct, characterId.Value);
+
+    public async Task<bool> RemoveQueueAsync(IUnitOfWork uow, Guid id, CancellationToken ct) =>
+        await PostgresUnitOfWork.From(uow).ExecuteAsync("DELETE FROM crafting.queue WHERE id = $1", ct, id) == 1;
+
     public Task AddAsync(IUnitOfWork uow, CraftLogEntry e, CancellationToken ct) =>
         PostgresUnitOfWork.From(uow).ExecuteAsync(
             "INSERT INTO crafting.log (id, character_id, account_id, kind, subject, attempts, successes, chance_permille, seed, stones_spent, from_level, to_level, rules_version, occurred_at) " +

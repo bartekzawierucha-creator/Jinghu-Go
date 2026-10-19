@@ -23,11 +23,17 @@ namespace JianghuGo.Android
                 return;
             }
 
+            if (tab == 4)
+            {
+                await ShowSectDevelopmentAsync(flow);
+                return;
+            }
+
             var ui = NewScreen(null, art: Resource.Drawable.loc_temple, tab: TabSect);
             var page = ui.Content;
             var mine = flow.Mine;
-            ui.Tabs(page, new[] { "Sekta", "Członkowie", "Terytoria", "Ranking" }, tab, i => Run(() => ShowSectTabAsync(i)),
-                badges: new[] { mine?.PendingApplications?.Count ?? 0, 0, flow.Territories?.Wars?.Count ?? 0, 0 });
+            ui.Tabs(page, new[] { "Sekta", "Członkowie", "Terytoria", "Ranking", "Rozwój" }, tab, i => Run(() => ShowSectTabAsync(i)),
+                badges: new[] { mine?.PendingApplications?.Count ?? 0, 0, flow.Territories?.Wars?.Count ?? 0, 0, 0 });
 
             async Task Reload(int t, string message = null)
             {
@@ -349,7 +355,7 @@ namespace JianghuGo.Android
 
             var ui = NewScreen(null, art: Resource.Drawable.tile_menu_ranking, tab: TabSect);
             var page = ui.Content;
-            ui.Tabs(page, new[] { "Sekta", "Członkowie", "Terytoria", "Ranking" }, 3, i => Run(() => ShowSectTabAsync(i)));
+            ui.Tabs(page, new[] { "Sekta", "Członkowie", "Terytoria", "Ranking", "Rozwój" }, 3, i => Run(() => ShowSectTabAsync(i)));
             var metrics = new[] { ((string)null, "Kultywacja"), ("pvp_won", "Pojedynki"), ("bosses_won", "Bossowie"), ("battles_won", "Zwycięstwa") };
             ui.Tabs(page, metrics.Select(m => m.Item2).ToArray(), Array.FindIndex(metrics, m => m.Item1 == metric), i => Run(() => ShowSectTabAsync(3, metrics[i].Item1)), 30);
 

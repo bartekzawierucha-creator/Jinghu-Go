@@ -19,7 +19,8 @@ public sealed record LoadoutView(Guid CharacterId, int Version, IReadOnlyList<Sl
 
 public sealed record EffectView(string Type, int Magnitude, int TurnsLeft);
 
-public sealed record FighterView(string Name, int Hp, int MaxHp, int Qi, int MaxQi, IReadOnlyList<EffectView> Effects);
+public sealed record FighterView(string Name, int Hp, int MaxHp, int Qi, int MaxQi, IReadOnlyList<EffectView> Effects, string? Title = null,
+    IReadOnlyList<string>? Badges = null, string? Element = null, string? TitleRarity = null);
 
 public sealed record BattleView(
     Guid Id,
@@ -73,6 +74,8 @@ public sealed partial class CombatService(
     ICharacterDirectory characters,
     IEquipmentStats equipment,
     IEnumerable<ICombatStatBonuses> statBonuses,
+    IEnumerable<ICombatPerkBonuses> perkBonuses,
+    IEnumerable<ICharacterDecorationProvider> decorations,
     IIdempotencyStore idempotency,
     IAuditLog audit,
     IOutbox outbox,
@@ -158,18 +161,24 @@ public sealed partial class CombatService(
             foreach (var (stat, value) in await provider.BonusesAsync(uow, c.Id.Value, ct)) bonuses[stat] = bonuses.GetValueOrDefault(stat) + value;
         }
 
+        var perks = PerkBonus.None;
         if (await repo.FindPetAsync(uow, c.Id, ct) is { } pet && config.Npc(pet.NpcId) is { } species)
         {
             foreach (var (stat, value) in SpiritPetRules.Bonuses(species, pet.Level)) bonuses[stat] = bonuses.GetValueOrDefault(stat) + value;
+            perks += SpiritPetRules.Companion(species, pet.Level);
         }
 
         var stats = c.Stats.ToDictionary(s => s.Key, s => s.Value + bonuses.GetValueOrDefault(s.Key));
+        foreach (var provider in perkBonuses) perks += await provider.BonusAsync(uow, c.Id.Value, ct);
+        var path = (config.Perks(c.Path) ?? new PathPerks(string.Empty)).With(perks);
+        var deco = await CharacterDecorations.ForAsync(decorations, uow, c.Id.Value, ct);
         return new Combatant(c.Name, stats, [.. slots.Select(id => id is null ? null : new EquippedTechnique(id, mastery.GetValueOrDefault(id, 1), dao.GetValueOrDefault(id)))],
-            null, config.PathHpBonusPermille[c.Path], config.Perks(c.Path));
+            null, config.PathHpBonusPermille[c.Path] + perks.HpPermille, path, config.Elements?.Paths.GetValueOrDefault(c.Path), deco.Title, deco.Badges, deco.TitleRarity);
     }
 
-    private static Combatant NpcCombatant(NpcDefinition n) =>
-        new(n.NamePl, n.Stats, [.. n.Loadout.Select(s => s is null ? null : new EquippedTechnique(s.Id, s.Level))], n.HpOverride);
+    private Combatant NpcCombatant(NpcDefinition n) =>
+        new(n.NamePl, n.Stats, [.. n.Loadout.Select(s => s is null ? null : new EquippedTechnique(s.Id, s.Level))], n.HpOverride,
+            Element: config.Elements?.Npcs.GetValueOrDefault(n.Id));
 
     // ---------------------------------------------------------------- starting battles
 
@@ -474,6 +483,7 @@ public sealed partial class CombatService(
         {
             BattleKinds.Tower => await TowerFinishedAsync(uow, battle, outcome, at, ct),
             BattleKinds.Boss => await BossFinishedAsync(uow, battle, at, ct),
+            BattleKinds.Arena => await ArenaFinishedAsync(uow, battle, outcome, at, ct),
             _ => 0,
         };
         if (battle.Kind == BattleKinds.Pve && outcome == Outcomes.AWon && config.Npc(battle.NpcId!) is { } npc && npc.RewardQi > 0
@@ -515,15 +525,19 @@ public sealed partial class CombatService(
 
         static string ResultFor(char side, string outcome) =>
             outcome == Outcomes.Draw ? "draw" : (outcome == Outcomes.AWon) == (side == 'a') ? "won" : "lost";
+        // damage each side took (Body path tempering grows from blows received)
+        var takenA = turns.SelectMany(t => t.Events).Where(e => e.Actor == "b").Sum(e => e.Damage) + turns.SelectMany(t => t.Events).Where(e => e.Actor == "a" && e.Action == "bleed").Sum(e => e.Damage);
+        var takenB = turns.SelectMany(t => t.Events).Where(e => e.Actor == "a" && e.Action != "bleed").Sum(e => e.Damage) + turns.SelectMany(t => t.Events).Where(e => e.Actor == "b" && e.Action == "bleed").Sum(e => e.Damage);
         var participants = new List<CombatEvents.Participant>
         {
-            new(battle.AccountA.Value, battle.CharacterA.Value, "a", ResultFor('a', outcome), reward),
+            new(battle.AccountA.Value, battle.CharacterA.Value, "a", ResultFor('a', outcome), reward, takenA),
         };
         if (battle.Kind == BattleKinds.Pvp)
-            participants.Add(new(battle.AccountB!.Value.Value, battle.CharacterB!.Value.Value, "b", ResultFor('b', outcome), 0));
+            participants.Add(new(battle.AccountB!.Value.Value, battle.CharacterB!.Value.Value, "b", ResultFor('b', outcome), 0, takenB));
 
         await outbox.EnqueueAsync(uow, OutboxMessage.Create(CombatEvents.BattleFinished,
-            new CombatEvents.BattleFinishedV1(battle.Id, battle.Kind, outcome, battle.NpcId, participants, battle.NpcId is { } nid && config.Npc(nid)?.Boss == true), at, correlation.CorrelationId), ct);
+            new CombatEvents.BattleFinishedV1(battle.Id, battle.Kind, outcome, battle.NpcId, participants, battle.NpcId is { } nid && config.Npc(nid)?.Boss == true, battle.Context),
+            at, correlation.CorrelationId), ct);
         await AuditAsync(uow, battle.AccountA, "combat.battle_finished", battle.Id,
             new { outcome, battle.State.Turn, reward, seed = battle.Seed.ToString(CultureInfo.InvariantCulture) }, at, ct);
         return finished;
@@ -585,7 +599,7 @@ public sealed partial class CombatService(
 
         FighterView? Fighter(Combatant? c, Fighter? f) => c is null || f is null
             ? null
-            : new FighterView(c.Name, f.Hp, f.MaxHp, f.Qi, f.MaxQi, [.. f.Effects.Select(e => new EffectView(e.Type, e.Magnitude, e.TurnsLeft))]);
+            : new FighterView(c.Name, f.Hp, f.MaxHp, f.Qi, f.MaxQi, [.. f.Effects.Select(e => new EffectView(e.Type, e.Magnitude, e.TurnsLeft))], c.Title, c.Badges ?? [], c.Element, c.TitleRarity);
 
         var slots = me is null || state is null
             ? []

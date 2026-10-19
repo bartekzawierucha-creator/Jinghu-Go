@@ -31,7 +31,7 @@ namespace JianghuGo.Client.Application
     ///   apply an effect twice (the server replays the stored response);
     /// - persists the rotating refresh token via <see cref="ITokenStore"/>.
     /// </summary>
-    public sealed class ApiClient
+    public sealed partial class ApiClient
     {
         private readonly IHttpTransport _transport;
         private readonly IJsonSerializer _json;

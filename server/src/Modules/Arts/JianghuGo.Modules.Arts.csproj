@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Path arts: heavenly flames, venoms / toxin body / Gu, body tempering, sword intent, path branches. -->
+  <PropertyGroup>
+    <RootNamespace>JianghuGo.Modules.Arts</RootNamespace>
+  </PropertyGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <ProjectReference Include="../../Infrastructure/JianghuGo.Infrastructure.csproj" />
+    <ProjectReference Include="../Identity/JianghuGo.Modules.Identity.csproj" />
+    <ProjectReference Include="../Characters/JianghuGo.Modules.Characters.csproj" />
+    <ProjectReference Include="../Inventory/JianghuGo.Modules.Inventory.csproj" />
+    <ProjectReference Include="../Crafting/JianghuGo.Modules.Crafting.csproj" />
+    <ProjectReference Include="../Combat/JianghuGo.Modules.Combat.csproj" />
+    <ProjectReference Include="../Cultivation/JianghuGo.Modules.Cultivation.csproj" />
+  </ItemGroup>
+</Project>

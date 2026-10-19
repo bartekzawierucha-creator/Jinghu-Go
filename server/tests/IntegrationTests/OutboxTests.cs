@@ -105,7 +105,7 @@ public class OutboxTests : IAsyncLifetime
         var p = await _host.RegisterAndLoginAsync();
         await p.CreateCharacterAsync("Dwakroc");
         var message = await _host.Service<IUnitOfWorkFactory>().RunAsync(async uow => (await _host.Service<IOutbox>().ClaimNextAsync(uow, _host.Clock.GetUtcNow(), default))!.Message, default);
-        var handler = _host.Service<IEnumerable<IOutboxHandler>>().Single(h => h.EventType == message.Type);
+        var handler = _host.Service<IEnumerable<IOutboxHandler>>().Single(h => h.EventType == message.Type && h.GetType().Namespace!.StartsWith("JianghuGo.Modules.Notifications", StringComparison.Ordinal));
         for (var i = 0; i < 2; i++)
         {
             await _host.Service<IUnitOfWorkFactory>().RunAsync(async uow =>

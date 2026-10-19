@@ -24,8 +24,14 @@ public class CultivationTests : IAsyncLifetime
         return (p, c);
     }
 
-    private static int Spirit(JsonObject character) =>
-        character["stats"]!.AsArray().Single(s => s!["id"]!.GetValue<string>() == "spirit")!["value"]!.GetValue<int>();
+    private double MethodMeditation(JsonObject character)
+    {
+        var config = _host.Service<JianghuGo.Modules.Cultivation.Domain.CultivationConfig>();
+        var method = config.Method(JianghuGo.Modules.Cultivation.Domain.CultivationProfile.StarterMethod(character.Str("path")));
+        var flow = 1000.0 + (method?.FlowPermille ?? 0);
+        return (flow + (method?.MeditationPermille ?? 0)) / flow;
+    }
+
 
     private async Task<JsonObject> MeditateAsync(Player p, JsonObject c, TimeSpan duration)
     {
@@ -44,11 +50,14 @@ public class CultivationTests : IAsyncLifetime
     {
         var (p, c) = await NewCultivatorAsync();
         var s = await StateAsync(p, c);
-        Assert.Equal("qi_condensation", s.Str("realmId"));
+        Assert.Equal("body_tempering", s.Str("realmId"));
+        Assert.Equal(66, s.Int("realmCount"));
+        Assert.Equal(12, s.Int("stagesInRealm"));
+        Assert.Equal("idle", s.Str("mode"));
         Assert.Equal(1, s.Int("stage"));
         Assert.Equal(0, s.Int("qi"));
         Assert.Equal(100, s.Int("qiRequired"));
-        Assert.Equal(0, s.Int("version"));
+        Assert.True(s.Int("version") >= 0);
     }
 
     [Fact]
@@ -65,12 +74,15 @@ public class CultivationTests : IAsyncLifetime
     public async Task Meditation_yields_qi_from_server_time_and_path()
     {
         var (p, c) = await NewCultivatorAsync("qi");
-        var result = await MeditateAsync(p, c, TimeSpan.FromMinutes(30) + TimeSpan.FromSeconds(59));
-        // 30 whole minutes × 2 × (1 + spirit × 0.02) × 1.5 (Qi path)
-        var expected = (long)Math.Floor(30m * 2m * (1 + (Spirit(c) * 0.02m)) * 1.5m);
-        Assert.Equal(expected, result["qiGained"]!.GetValue<long>());
-        Assert.Equal(30, result.Int("minutesCounted"));
-        Assert.Equal(expected, (await StateAsync(p, c))["qi"]!.GetValue<long>());
+        var state = await StateAsync(p, c);
+        var perHour = state["meditationPerHour"]!.GetValue<double>();
+        Assert.True(Math.Abs(perHour - (5 * state["flowPerHour"]!.GetValue<double>() * MethodMeditation(c))) < 0.01, "meditation flows ×5");
+        Assert.True(perHour > 0);
+        var result = await MeditateAsync(p, c, TimeSpan.FromMinutes(10));
+        var expected = (long)Math.Floor(perHour * 10 / 60);
+        Assert.InRange((int)result["qiGained"]!.GetValue<long>(), (int)expected - 1, (int)expected);
+        Assert.Equal(10, result.Int("minutesCounted"));
+        Assert.Equal(result["qiGained"]!.GetValue<long>(), (await StateAsync(p, c))["qi"]!.GetValue<long>());
     }
 
     // Acceptance #2: the same reward request twice does not grant twice.
@@ -116,26 +128,41 @@ public class CultivationTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task Sessions_are_capped_and_daily_cap_resets_next_world_day()
+    public async Task Qi_flows_while_away_up_to_the_vessel_and_reports_a_summary_once()
     {
         var (p, c) = await NewCultivatorAsync("qi");
-        var capped = await MeditateAsync(p, c, TimeSpan.FromHours(10));
-        Assert.Equal(120, capped.Int("minutesCounted"));
-
-        long total = capped["qiGained"]!.GetValue<long>();
-        for (var i = 0; i < 6 && total < 1500; i++)
-        {
-            total += (await MeditateAsync(p, c, TimeSpan.FromMinutes(120)))["qiGained"]!.GetValue<long>();
-        }
-
-        Assert.Equal(1500, total, "daily cap");
-        var blocked = await MeditateAsync(p, c, TimeSpan.FromMinutes(60));
-        Assert.Equal(0, blocked["qiGained"]!.GetValue<long>());
-        Assert.True(blocked["dailyCapReached"]!.GetValue<bool>());
-
-        _host.Clock.Advance(TimeSpan.FromDays(1));
+        await _host.DrainOutboxAsync(); // the character starts cultivating when it is created
+        _host.Clock.Advance(TimeSpan.FromMinutes(20));
         await p.RefreshAsync();
-        Assert.True((await MeditateAsync(p, c, TimeSpan.FromMinutes(10)))["qiGained"]!.GetValue<long>() > 0, "new day, new cap");
+        var s = await StateAsync(p, c);
+        Assert.True(s["qi"]!.GetValue<long>() > 0, "idle flow ×1");
+
+        _host.Clock.Advance(TimeSpan.FromHours(30));
+        await p.RefreshAsync();
+        var full = await StateAsync(p, c);
+        Assert.Equal(full["vessel"]!.GetValue<long>(), full["qi"]!.GetValue<long>());
+        Assert.True(full["summary"]!["vesselFull"]!.GetValue<bool>());
+        var acked = await ApiHost.Json(await p.PostAsync(Base(c) + "/summary/ack"));
+        Assert.True(acked["summary"] is null);
+
+        // a bigger vessel is bought with crystals (none yet)
+        var vessel = await p.PostAsync(Base(c) + "/vessel");
+        Assert.Equal("insufficient_crystals", (await ApiHost.Json(vessel)).Str("code"));
+    }
+
+    [Fact]
+    public async Task Retreat_and_method_rules_are_enforced()
+    {
+        var (p, c) = await NewCultivatorAsync("qi");
+        var early = await p.PostAsync(Base(c) + "/retreat", new { hours = 8 });
+        Assert.Equal("realm_too_low", (await ApiHost.Json(early)).Str("code"));
+        var unknown = await p.PostAsync(Base(c) + "/method", new { methodId = "primordial_breath" });
+        Assert.True(unknown.StatusCode is HttpStatusCode.Conflict or HttpStatusCode.NotFound or HttpStatusCode.BadRequest, await unknown.Content.ReadAsStringAsync());
+        var accel = await ApiHost.Json(await p.PostAsync(Base(c) + "/accelerator"));
+        Assert.False(accel["acceleratorAvailable"]!.GetValue<bool>());
+        Assert.True(accel["qi"]!.GetValue<long>() > 0, "the accelerator pays hours of flow at once");
+        var again = await p.PostAsync(Base(c) + "/accelerator");
+        Assert.Equal(HttpStatusCode.Conflict, again.StatusCode);
     }
 
     [Fact]
@@ -150,7 +177,8 @@ public class CultivationTests : IAsyncLifetime
         var first = await ApiHost.Json(await p.PostAsync(Base(c) + "/steps", new { steps = 50_000 }, key));
         Assert.Equal(60 * 220, first.Int("acceptedSteps"));     // first report: at most one hour of walking
         Assert.True(first["clipped"]!.GetValue<bool>());
-        Assert.Equal(60 * 220 / 20, first.Int("qiGained"));
+        var method = _host.Service<JianghuGo.Modules.Cultivation.Domain.CultivationConfig>().Method("iron_body_canon")!;
+        Assert.Equal(60 * 220 / 20 * (1000 + method.StepsPermille) / 1000, first.Int("qiGained"));
         var replay = await ApiHost.Json(await p.PostAsync(Base(c) + "/steps", new { steps = 50_000 }, key));
         Assert.Equal(first.Compact(), replay.Compact());
 
@@ -218,7 +246,7 @@ public class CultivationTests : IAsyncLifetime
     public async Task Failed_breakthrough_causes_qi_deviation()
     {
         var (p, c) = await NewCultivatorAsync("qi");
-        await MeditateAsync(p, c, TimeSpan.FromMinutes(60));
+        await MeditateAsync(p, c, TimeSpan.FromMinutes(10));
         var before = await StateAsync(p, c);
         _seeds.Enqueue(QueuedSeedSource.Find(success: false, before["breakthroughChance"]!.GetValue<double>()));
 
@@ -232,9 +260,10 @@ public class CultivationTests : IAsyncLifetime
         Assert.Equal("qi_deviation_active", (await ApiHost.Json(blocked)).Str("code"));
 
         // Meditating during deviation yields half.
+        var deviated = (await StateAsync(p, c))["meditationPerHour"]!.GetValue<double>();
+        Assert.True(Math.Abs(deviated - (before["meditationPerHour"]!.GetValue<double>() / 2)) < 0.01, "deviation halves the flow");
         var during = await MeditateAsync(p, c, TimeSpan.FromMinutes(20));
-        var normal = (long)Math.Floor(20m * 2m * (1 + (Spirit(c) * 0.02m)) * 1.5m);
-        Assert.Equal((long)Math.Floor(normal / 2m), during["qiGained"]!.GetValue<long>());
+        Assert.InRange((int)during["qiGained"]!.GetValue<long>(), (int)Math.Floor(deviated / 3) - 1, (int)Math.Floor(deviated / 3));
     }
 
     [Fact]

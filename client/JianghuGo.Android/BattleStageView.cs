@@ -677,7 +677,29 @@ namespace JianghuGo.Android
             _text.TextSize = 13 * _d;
             _text.Color = Ui.Ink;
             _text.TextAlign = left ? Paint.Align.Left : Paint.Align.Right;
-            canvas.DrawText(f.Name, left ? l + 8 * _d : l + pw - 8 * _d, y + 16 * _d, _text);
+            var badges = f.Badges != null && f.Badges.Count > 0 ? " " + string.Join(" ", f.Badges) : string.Empty;
+            canvas.DrawText(f.Name + badges, left ? l + 8 * _d : l + pw - 8 * _d, y + 16 * _d, _text);
+            if (!string.IsNullOrEmpty(f.Title))
+            {
+                // the chosen title floats above the plate, coloured by its rarity
+                var tc = Ui.RarityOf(TitleRarity(f.TitleRarity)).Color;
+                _text.TextSize = 10 * _d;
+                var label = "「" + f.Title + "」";
+                var tw = _text.MeasureText(label) + 14 * _d;
+                var tl = left ? l : l + pw - tw;
+                var tr = new RectF(tl, y - 17 * _d, tl + tw, y - 2 * _d);
+                _p.Color = Color.Argb(210, 8, 10, 12);
+                canvas.DrawRoundRect(tr, 6 * _d, 6 * _d, _p);
+                _p.SetStyle(Paint.Style.Stroke);
+                _p.Color = tc;
+                canvas.DrawRoundRect(tr, 6 * _d, 6 * _d, _p);
+                _p.SetStyle(Paint.Style.Fill);
+                _text.Color = tc;
+                _text.TextAlign = Paint.Align.Center;
+                canvas.DrawText(label, tr.CenterX(), tr.Bottom - 4 * _d, _text);
+                _text.TextSize = 13 * _d;
+                _text.Color = Ui.Ink;
+            }
             _text.TextAlign = Paint.Align.Center;
             Bar(canvas, new RectF(l + 8 * _d, y + 22 * _d, l + pw - 8 * _d, y + 31 * _d), f.Hp, f.MaxHp, hpColor);
             Bar(canvas, new RectF(l + 8 * _d, y + 34 * _d, l + pw - 8 * _d, y + 40 * _d), f.Qi, f.MaxQi, Ui.QiBlue);
@@ -685,6 +707,16 @@ namespace JianghuGo.Android
             _text.Color = Ui.Ink;
             canvas.DrawText(f.Hp + " / " + f.MaxHp, l + pw / 2, y + 30 * _d, _text);
         }
+
+        /// <summary>Title plates use the item rarity palette: common/rare/epic/legendary/mythic → mortal…divine.</summary>
+        private static string TitleRarity(string r) => r switch
+        {
+            "rare" => "spirit",
+            "epic" => "earth",
+            "legendary" => "heavenly",
+            "mythic" => "divine",
+            _ => "mortal",
+        };
 
         private void Bar(Canvas canvas, RectF r, int value, int max, Color color)
         {

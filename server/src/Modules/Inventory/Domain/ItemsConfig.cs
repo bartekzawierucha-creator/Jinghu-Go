@@ -6,8 +6,17 @@ public sealed record ItemsConfig(
     BagRules Bag,
     int UpgradeBonusPercentPerLevel,
     IReadOnlyList<ItemDefinition> Items,
-    IReadOnlyDictionary<string, LootTable> LootTables)
+    IReadOnlyDictionary<string, LootTable> LootTables,
+    IReadOnlyList<AffixDefinition>? Affixes = null,
+    IReadOnlyList<ItemSet>? Sets = null,
+    IReadOnlyDictionary<string, IReadOnlyList<LootDrop>>? Dismantle = null)
 {
+    public IReadOnlyList<AffixDefinition> AffixList => Affixes ?? [];
+
+    public IReadOnlyList<ItemSet> SetList => Sets ?? [];
+
+    public ItemSet? SetOf(string itemId) => SetList.FirstOrDefault(s => s.Items.Contains(itemId));
+
     public ItemDefinition? Find(string? id) => id is null ? null : Items.FirstOrDefault(i => i.Id == id);
     public ItemDefinition Item(string id) => Find(id) ?? throw new KeyNotFoundException($"Unknown item '{id}'.");
 }
@@ -34,6 +43,14 @@ public sealed record ConsumableSpec(long Qi);
 public sealed record EquipmentSpec(string Slot, IReadOnlyDictionary<string, int> Stats, int BagBonus = 0);
 
 public sealed record LootTable(long Stones, IReadOnlyList<LootDrop> Drops);
+
+/// <summary>A random property of a piece of equipment: +[min, max] × rarity tier of one stat (fixed forever by the item's id).</summary>
+public sealed record AffixDefinition(string Id, string NamePl, string Stat, int Min, int Max);
+
+public sealed record SetBonus(int Pieces, IReadOnlyDictionary<string, int> Stats);
+
+/// <summary>Equipment set: wearing several pieces together grants extra stats.</summary>
+public sealed record ItemSet(string Id, string NamePl, IReadOnlyList<string> Items, IReadOnlyList<SetBonus> Bonuses);
 
 public sealed record LootDrop(string Item, int ChancePermille, int Min, int Max);
 
@@ -84,6 +101,24 @@ public static class ItemsConfigValidator
                 if (eq.Stats is null || eq.Stats.Any(s => !Stats.Contains(s.Key) || s.Value is < 0 or > 50)) e.Add($"item {i.Id}: stats must be known ids with 0-50.");
                 if (eq.BagBonus is < 0 or > 200) e.Add($"item {i.Id}: bagBonus 0-200.");
             }
+        }
+
+        foreach (var a in c.AffixList)
+            if (string.IsNullOrWhiteSpace(a.Id) || string.IsNullOrWhiteSpace(a.NamePl) || !Stats.Contains(a.Stat) || a.Min < 1 || a.Max < a.Min || a.Max > 10) e.Add($"affix '{a.Id}' invalid.");
+        foreach (var set in c.SetList)
+        {
+            if (string.IsNullOrWhiteSpace(set.Id) || string.IsNullOrWhiteSpace(set.NamePl) || set.Items is null || set.Items.Count < 2) e.Add($"set '{set.Id}' invalid.");
+            else if (set.Items.Any(i => c.Find(i)?.Equipment is null)) e.Add($"set {set.Id}: every piece must be equipment.");
+            if (set.Bonuses is null || set.Bonuses.Count == 0 || set.Bonuses.Any(b => b.Pieces < 2 || b.Pieces > (set.Items?.Count ?? 0) || b.Stats is null || b.Stats.Any(kv => !Stats.Contains(kv.Key) || kv.Value is < 1 or > 50)))
+                e.Add($"set {set.Id}: bonuses invalid.");
+        }
+
+        foreach (var dup in c.SetList.SelectMany(s => s.Items).GroupBy(i => i).Where(g => g.Count() > 1)) e.Add($"item {dup.Key} belongs to two sets.");
+        foreach (var (rarity, drops) in c.Dismantle ?? new Dictionary<string, IReadOnlyList<LootDrop>>())
+        {
+            if (!Rarities.All.Contains(rarity)) e.Add($"dismantle: unknown rarity '{rarity}'.");
+            foreach (var d in drops)
+                if (c.Find(d.Item) is null || d.ChancePermille is < 1 or > 1000 || d.Min < 1 || d.Max < d.Min || d.Max > 100) e.Add($"dismantle {rarity}: drop '{d.Item}' invalid.");
         }
 
         foreach (var (npc, table) in c.LootTables ?? new Dictionary<string, LootTable>())

@@ -31,6 +31,14 @@ public static class QuestsModule
         else
             services.AddSingleton<IQuestRepository, InMemoryQuestRepository>();
         services.AddScoped<QuestService>();
+        services.AddSingleton<QuestTitles>();
+        services.AddSingleton<ICharacterDecorationProvider, QuestTitleDecoration>();
+        services.AddSingleton<IOutboxHandler, RealmCounter>();
+        services.AddSingleton<IOutboxHandler, ArtsCounter>();
+        services.AddSingleton<IOutboxHandler, StepsCounter>();
+        services.AddSingleton<IOutboxHandler, LeagueTitleHandler>();
+        services.AddSingleton<IOutboxHandler, HarvestCounter>();
+        services.AddSingleton<IOutboxHandler, ExpeditionCounter>();
         services.AddSingleton<JianghuGo.Modules.Combat.Contracts.ICombatStatBonuses, TitleCombatBonuses>();
         services.AddSingleton<IOutboxHandler, BattleCounter>();
         services.AddSingleton<IOutboxHandler, MeditationCounter>();
@@ -61,6 +69,10 @@ public static class QuestsModule
             await Guard(async () => ApiResults.From(await svc.ClaimAsync(http.User.GetAccountId(), characterId, questId, ct), Results.Ok)));
         g.MapPost("/checkin", async (Guid characterId, HttpContext http, QuestService svc, CancellationToken ct) =>
             await Guard(async () => ApiResults.From(await svc.CheckinAsync(http.User.GetAccountId(), characterId, ct), Results.Ok)));
+        g.MapGet("/titles", async (Guid characterId, HttpContext http, QuestService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.TitlesAsync(http.User.GetAccountId(), characterId, ct), list => Results.Ok(new { items = list })));
+        g.MapPut("/titles/selected", async (Guid characterId, SelectTitleCommand cmd, HttpContext http, QuestService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.SelectTitleAsync(http.User.GetAccountId(), characterId, cmd, ct), list => Results.Ok(new { items = list })));
         g.MapGet("/leaders/{metric}", async (Guid characterId, string metric, HttpContext http, QuestService svc, CancellationToken ct) =>
             ApiResults.From(await svc.LeadersAsync(http.User.GetAccountId(), characterId, metric, ct), list => Results.Ok(new { items = list })));
         return app;
@@ -87,11 +99,23 @@ internal sealed class BattleCounter(IQuestRepository repo, ICharacterDirectory c
     public async Task HandleAsync(IUnitOfWork uow, OutboxMessage message, CancellationToken ct)
     {
         var e = message.Payload<JianghuGo.Modules.Combat.Contracts.CombatEvents.BattleFinishedV1>();
-        foreach (var p in e.Participants.Where(p => p.Result == "won"))
+        var night = QuestRules.IsNight(config, message.OccurredAt);
+        var moon = QuestRules.IsFullMoon(message.OccurredAt);
+        foreach (var p in e.Participants)
         {
+            if (p.Result != "won")
+            {
+                await QuestCounter.CountAsync(repo, characters, config, uow, message, p.CharacterId, ct,
+                    (Metrics.BattlesLost, p.Result == "lost" ? 1 : 0), (Metrics.WorldBossFights, e.Kind == "boss" ? 1 : 0));
+                continue;
+            }
+
             var pvp = e.Kind == "pvp";
             await QuestCounter.CountAsync(repo, characters, config, uow, message, p.CharacterId, ct,
-                (Metrics.BattlesWon, 1), (Metrics.PvpWon, pvp ? 1 : 0), (Metrics.BossesWon, !pvp && e.Boss ? 1 : 0));
+                (Metrics.BattlesWon, 1), (Metrics.PvpWon, pvp ? 1 : 0), (Metrics.BossesWon, !pvp && e.Boss ? 1 : 0),
+                (Metrics.ArenaWon, e.Kind == "arena" ? 1 : 0), (Metrics.TowerWon, e.Kind == "tower" ? 1 : 0), (Metrics.Tribulations, e.Kind == "tribulation" ? 1 : 0),
+                (Metrics.SpiritsWon, e.Kind == "spirit" ? 1 : 0), (Metrics.NightWins, night ? 1 : 0), (Metrics.FullMoonWins, moon ? 1 : 0),
+                (Metrics.WorldBossFights, e.Kind == "boss" ? 1 : 0));
         }
     }
 }
@@ -171,5 +195,75 @@ internal sealed class SaleCounter(IQuestRepository repo, ICharacterDirectory cha
     {
         var e = message.Payload<JianghuGo.Modules.Market.Contracts.MarketEvents.ListingSoldV1>();
         return QuestCounter.CountAsync(repo, characters, config, uow, message, e.SellerCharacterId, ct, (Metrics.MarketSales, 1));
+    }
+}
+
+internal sealed class RealmCounter(IQuestRepository repo, ICharacterDirectory characters, QuestsConfig config) : IOutboxHandler
+{
+    public string EventType => JianghuGo.Modules.Cultivation.Application.CultivationEvents.RealmReached;
+
+    public Task HandleAsync(IUnitOfWork uow, OutboxMessage message, CancellationToken ct)
+    {
+        var e = message.Payload<JianghuGo.Modules.Cultivation.Application.CultivationEvents.RealmReachedV1>();
+        return QuestCounter.CountAsync(repo, characters, config, uow, message, e.CharacterId, ct, (Metrics.Realm, e.Realm));
+    }
+}
+
+internal sealed class ArtsCounter(IQuestRepository repo, ICharacterDirectory characters, QuestsConfig config) : IOutboxHandler
+{
+    public string EventType => JianghuGo.Modules.Arts.Contracts.ArtsEvents.Progress;
+
+    public Task HandleAsync(IUnitOfWork uow, OutboxMessage message, CancellationToken ct)
+    {
+        var e = message.Payload<JianghuGo.Modules.Arts.Contracts.ArtsEvents.ProgressV1>();
+        return QuestCounter.CountAsync(repo, characters, config, uow, message, e.CharacterId, ct,
+            (Metrics.FlamesOwned, e.FlamesOwned), (Metrics.ToxinLevel, e.ToxinLevel), (Metrics.Temper, e.Temper), (Metrics.Swords, e.Swords));
+    }
+}
+
+internal sealed class StepsCounter(IQuestRepository repo, ICharacterDirectory characters, QuestsConfig config) : IOutboxHandler
+{
+    public string EventType => JianghuGo.Modules.Cultivation.Contracts.CultivationStepEvents.StepsAccepted;
+
+    public Task HandleAsync(IUnitOfWork uow, OutboxMessage message, CancellationToken ct)
+    {
+        var e = message.Payload<JianghuGo.Modules.Cultivation.Contracts.CultivationStepEvents.StepsAcceptedV1>();
+        return QuestCounter.CountAsync(repo, characters, config, uow, message, e.CharacterId, ct, (Metrics.Steps, e.Steps));
+    }
+}
+
+/// <summary>A weekly reward collected in an arena league grants that league's title (if it has one).</summary>
+internal sealed class LeagueTitleHandler(IQuestRepository repo, ICharacterDirectory characters, QuestsConfig config) : IOutboxHandler
+{
+    public string EventType => JianghuGo.Modules.Combat.Contracts.CombatEvents.ArenaLeague;
+
+    public Task HandleAsync(IUnitOfWork uow, OutboxMessage message, CancellationToken ct)
+    {
+        var e = message.Payload<JianghuGo.Modules.Combat.Contracts.CombatEvents.ArenaLeagueV1>();
+        return config.ArenaTitleList.Any(t => t.League == e.LeagueId)
+            ? QuestCounter.FlagAsync(repo, characters, uow, message, e.CharacterId, "l_" + e.LeagueId, ct)
+            : Task.CompletedTask;
+    }
+}
+
+internal sealed class HarvestCounter(IQuestRepository repo, ICharacterDirectory characters, QuestsConfig config) : IOutboxHandler
+{
+    public string EventType => JianghuGo.Modules.Estate.Contracts.EstateEvents.Harvested;
+
+    public Task HandleAsync(IUnitOfWork uow, OutboxMessage message, CancellationToken ct)
+    {
+        var e = message.Payload<JianghuGo.Modules.Estate.Contracts.EstateEvents.HarvestedV1>();
+        return QuestCounter.CountAsync(repo, characters, config, uow, message, e.CharacterId, ct, (Metrics.Harvests, e.Plots));
+    }
+}
+
+internal sealed class ExpeditionCounter(IQuestRepository repo, ICharacterDirectory characters, QuestsConfig config) : IOutboxHandler
+{
+    public string EventType => JianghuGo.Modules.Estate.Contracts.EstateEvents.ExpeditionFinished;
+
+    public Task HandleAsync(IUnitOfWork uow, OutboxMessage message, CancellationToken ct)
+    {
+        var e = message.Payload<JianghuGo.Modules.Estate.Contracts.EstateEvents.ExpeditionFinishedV1>();
+        return QuestCounter.CountAsync(repo, characters, config, uow, message, e.CharacterId, ct, (Metrics.Expeditions, e.Count));
     }
 }

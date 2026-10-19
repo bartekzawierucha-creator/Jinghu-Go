@@ -10,7 +10,7 @@ public sealed record EquippedTechnique(string Id, int Level, TechniqueDefinition
 
 /// <summary>Immutable snapshot of a fighter's build, frozen when the battle starts (later loadout changes do not leak in).</summary>
 public sealed record Combatant(string Name, IReadOnlyDictionary<string, int> Stats, IReadOnlyList<EquippedTechnique?> Slots, int? HpOverride, int HpBonusPermille = 0,
-    PathPerks? Perks = null)
+    PathPerks? Perks = null, string? Element = null, string? Title = null, IReadOnlyList<string>? Badges = null, string? TitleRarity = null)
 {
     public int Stat(string id) => Stats.GetValueOrDefault(id);
 }
@@ -262,11 +262,20 @@ public static class CombatEngine
             dmg = dmg * (1000 + (who.Stat(scaling) * c.Damage.StatScalingPermille)) / 1000;
             dmg = dmg * (1000 + (who.Perks?.DamageBonus(scaling) ?? 0)) / 1000;
             if (combo is not null) dmg = dmg * (1000 + (me.Momentum * combo.MomentumPermillePerStack) + (exploit ? combo.ExploitPermille : 0)) / 1000;
+            if (c.Elements is { } el) dmg = dmg * (1000 + el.Modifier(el.OfTechnique(c.Technique(eq).Id) ?? who.Element, foeWho.Element)) / 1000;
+            if (s.Turn == 1 && (who.Perks?.FirstStrikePermille ?? 0) > 0) dmg = dmg * (1000 + who.Perks!.FirstStrikePermille) / 1000;
             dmg = dmg * (1000 - me.Sum(EffectTypes.Weaken)) / 1000;
             dmg = dmg * (1000 + variance) / 1000;
             dmg = dmg * (1000 - foe.Sum(EffectTypes.Guard)) / 1000;
             var damage = (int)Math.Max(1, dmg);
             foe.Hp -= damage;
+            Survive(foe, foeWho);
+            if ((who.Perks?.LifestealPermille ?? 0) > 0) me.Hp = Math.Min(me.MaxHp, me.Hp + (damage * who.Perks!.LifestealPermille / 1000));
+            if ((foeWho.Perks?.ReflectPermille ?? 0) > 0 && foe.Hp > 0)
+            {
+                me.Hp -= damage * foeWho.Perks!.ReflectPermille / 1000;
+                Survive(me, who);
+            }
 
             int reflected = 0, stolen = 0;
             if (foe.Effects.FirstOrDefault(e => e.Type == EffectTypes.Counter) is { } counter)
@@ -290,6 +299,34 @@ public static class CombatEngine
             return (true, damage, reflected, stolen, applied, exploit);
         }
 
+        // "survive once" perk: the first lethal blow of the battle leaves 1 HP (remembered as a permanent effect)
+        static void Survive(W w, Combatant who)
+        {
+            if (w.Hp > 0 || (who.Perks?.SurviveOnce ?? 0) == 0 || w.Effects.Any(e => e.Type == EffectTypes.Survived)) return;
+            w.Hp = 1;
+            w.Effects.Add(new Effect(EffectTypes.Survived, 1, 0, 1));
+        }
+
+        // spirit pets strike on their own every few turns; regeneration perks heal at the end of the turn
+        foreach (var (w, foeW, who, side) in new[] { (a, b, ca, 'a'), (b, a, cb, 'b') })
+        {
+            if (w.Hp <= 0 || foeW.Hp <= 0) continue;
+            if (who.Perks is { PetPower: > 0, PetEvery: > 0 } pp && s.Turn % pp.PetEvery == 0)
+            {
+                foeW.Hp -= pp.PetPower;
+                Log(side, "pet", dmg: pp.PetPower);
+            }
+        }
+
+        foreach (var (w, who, side) in new[] { (a, ca, 'a'), (b, cb, 'b') })
+        {
+            if (w.Hp <= 0 || (who.Perks?.RegenPermille ?? 0) <= 0) continue;
+            var heal = Math.Min(w.MaxHp - w.Hp, Math.Max(1, w.MaxHp * who.Perks!.RegenPermille / 1000));
+            if (heal <= 0) continue;
+            w.Hp += heal;
+            Log(side, "regen", healed: heal);
+        }
+
         // 4. End of turn: bleeding, effect expiry, cooldowns, Qi regeneration.
         foreach (var (w, side) in new[] { (a, 'a'), (b, 'b') })
         {
@@ -311,7 +348,7 @@ public static class CombatEngine
                 {
                     w.Effects.RemoveAt(i);
                 }
-                else if (e.Type is not (EffectTypes.Stun or EffectTypes.Momentum))
+                else if (e.Type is not (EffectTypes.Stun or EffectTypes.Momentum or EffectTypes.Survived))
                 {
                     w.Effects[i] = e with { TurnsLeft = e.TurnsLeft - 1 };
                     if (e.TurnsLeft - 1 <= 0) w.Effects.RemoveAt(i);

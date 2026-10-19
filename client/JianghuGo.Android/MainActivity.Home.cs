@@ -49,6 +49,11 @@ namespace JianghuGo.Android
                 if (_steps.Available) _steps.Start();
             }
 
+            var more = ui.HRow(page, 40);
+            ui.Btn("Odosobnienie", () => RetreatSheet(flow, Render), more, secondary: true, sp: 12, heightDp: 40, icon: "menu_meditate");
+            ui.Btn("Kultywacja", () => CultivationSheet(flow, Render), more, secondary: true, sp: 12, heightDp: 40, icon: "menu_breakthrough");
+            ui.Btn("Posiadłość", () => Run(() => ShowEstateAsync(0)), more, secondary: true, sp: 12, heightDp: 40, icon: "menu_sect");
+
             // the day: three quests and the check-in seal
             var daily = ui.HRow(page, 74);
             _homeDaily = daily;
@@ -59,17 +64,21 @@ namespace JianghuGo.Android
                 if (st == null || gen != _screen) return;
                 _cultivation = st;
                 RenderHud();
-                realm.Text = st.RealmNamePl + " · etap " + st.Stage + "/" + st.StagesInRealm;
+                realm.Text = (string.IsNullOrEmpty(st.RealmHanzi) ? string.Empty : st.RealmHanzi + " ") + st.RealmNamePl + " · " + (st.StageName ?? "etap") + " " + st.Stage + "/" + st.StagesInRealm;
                 var id = ui.ArtId("emblem_" + st.RealmId);
                 if (id != 0) emblem.SetImageBitmap(Ui.Art(this, id));
                 charge.State = st;
                 charge.Invalidate();
                 var deviation = st.DeviationUntil.HasValue && st.DeviationUntil > DateTimeOffset.UtcNow ? "  ·  odchylenie Qi do " + st.DeviationUntil.Value.ToLocalTime().ToString("HH:mm") : string.Empty;
-                info.Text = "Szansa przełomu: " + Math.Round(st.BreakthroughChance * 100) + "%" +
-                            (st.IsMeditating ? "   ·   Medytujesz od " + st.MeditationStartedAt.Value.ToLocalTime().ToString("HH:mm") : string.Empty) +
-                            "\nDziś z medytacji: " + st.DailyMeditationQi + " / " + st.DailyMeditationQiCap + deviation +
+                var rate = st.IsInRetreat ? st.RetreatPerHour : st.IsMeditating ? st.MeditationPerHour : st.FlowPerHour;
+                var mode = st.IsInRetreat ? "Odosobnienie do " + (st.RetreatUntil?.ToLocalTime().ToString("HH:mm") ?? "?") : st.IsMeditating ? "Medytacja ×5" : "Qi płynie samo ×1";
+                info.Text = mode + " · " + Math.Round(rate) + " Qi/h" + (st.WeekendPermille > 1000 ? " · weekend ×" + (st.WeekendPermille / 1000.0).ToString("0.#") : string.Empty)
+                            + " · naczynie " + st.Qi + "/" + st.Vessel +
+                            (st.TribulationRequired ? "\n⚡ Doskonałość — czeka Niebiańska Próba" : st.BottleneckItem != null && !st.IsPeak && st.Stage == 11 ? "\nWąskie gardło: potrzebna pigułka przełomu" :
+                                "\nSzansa przełomu: " + Math.Round(st.BreakthroughChance * 100) + "%") + deviation +
                             (steps != null ? "   ·   kroki " + st.DailySteps + "/" + st.DailyStepCap : string.Empty);
                 meditate.Text = st.IsMeditating ? "Zakończ" : "Medytuj";
+                breakthrough.Text = st.TribulationRequired ? "Próba Niebios" : "Przełom";
             }
 
             meditate.Click += (_, __) => Run(async () =>
@@ -91,6 +100,12 @@ namespace JianghuGo.Android
             });
             breakthrough.Click += (_, __) => Run(async () =>
             {
+                if (flow.State?.TribulationRequired == true)
+                {
+                    await StartTribulationAsync(flow);
+                    return;
+                }
+
                 var r = await flow.BreakthroughAsync(Ct);
                 Render();
                 if (r == null)
@@ -153,6 +168,7 @@ namespace JianghuGo.Android
             {
                 await flow.LoadAsync(Ct);
                 Render();
+                ShowOfflineSummary(flow, Render);
                 RenderDaily(await _api.GetQuestsAsync(c.Id, Ct));
             });
         }
@@ -169,8 +185,10 @@ namespace JianghuGo.Android
             var ui = NewScreen("Zadania", BackToTab, Resource.Drawable.tile_menu_quests, "DZIEŃ " + board.Day);
             var page = ui.Content;
             var claimableAch = board.Achievements.Count(a => a.Completed && !a.Claimed);
-            ui.Tabs(page, new[] { "Dziś", "Osiągnięcia", "Tytuły" }, tab, i => Run(() => ShowQuestsAsync(i)),
-                badges: new[] { board.Daily.Count(q => q.Completed && !q.Claimed) + (board.Checkin.CheckedInToday ? 0 : 1), claimableAch, 0 });
+            var storyReady = board.Story != null && board.Story.Completed && !board.Story.Finished ? 1 : 0;
+            ui.Tabs(page, new[] { "Dziś", "Osiągnięcia", "Tytuły", "Opowieść" }, tab, i => Run(() => ShowQuestsAsync(i)),
+                badges: new[] { board.Daily.Count(q => q.Completed && !q.Claimed) + (board.Checkin.CheckedInToday ? 0 : 1), claimableAch,
+                    0, storyReady + board.Seasonal.Count(q => q.Completed && !q.Claimed) });
 
             async Task Claim(QuestDto q)
             {
@@ -184,9 +202,12 @@ namespace JianghuGo.Android
 
             void QuestCard(LinearLayout cell, QuestDto q, bool achievement)
             {
-                var card = ui.Card(cell, 1f, 8, q.Completed && !q.Claimed ? Ui.Gold : (Color?)null, 0);
+                var rim = q.Completed && !q.Claimed ? Ui.Gold : q.Secret ? Ui.Violet : (Color?)null;
+                var card = ui.Card(cell, 1f, 8, rim, 0);
                 var top = ui.HRow(card, 22, 0);
-                ui.Text((q.Claimed ? "✓ " : string.Empty) + q.NamePl, top, 14, q.Claimed ? Ui.Muted : q.Completed ? Ui.Gold : Ui.Ink, bold: true);
+                var secretHidden = q.Secret && !q.Completed;
+                ui.Text((q.Claimed ? "✓ " : string.Empty) + (q.Secret ? "🔒 " : string.Empty) + (secretHidden ? "Tajne osiągnięcie" : q.NamePl), top, 14,
+                    q.Claimed ? Ui.Muted : q.Completed ? Ui.Gold : secretHidden ? Ui.Violet : Ui.Ink, bold: true);
                 ui.Text("+" + q.Stones, top, 12, Ui.Gold, bold: true).Gravity = GravityFlags.End;
                 ui.Text(q.DescriptionPl + (q.TitlePl != null ? "  ·  「" + q.TitlePl + "」" + (q.Bonus != null ? " " + StatsText(q.Bonus, ", ") : string.Empty) : string.Empty), card, 11, Ui.Muted, maxLines: 2);
                 ui.Box(card, 1f, marginDp: 0);
@@ -225,31 +246,91 @@ namespace JianghuGo.Android
             }
             else if (tab == 1)
             {
-                var list = board.Achievements.OrderBy(a => a.Claimed).ThenByDescending(a => a.Completed).ThenByDescending(a => a.Progress / (double)Math.Max(1, a.Target)).ToList();
+                var list = board.Achievements.OrderBy(a => a.Claimed).ThenByDescending(a => a.Completed).ThenBy(a => a.Secret)
+                    .ThenByDescending(a => a.Progress / (double)Math.Max(1, a.Target)).ToList();
+                ui.Text("Tajne osiągnięcia: " + board.SecretsFound + " / " + board.SecretsTotal + " — zagadki podpowiadają, czego szukać.", page, 11, Ui.Violet, center: true);
                 ui.Pages(page, list.Count, 1, 4, (i, cell) => QuestCard(cell, list[i], true));
             }
-            else
+            else if (tab == 2)
             {
-                if (board.Titles.Count == 0)
+                var all = board.AllTitles ?? new List<TitleDto>();
+                if (all.Count == 0)
                 {
                     ui.Box(page, 1f);
-                    ui.Text("Nie masz jeszcze tytułów — zdobywa się je za osiągnięcia.", page, 14, Ui.Muted, center: true, maxLines: 3);
+                    ui.Text("Nie masz jeszcze tytułów — zdobywa się je za osiągnięcia, królestwa, płomienie i arenę.", page, 14, Ui.Muted, center: true, maxLines: 3);
                     ui.Box(page, 1f);
                 }
                 else
                 {
-                    ui.Text("Razem w walce: " + StatsText(board.TitleBonuses), page, 12, Ui.Jade, bold: true, center: true, maxLines: 2);
-                    ui.Pages(page, board.Titles.Count, 2, 4, (i, cell) =>
+                    var chosen = all.FirstOrDefault(t => t.Selected);
+                    ui.Text("Nad postacią: " + (chosen != null ? "「" + chosen.NamePl + "」" : "brak") + "  ·  premie tytułów: " + StatsText(board.TitleBonuses), page, 12, Ui.Jade, bold: true, center: true, maxLines: 2);
+                    var ordered = all.OrderByDescending(t => t.Selected).ThenByDescending(t => RarityRank(t.Rarity)).ToList();
+                    ui.Pages(page, ordered.Count, 2, 4, (i, cell) =>
                     {
-                        var card = ui.Card(cell, 1f, 8, Ui.Gold, 0);
+                        var t = ordered[i];
+                        var color = Ui.RarityOf(TitlePalette(t.Rarity)).Color;
+                        var card = ui.Card(cell, 1f, 6, t.Selected ? Ui.Gold : color, 0);
                         card.SetGravity(GravityFlags.Center);
-                        ui.Text("「" + board.Titles[i] + "」", card, 15, Ui.Gold, bold: true, center: true, maxLines: 2);
-                        var bonus = board.Achievements.FirstOrDefault(a => a.TitlePl == board.Titles[i])?.Bonus;
-                        if (bonus != null) ui.Text(StatsText(bonus, ", "), card, 11, Ui.Ink, center: true, maxLines: 2);
+                        ui.Text("「" + t.NamePl + "」", card, 13, color, bold: true, center: true, maxLines: 2);
+                        ui.Text(TitleSourceName(t.Source), card, 10, Ui.Muted, center: true);
+                        card.Clickable = true;
+                        card.Click += (_, __) => Run(async () =>
+                        {
+                            await _api.SelectTitleAsync(c.Id, t.Selected ? null : t.Id, Ct);
+                            Sfx.Play(Sfx.Chime, 0.6f);
+                            await ShowQuestsAsync(2);
+                            SetStatus(t.Selected ? "Tytuł ukryty." : "Nad twoją postacią: 「" + t.NamePl + "」");
+                        });
                     });
+                    ui.Text("Dotknij tytułu, aby nosić go nad postacią (widzą go inni gracze i rywale w walce).", page, 11, Ui.Muted, center: true, maxLines: 2);
                 }
             }
+            else
+            {
+                if (board.Story is { } st)
+                {
+                    var story = ui.Card(page, 1.6f, 10, st.Completed && !st.Finished ? Ui.Gold : Ui.GoldDim);
+                    ui.Text("ROZDZIAŁ " + st.Chapter + " / " + st.Chapters + " — " + st.TitlePl.ToUpperInvariant(), story, 14, Ui.Gold, bold: true);
+                    ui.Text(st.TextPl, story, 12, Ui.Ink, maxLines: 5);
+                    ui.Box(story, 1f, marginDp: 0);
+                    ui.Text("Cel: " + st.GoalPl + "  ·  nagroda: " + st.Stones + " KD" + (st.ItemNamePl != null ? " + " + st.ItemQuantity + "× " + st.ItemNamePl : string.Empty), story, 11, Ui.Jade, maxLines: 2);
+                    var srow = ui.HRow(story, 32, 2);
+                    var mb = ui.Box(srow, 1.4f, marginDp: 0);
+                    mb.SetGravity(GravityFlags.CenterVertical);
+                    ui.MeterIn(mb, Ui.Gold, st.Finished ? "Opowieść ukończona" : st.Progress + " / " + st.Target, st.Finished ? 1 : st.Progress, st.Finished ? 1 : st.Target, 16);
+                    if (st.Completed && !st.Finished)
+                        ui.Btn("Dalej", () => Run(async () =>
+                        {
+                            var r = await _api.ClaimQuestAsync(c.Id, st.Id, Ct);
+                            Sfx.Play(Sfx.Breakthrough, 0.6f);
+                            _board = r.Board;
+                            _balance = r.Balance;
+                            await ShowQuestsAsync(3);
+                            ShowBanner("ROZDZIAŁ " + st.Chapter, st.TitlePl, "+" + r.Stones + " kamieni" + (st.ItemNamePl != null ? " · " + st.ItemQuantity + "× " + st.ItemNamePl : string.Empty), "menu_quests");
+                        }), srow, sp: 12, heightDp: 32);
+                }
+
+                ui.Text(board.Seasonal.Count > 0 ? "WYDARZENIA SEZONOWE" : "Brak wydarzeń sezonowych — zajrzyj w święta.", page, 12, Ui.Gold, bold: true, center: true);
+                var seasonal = board.Seasonal;
+                ui.Pages(page, seasonal.Count, 1, 2, (i, cell) => QuestCard(cell, seasonal[i], true));
+            }
         }
+
+        private static int RarityRank(string r) => r switch { "mythic" => 5, "legendary" => 4, "epic" => 3, "rare" => 2, _ => 1 };
+
+        /// <summary>Titles reuse the item rarity colours.</summary>
+        private static string TitlePalette(string r) => r switch { "rare" => "spirit", "epic" => "earth", "legendary" => "heavenly", "mythic" => "divine", _ => "mortal" };
+
+        private static string TitleSourceName(string s) => s switch
+        {
+            "achievement" => "osiągnięcie",
+            "secret" => "tajne osiągnięcie",
+            "season" => "wydarzenie",
+            "arena" => "arena",
+            "cultivation" => "królestwo",
+            "arts" => "sztuki ścieżki",
+            _ => s,
+        };
 
         // ---- Wieści -------------------------------------------------------------------------------------------
 

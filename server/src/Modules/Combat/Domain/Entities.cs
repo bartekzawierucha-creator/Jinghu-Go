@@ -25,9 +25,12 @@ public static class BattleKinds
     public const string Pvp = "pvp";
     public const string Tower = "tower";
     public const string Boss = "boss";
+    public const string Tribulation = "tribulation";
+    public const string Arena = "arena";
+    public const string Spirit = "spirit";
 
-    /// <summary>Side B is played by the server AI (PvE, tower floor, world boss).</summary>
-    public static bool AgainstNpc(string kind) => kind is Pve or Tower or Boss;
+    /// <summary>Side B is played by the server AI (PvE, tower floor, world boss, tribulation, arena copy of a player).</summary>
+    public static bool AgainstNpc(string kind) => kind is Pve or Tower or Boss or Tribulation or Arena or Spirit;
 }
 
 public static class BattleStatuses
@@ -97,3 +100,6 @@ public sealed record WorldBossState(int Cycle, string NpcId, int PoolHp, int HpL
 
 /// <summary>A character's contribution to one world boss cycle; <see cref="ClaimedAt"/> is set once the kill reward is taken.</summary>
 public sealed record WorldBossDamage(int Cycle, CharacterId CharacterId, AccountId AccountId, string Name, long Damage, int Attempts, DateTimeOffset? ClaimedAt, int Version);
+
+/// <summary>A player's place in the ranked arena: rating, record and the frozen copy others fight against.</summary>
+public sealed record ArenaEntry(CharacterId CharacterId, AccountId AccountId, string Name, int Rating, int Wins, int Losses, Combatant Defense, DateTimeOffset UpdatedAt, int Version);

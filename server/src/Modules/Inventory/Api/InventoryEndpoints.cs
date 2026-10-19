@@ -28,7 +28,10 @@ public static class InventoryEndpoints
                 slot = i.Equipment?.Slot,
                 stats = i.Equipment?.Stats,
                 bagBonus = i.Equipment?.BagBonus,
+                set = c.SetOf(i.Id)?.Id,
             }),
+            sets = c.SetList,
+            affixes = c.AffixList,
         })).WithTags("Inventory").RequireAuthorization();
 
         var g = app.MapGroup("/api/v1/characters/{characterId:guid}/inventory").WithTags("Inventory").RequireAuthorization();
@@ -47,6 +50,9 @@ public static class InventoryEndpoints
 
         g.MapPost("/discard", async (Guid characterId, DiscardCommand body, [FromHeader(Name = "Idempotency-Key")] string? key, HttpContext http, InventoryService svc, CancellationToken ct) =>
             await Guard(async () => ApiResults.From(await svc.DiscardAsync(http.User.GetAccountId(), characterId, key, body, ct), Results.Ok)));
+
+        g.MapPost("/dismantle", async (Guid characterId, DismantleCommand body, [FromHeader(Name = "Idempotency-Key")] string? key, HttpContext http, InventoryService svc, CancellationToken ct) =>
+            await Guard(async () => ApiResults.From(await svc.DismantleAsync(http.User.GetAccountId(), characterId, key, body, ct), Results.Ok)));
 
         g.MapGet("/wallet", async (Guid characterId, Guid? before, int? limit, HttpContext http, InventoryService svc, CancellationToken ct) =>
             ApiResults.From(await svc.WalletAsync(http.User.GetAccountId(), characterId, before, limit, ct), list => Results.Ok(new

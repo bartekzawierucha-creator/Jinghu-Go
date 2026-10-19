@@ -7,9 +7,12 @@ public sealed record CraftingConfig(
     IReadOnlyList<Recipe> Recipes,
     int AlchemyInsightBonusPermille,
     UpgradeRules Upgrade,
-    ProfessionRules? Professions = null)
+    ProfessionRules? Professions = null,
+    QueueRules? Queue = null)
 {
     public ProfessionRules ProfessionRules => Professions ?? new ProfessionRules(10, 15, 3, 1, 15, 10, 20);
+
+    public QueueRules QueueRules => Queue ?? new QueueRules(6, 10, 50);
 
     public Recipe? Find(string? id) => id is null ? null : Recipes.FirstOrDefault(r => r.Id == id);
 }
@@ -57,6 +60,12 @@ public static class RecipeKinds
 }
 
 /// <summary>Pure crafting rules. Rolls come from server seeds that are stored with every attempt (auditable, replayable).</summary>
+/// <summary>The cauldron / forge queue: batches that finish on their own while the player is away.</summary>
+public sealed record QueueRules(int AlchemyMinutesPerCraft, int ForgeMinutesPerCraft, int MaxTimes)
+{
+    public int MinutesFor(Recipe r) => r.Kind == RecipeKinds.Alchemy ? AlchemyMinutesPerCraft : ForgeMinutesPerCraft;
+}
+
 public static class CraftingRules
 {
     public const int MaxTimesPerRequest = 10;

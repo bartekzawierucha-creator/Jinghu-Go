@@ -4,9 +4,11 @@ using JianghuGo.Infrastructure;
 using JianghuGo.Infrastructure.InMemory;
 using JianghuGo.Infrastructure.Outbox;
 using JianghuGo.Infrastructure.Postgres;
+using JianghuGo.Modules.Arts;
 using JianghuGo.Modules.Characters;
 using JianghuGo.Modules.Combat;
 using JianghuGo.Modules.Crafting;
+using JianghuGo.Modules.Estate;
 using JianghuGo.Modules.Cultivation;
 using JianghuGo.Modules.Geolocation;
 using JianghuGo.Modules.Inventory;
@@ -51,6 +53,8 @@ public static class JianghuCore
         services.AddTerritoryModule(configuration);
         services.AddNotificationsModule(configuration);
         services.AddQuestsModule(configuration);
+        services.AddArtsModule(configuration);
+        services.AddEstateModule(configuration);
         return services;
     }
 

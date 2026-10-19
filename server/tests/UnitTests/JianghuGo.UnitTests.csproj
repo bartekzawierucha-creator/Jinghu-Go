@@ -16,6 +16,8 @@
     <ProjectReference Include="../../src/Modules/Sects/JianghuGo.Modules.Sects.csproj" />
     <ProjectReference Include="../../src/Modules/Territory/JianghuGo.Modules.Territory.csproj" />
     <ProjectReference Include="../../src/Modules/Quests/JianghuGo.Modules.Quests.csproj" />
+    <ProjectReference Include="../../src/Modules/Arts/JianghuGo.Modules.Arts.csproj" />
+    <ProjectReference Include="../../src/Modules/Estate/JianghuGo.Modules.Estate.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="../../../content/game-config/**/*.json" Link="game-config/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />

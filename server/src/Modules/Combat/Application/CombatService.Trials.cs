@@ -73,6 +73,39 @@ public sealed partial class CombatService
 
     private IReadOnlyList<RewardView> Views(IReadOnlyList<RewardItem> list) => [.. list.Select(i => new RewardView(i.Item, items.Find(i.Item)?.NamePl ?? i.Item, i.Quantity))];
 
+    // ---------------------------------------------------------------- heavenly tribulation (Cultivation)
+
+    public async Task<Result<Guid>> StartTribulationAsync(IUnitOfWork uow, AccountId accountId, Guid characterId, int realm, int powerPermille, string namePl, CancellationToken ct)
+    {
+        var now = clock.GetUtcNow();
+        var c = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
+        if (c is null) return CharacterNotFound;
+        if (config.Npc("heavenly_tribulation") is not { } template) return Error.NotFound("tribulation_unavailable", "Tribulations are not configured.");
+        var npc = TribulationNpc(template, realm, powerPermille, namePl);
+        var started = await StartNpcBattleAsync(uow, c, BattleKinds.Tribulation, npc, "trib:" + realm, now, ct);
+        return started.IsSuccess ? started.Value.Id : started.Error!;
+    }
+
+    public async Task<Result<Guid>> StartSpiritAsync(IUnitOfWork uow, AccountId accountId, Guid characterId, string npcId, int realm, int powerPermille, Guid reference, string namePl, CancellationToken ct)
+    {
+        var now = clock.GetUtcNow();
+        var c = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
+        if (c is null) return CharacterNotFound;
+        if (config.Npc(npcId) is not { } template) return Error.NotFound("npc_not_found", "Unknown spirit.");
+        var npc = TribulationNpc(template, realm, powerPermille, namePl) with { Id = template.Id };
+        var started = await StartNpcBattleAsync(uow, c, BattleKinds.Spirit, npc, "spirit:" + reference.ToString("D"), now, ct);
+        return started.IsSuccess ? started.Value.Id : started.Error!;
+    }
+
+    /// <summary>The sky grows with the realm: every stat ≈ 9 per realm above the template, times the power (‰).</summary>
+    public static NpcDefinition TribulationNpc(NpcDefinition template, int realm, int powerPermille, string namePl) => template with
+    {
+        NamePl = namePl,
+        Stats = template.Stats.ToDictionary(s => s.Key, s => (int)((long)(s.Value + (9 * realm)) * powerPermille / 1000)),
+        HpOverride = null,
+        Loadout = [.. template.Loadout.Select(s => s is null ? null : s with { Level = Math.Clamp(1 + (realm / 6), 1, 10) })],
+    };
+
     // ---------------------------------------------------------------- Tower of Trials
 
     private TowerRules Tower => config.Tower ?? throw new InvalidOperationException("The tower is not configured.");

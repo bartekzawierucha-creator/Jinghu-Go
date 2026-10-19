@@ -23,7 +23,9 @@ public sealed record CombatConfig(
     IReadOnlyDictionary<string, PathPerks>? PathPerks = null,
     ComboRules? Combo = null,
     TowerRules? Tower = null,
-    WorldBossRules? WorldBoss = null)
+    WorldBossRules? WorldBoss = null,
+    ElementRules? Elements = null,
+    ArenaRules? Arena = null)
 {
     /// <summary>Combat perks of a cultivation path (none for an unknown path or a config without them).</summary>
     public PathPerks? Perks(string? path) => path is not null && PathPerks is not null && PathPerks.TryGetValue(path, out var p) ? p : null;
@@ -49,6 +51,11 @@ public sealed record DistanceRules(int Start, int Min, int Max);
 public sealed record ComboRules(int MomentumPermillePerStack, int MaxMomentum, int ExploitPermille);
 
 public sealed record RewardItem(string Item, int Quantity);
+
+/// <summary>Ranked arena: fights against frozen copies of other players, Elo rating, leagues and a daily attempt limit.</summary>
+public sealed record ArenaRules(int StartRating, int KFactor, int AttemptsPerDay, int OpponentWindow, IReadOnlyList<ArenaLeague> Leagues, long QiPerWin);
+
+public sealed record ArenaLeague(string Id, string NamePl, int MinRating, long WeeklyStones, string? TitlePl);
 
 /// <summary>Rewards for clearing a tower floor for the first time (on top of <see cref="TowerRules.QiPerFloor"/> × floor).</summary>
 public sealed record TowerReward(int Floor, long Stones, IReadOnlyList<RewardItem> Items);
@@ -110,9 +117,57 @@ public sealed record PathPerks(
     int EffectChancePermille = 0,
     int BleedPermille = 0,
     int HealPermille = 0,
-    IReadOnlyDictionary<string, int>? ScalingDamagePermille = null)
+    IReadOnlyDictionary<string, int>? ScalingDamagePermille = null,
+    int DamagePermille = 0,
+    int RegenPermille = 0,
+    int ReflectPermille = 0,
+    int LifestealPermille = 0,
+    int FirstStrikePermille = 0,
+    int SurviveOnce = 0,
+    int PetPower = 0,
+    int PetEvery = 0)
 {
-    public int DamageBonus(string? scaling) => scaling is not null && ScalingDamagePermille is not null ? ScalingDamagePermille.GetValueOrDefault(scaling) : 0;
+    public int DamageBonus(string? scaling) =>
+        DamagePermille + (scaling is not null && ScalingDamagePermille is not null ? ScalingDamagePermille.GetValueOrDefault(scaling) : 0);
+
+    /// <summary>The path's perks plus perks earned outside combat (frozen into the battle snapshot).</summary>
+    public PathPerks With(JianghuGo.Modules.Combat.Contracts.PerkBonus b) => this with
+    {
+        QiPermille = QiPermille + b.QiPermille,
+        QiRegen = QiRegen + b.QiRegen,
+        GuardPermille = GuardPermille + b.GuardPermille,
+        EffectChancePermille = EffectChancePermille + b.EffectChancePermille,
+        BleedPermille = BleedPermille + b.BleedPermille,
+        HealPermille = HealPermille + b.HealPermille,
+        DamagePermille = DamagePermille + b.DamagePermille,
+        RegenPermille = RegenPermille + b.RegenPermille,
+        ReflectPermille = ReflectPermille + b.ReflectPermille,
+        LifestealPermille = LifestealPermille + b.LifestealPermille,
+        FirstStrikePermille = FirstStrikePermille + b.FirstStrikePermille,
+        SurviveOnce = Math.Max(SurviveOnce, b.SurviveOnce),
+        PetPower = Math.Max(PetPower, b.PetPower),
+        PetEvery = PetPower >= b.PetPower ? PetEvery : b.PetEvery,
+    };
+}
+
+/// <summary>
+/// The five elements (wood, fire, earth, metal, water): a technique whose element overcomes the defender's element deals
+/// more damage, one the defender's element overcomes deals less.
+/// </summary>
+public sealed record ElementRules(
+    IReadOnlyDictionary<string, string> Overcomes,
+    int AdvantagePermille,
+    IReadOnlyDictionary<string, string> Paths,
+    IReadOnlyDictionary<string, string> Npcs,
+    IReadOnlyDictionary<string, string> Techniques)
+{
+    public string? OfTechnique(string id) => Techniques.TryGetValue(id, out var e) ? e : null;
+
+    public int Modifier(string? attack, string? defender) =>
+        attack is null || defender is null ? 0
+        : Overcomes.GetValueOrDefault(attack) == defender ? AdvantagePermille
+        : Overcomes.GetValueOrDefault(defender) == attack ? -AdvantagePermille
+        : 0;
 }
 
 /// <summary>One automatic battle every <see cref="MinutesPerBattle"/> minutes, for at most <see cref="MaxHours"/> hours per hunt.</summary>
@@ -195,6 +250,7 @@ public static class EffectTypes
     public const string Evasion = "evasion"; // this turn: magnitude = ‰ hit chance removed
     public const string Counter = "counter"; // this turn: magnitude = ‰ reflected, second value = qi steal
     public const string Momentum = "momentum"; // combo stacks (consecutive landed strikes); never expires on its own
+    public const string Survived = "survived"; // the "survive once" perk was used in this battle
     public static readonly IReadOnlyList<string> Applicable = [Bleed, Stun, Weaken];
 }
 

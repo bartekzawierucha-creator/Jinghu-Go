@@ -16,6 +16,45 @@ namespace JianghuGo.Client.Application
         public bool Claimed { get; set; }
         public string TitlePl { get; set; }
         public Dictionary<string, int> Bonus { get; set; }
+        public bool Secret { get; set; }
+        public string RiddlePl { get; set; }
+        public string Rarity { get; set; }
+
+        /// <summary>Seasonal quests: the last day (MM-dd).</summary>
+        public string Until { get; set; }
+    }
+
+    public sealed class StoryDto
+    {
+        public int Chapter { get; set; }
+        public int Chapters { get; set; }
+        public string Id { get; set; }
+        public string TitlePl { get; set; }
+        public string TextPl { get; set; }
+        public string GoalPl { get; set; }
+        public string Metric { get; set; }
+        public long Target { get; set; }
+        public long Progress { get; set; }
+        public long Stones { get; set; }
+        public string Item { get; set; }
+        public string ItemNamePl { get; set; }
+        public int ItemQuantity { get; set; }
+        public bool Completed { get; set; }
+        public bool Finished { get; set; }
+    }
+
+    public sealed class TitleDto
+    {
+        public string Id { get; set; }
+        public string NamePl { get; set; }
+        public string Rarity { get; set; }
+        public string Source { get; set; }
+        public bool Selected { get; set; }
+    }
+
+    public sealed class TitleListDto
+    {
+        public List<TitleDto> Items { get; set; } = new List<TitleDto>();
     }
 
     public sealed class CheckinDto
@@ -34,6 +73,12 @@ namespace JianghuGo.Client.Application
         public CheckinDto Checkin { get; set; } = new CheckinDto();
         public List<string> Titles { get; set; } = new List<string>();
         public Dictionary<string, int> TitleBonuses { get; set; } = new Dictionary<string, int>();
+        public List<QuestDto> Seasonal { get; set; } = new List<QuestDto>();
+        public StoryDto Story { get; set; }
+        public List<TitleDto> AllTitles { get; set; } = new List<TitleDto>();
+        public string SelectedTitleId { get; set; }
+        public int SecretsFound { get; set; }
+        public int SecretsTotal { get; set; }
     }
 
     public sealed class ClaimResultDto

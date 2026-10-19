@@ -153,9 +153,9 @@ public class WorldTests : IAsyncLifetime
         var twice = await e.InteractAsync(node.Key);
         Assert.Equal("already_harvested", (await ApiHost.Json(twice)).Str("code"));
 
-        Assert.Equal(0, await QiAsync(e));
+        var before = await QiAsync(e);                              // the idle flow may have added a little already
         await _host.DrainOutboxAsync();
-        Assert.Equal(expected, await QiAsync(e));
+        Assert.Equal(before + expected, await QiAsync(e));
         Assert.True((await e.NearbyAsync())["nodes"]!.AsArray().Single(n => n!.Str("key") == node.Key)!["harvested"]!.GetValue<bool>());
     }
 
@@ -174,7 +174,7 @@ public class WorldTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Conflict, denied.StatusCode);
         Assert.Equal("relocation_cooldown", (await ApiHost.Json(denied)).Str("code"));
         await _host.DrainOutboxAsync();
-        Assert.Equal(0, await QiAsync(e));
+        Assert.True(await QiAsync(e) < 10, "only the idle Qi flow of a few seconds, not the spring's reward");
 
         // Not a punishment: a genuine traveller who stays put is trusted again after the cooldown.
         for (var i = 0; i < 7; i++)

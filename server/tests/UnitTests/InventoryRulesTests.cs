@@ -45,11 +45,44 @@ public class InventoryRulesTests
         Assert.Equal(2, InventoryRules.ScaledStat(Items, 2, 4));      // 2 × 1.4 = 2.8 → 2
         Assert.Equal(3, InventoryRules.ScaledStat(Items, 2, 5));      // 2 × 1.5 = 3
         Assert.Equal(5, InventoryRules.ScaledStat(Items, 2, 15));     // 2 × 2.5 = 5
-        var bonuses = InventoryRules.Bonuses(Items, [Equipped("wolf_fang_dagger", 10), Equipped("jade_talisman")]);
-        Assert.Equal(6, bonuses["agility"]);
-        Assert.Equal(2, bonuses["strength"]);
-        Assert.Equal(3, bonuses["spirit"]);
-        Assert.Equal(2, bonuses["insight"]);
+        var dagger = Equipped("wolf_fang_dagger", 10);
+        var talisman = Equipped("jade_talisman");
+        var bonuses = InventoryRules.Bonuses(Items, [dagger, talisman]);
+        int Affix(string stat) => InventoryRules.Affixes(Items, dagger).Concat(InventoryRules.Affixes(Items, talisman)).Where(a => a.Stat == stat).Sum(a => a.Value);
+        Assert.Equal(6 + Affix("agility"), bonuses["agility"]);
+        Assert.Equal(2 + Affix("strength"), bonuses["strength"]);
+        Assert.Equal(3 + Affix("spirit"), bonuses["spirit"]);
+        Assert.Equal(2 + Affix("insight"), bonuses["insight"]);
+    }
+
+    [Fact]
+    public void Affixes_are_fixed_by_the_item_and_grow_with_rarity()
+    {
+        var mortal = Equipped("iron_sword");
+        var spirit = Equipped("wolf_fang_dagger");
+        var divine = Equipped("dragon_pearl");
+        Assert.Equal(0, InventoryRules.Affixes(Items, mortal).Count);
+        Assert.Equal(1, InventoryRules.Affixes(Items, spirit).Count);
+        Assert.Equal(3, InventoryRules.Affixes(Items, divine).Count);
+        Assert.Equal(string.Join(",", InventoryRules.Affixes(Items, divine).Select(a => a.Id + a.Value)),
+            string.Join(",", InventoryRules.Affixes(Items, divine with { UpgradeLevel = 7 }).Select(a => a.Id + a.Value)));
+        Assert.Equal(3, InventoryRules.Affixes(Items, divine).Select(a => a.Id).Distinct().Count());
+    }
+
+    [Fact]
+    public void Sets_pay_for_pieces_worn_together_and_dismantling_returns_materials()
+    {
+        var two = InventoryRules.ActiveSets(Items, [Equipped("golem_gauntlets"), Equipped("golem_plate")]);
+        Assert.Equal("stone_golem", two.Single().Set.Id);
+        Assert.Equal(4, two.Single().Stats["constitution"]);
+        var three = InventoryRules.ActiveSets(Items, [Equipped("golem_gauntlets"), Equipped("golem_plate"), Equipped("golem_heart")]);
+        Assert.Equal(10, three.Single().Stats["constitution"]);
+        Assert.Equal(0, InventoryRules.ActiveSets(Items, [Equipped("golem_gauntlets")]).Count);
+
+        var upgraded = Equipped("frost_sword", 6);
+        var mats = InventoryRules.Dismantle(Items, upgraded);
+        Assert.True(mats.Single(m => m.ItemId == "refining_stone").Quantity >= 3);
+        Assert.Equal(string.Join(",", mats.Select(m => m.ItemId + m.Quantity)), string.Join(",", InventoryRules.Dismantle(Items, upgraded).Select(m => m.ItemId + m.Quantity)));
     }
 
     [Fact]

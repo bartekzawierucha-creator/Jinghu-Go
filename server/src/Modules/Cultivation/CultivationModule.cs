@@ -27,6 +27,8 @@ public static class CultivationModule
         if (StorageProvider.From(configuration) == StorageKind.Postgres)
         {
             services.AddSingleton<ICultivationRepository, PostgresCultivationRepository>();
+            services.AddSingleton(new JianghuGo.Application.RetentionPolicy("cultivation.handled_events",
+                "DELETE FROM cultivation.handled_events WHERE ctid IN (SELECT ctid FROM cultivation.handled_events WHERE handled_at < $1 - interval '30 days' LIMIT 1000)"));
         }
         else
         {
@@ -36,10 +38,18 @@ public static class CultivationModule
         services.AddScoped<CultivationService>();
         services.AddScoped<MeridianService>();
         services.AddScoped<RankingService>();
+        services.AddSingleton<JianghuGo.Modules.Cultivation.Contracts.ICultivationStatus, CultivationStatusProvider>();
+        services.AddSingleton<JianghuGo.Modules.Characters.Contracts.ITitleSource, CultivationTitles>();
         services.AddSingleton<JianghuGo.Modules.Combat.Contracts.ICombatStatBonuses, CultivationCombatBonuses>();
         services.AddSingleton<JianghuGo.Application.IOutboxHandler, CombatRewardHandler>();
         services.AddSingleton<JianghuGo.Application.IOutboxHandler, WorldRewardHandler>();
         services.AddSingleton<JianghuGo.Application.IOutboxHandler, ConsumableQiHandler>();
+        services.AddSingleton<JianghuGo.Application.IOutboxHandler, TribulationHandler>();
+        services.AddSingleton<JianghuGo.Application.IOutboxHandler, CharacterStartHandler>();
+        services.AddSingleton<JianghuGo.Application.IOutboxHandler, BattleCountersHandler>();
+        services.AddSingleton<JianghuGo.Application.IOutboxHandler, CraftCountersHandler>();
+        services.AddSingleton<JianghuGo.Application.IOutboxHandler, GatherCountersHandler>();
+        services.AddSingleton<JianghuGo.Application.IOutboxHandler, PillInstabilityHandler>();
         return services;
     }
 

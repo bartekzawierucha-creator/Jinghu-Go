@@ -9,11 +9,20 @@ namespace JianghuGo.Modules.Inventory.Application;
 
 public sealed record StackView(string ItemId, string NamePl, string Type, string Rarity, long Quantity);
 
+public sealed record AffixView(string Id, string NamePl, string Stat, int Value);
+
 public sealed record InstanceView(Guid Id, string ItemId, string NamePl, string Rarity, string? Slot, int UpgradeLevel, string State, int Version,
-    IReadOnlyDictionary<string, int> Stats, string? BoundRef);
+    IReadOnlyDictionary<string, int> Stats, string? BoundRef, IReadOnlyList<AffixView>? Affixes = null, string? SetId = null, string? SetNamePl = null);
+
+public sealed record SetView(string Id, string NamePl, int Worn, int Pieces, IReadOnlyDictionary<string, int> Active, IReadOnlyList<SetBonus> Bonuses);
 
 public sealed record InventoryView(Guid CharacterId, string RulesVersion, long Balance, int SlotsUsed, int Capacity,
-    IReadOnlyList<StackView> Stacks, IReadOnlyList<InstanceView> Items, IReadOnlyDictionary<string, Guid> Equipped, IReadOnlyDictionary<string, int> Bonuses);
+    IReadOnlyList<StackView> Stacks, IReadOnlyList<InstanceView> Items, IReadOnlyDictionary<string, Guid> Equipped, IReadOnlyDictionary<string, int> Bonuses,
+    IReadOnlyList<SetView>? Sets = null);
+
+public sealed record DismantleCommand(Guid InstanceId, int ExpectedVersion);
+
+public sealed record DismantleResult(IReadOnlyList<StackView> Materials, InventoryView Inventory);
 
 public sealed record EquipCommand(Guid InstanceId, int ExpectedVersion);
 
@@ -153,6 +162,35 @@ public sealed class InventoryService(
             return result;
         }, ct);
 
+    /// <summary>Breaks a piece of equipment from the bag into materials (by rarity; upgraded pieces give back refining stones).</summary>
+    public Task<Result<DismantleResult>> DismantleAsync(AccountId accountId, Guid characterId, string? key, DismantleCommand cmd, CancellationToken ct) =>
+        uowFactory.RunAsync<Result<DismantleResult>>(async uow =>
+        {
+            var result = await Idempotency.ExecuteAsync(idempotency, uow, clock, accountId, "inventory.dismantle", key, new { characterId, cmd }, async Task<Result<DismantleResult>> () =>
+            {
+                var c = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
+                if (c is null) return CharacterNotFound;
+                var item = await repo.FindInstanceAsync(uow, cmd.InstanceId, ct);
+                if (item is null || item.CharacterId != c.Id || item.State == InstanceStates.Destroyed) return ItemNotFound;
+                if (item.Version != cmd.ExpectedVersion) return Concurrent;
+                if (item.State != InstanceStates.Bag) return Error.Conflict("item_not_in_bag", "Unequip the item (or cancel its listing) first.");
+                if (config.Find(item.ItemId)?.Equipment is null) return Error.Validation("item_not_dismantlable", "Only equipment can be dismantled.");
+                if (!await MoveAsync(uow, item, InstanceStates.Destroyed, "dismantled", ct)) return Concurrent;
+                var materials = InventoryRules.Dismantle(config, item);
+                foreach (var m in materials)
+                {
+                    var added = await ledger.AddItemsAsync(uow, c.Id, m.ItemId, m.Quantity, "dismantle", item.Id.ToString(), ct);
+                    if (!added.IsSuccess) return added.Error!;
+                }
+
+                await AuditAsync(uow, accountId, "inventory.dismantled", c.Id, new { instanceId = item.Id, item.ItemId, materials }, ct);
+                var views = materials.Select(m => { var d = config.Item(m.ItemId); return new StackView(m.ItemId, d.NamePl, d.Type, d.Rarity, m.Quantity); }).ToList();
+                return new DismantleResult(views, await ViewAsync(uow, c.Id, ct));
+            }, ct);
+            if (result.IsSuccess) await uow.CommitAsync(ct);
+            return result;
+        }, ct);
+
     public Task<Result<IReadOnlyList<WalletEntryView>>> WalletAsync(AccountId accountId, Guid characterId, Guid? before, int? limit, CancellationToken ct) =>
         uowFactory.RunAsync<Result<IReadOnlyList<WalletEntryView>>>(async uow =>
         {
@@ -208,10 +246,18 @@ public sealed class InventoryService(
             {
                 var d = config.Item(i.ItemId);
                 var stats = d.Equipment?.Stats.ToDictionary(s => s.Key, s => InventoryRules.ScaledStat(config, s.Value, i.UpgradeLevel)) ?? [];
-                return new InstanceView(i.Id, i.ItemId, d.NamePl, d.Rarity, d.Equipment?.Slot, i.UpgradeLevel, i.State, i.Version, stats, i.BoundRef);
+                var set = config.SetOf(i.ItemId);
+                return new InstanceView(i.Id, i.ItemId, d.NamePl, d.Rarity, d.Equipment?.Slot, i.UpgradeLevel, i.State, i.Version, stats, i.BoundRef,
+                    [.. InventoryRules.Affixes(config, i).Select(a => new AffixView(a.Id, a.NamePl, a.Stat, a.Value))], set?.Id, set?.NamePl);
             })],
             equipped.ToDictionary(i => InventoryRules.SlotOf(config, i.ItemId)!, i => i.Id),
-            InventoryRules.Bonuses(config, equipped));
+            InventoryRules.Bonuses(config, equipped),
+            [.. config.SetList.Where(s => instances.Any(i => i.State != InstanceStates.Destroyed && s.Items.Contains(i.ItemId))).Select(s =>
+            {
+                var worn = s.Items.Count(id => equipped.Any(e => e.ItemId == id));
+                var active = InventoryRules.ActiveSets(config, equipped).FirstOrDefault(a => a.Set.Id == s.Id).Stats ?? new Dictionary<string, int>();
+                return new SetView(s.Id, s.NamePl, worn, s.Items.Count, active, s.Bonuses);
+            })]);
     }
 
     private Task AuditAsync(IUnitOfWork uow, AccountId accountId, string action, CharacterId characterId, object data, CancellationToken ct) =>

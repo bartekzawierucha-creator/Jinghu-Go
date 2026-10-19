@@ -28,15 +28,25 @@ public static class SectsModule
         if (StorageProvider.From(configuration) == StorageKind.Postgres)
         {
             services.AddSingleton<ISectRepository, PostgresSectRepository>();
+            services.AddSingleton<ISectDevelopmentRepository, PostgresSectDevelopmentRepository>();
+            services.AddSingleton(new JianghuGo.Application.RetentionPolicy("sects.handled_events",
+                "DELETE FROM sects.handled_events WHERE ctid IN (SELECT ctid FROM sects.handled_events WHERE handled_at < $1 - interval '30 days' LIMIT 1000)"));
             services.AddSingleton(new JianghuGo.Application.RetentionPolicy("sects.chat_messages",
                 "DELETE FROM sects.chat_messages WHERE ctid IN (SELECT ctid FROM sects.chat_messages WHERE created_at < $1 - interval '30 days' LIMIT 1000)"));
         }
         else
         {
             services.AddSingleton<ISectRepository, InMemorySectRepository>();
+            services.AddSingleton<ISectDevelopmentRepository, InMemorySectDevelopmentRepository>();
         }
         services.AddSingleton<ISectDirectory, SectDirectory>();
         services.AddScoped<SectService>();
+        services.AddScoped<SectDevelopmentService>();
+        services.AddSingleton<JianghuGo.Modules.Combat.Contracts.ICombatPerkBonuses, SectCombatPerks>();
+        services.AddSingleton<JianghuGo.Modules.Crafting.Contracts.ICraftingBonuses, SectCraftingBonuses>();
+        foreach (var type in new[] { JianghuGo.Modules.Combat.Contracts.CombatEvents.BattleFinished, JianghuGo.Modules.World.Contracts.WorldEvents.ItemsGathered,
+                     JianghuGo.Modules.Crafting.Contracts.CraftingEvents.Crafted })
+            services.AddSingleton<JianghuGo.Application.IOutboxHandler>(sp => new SectProgressHandler(sp.GetRequiredService<IServiceScopeFactory>(), sp.GetRequiredService<SectsConfig>(), type));
         return services;
     }
 

@@ -25,6 +25,8 @@ public static class CombatEndpoints
             paths = c.PathPerks,
             npcs = c.Npcs.Select(n => new { n.Id, n.NamePl, n.NameEn, n.RewardQi, n.Tier, n.Boss, n.WorldOnly, n.Tameable }),
             combo = c.Combo,
+            elements = c.Elements is null ? null : new { c.Elements.Overcomes, c.Elements.AdvantagePermille, c.Elements.Paths, c.Elements.Npcs },
+            arenaLeagues = c.Arena?.Leagues,
             worldBossNpcId = c.WorldBoss?.NpcId,
         })).WithTags("Combat").RequireAuthorization();
 
@@ -53,6 +55,12 @@ public static class CombatEndpoints
             await Guard(async () => ApiResults.From(await svc.StartWorldBossAsync(http.User.GetAccountId(), characterId, key, ct), v => Results.Created($"/api/v1/combat/battles/{v.Id}", v))));
         character.MapPost("/world-boss/claim", async (Guid characterId, ClaimBossCommand body, HttpContext http, CombatService svc, CancellationToken ct) =>
             ApiResults.From(await svc.ClaimWorldBossAsync(http.User.GetAccountId(), characterId, body, ct), Results.Ok));
+        character.MapGet("/arena", async (Guid characterId, HttpContext http, CombatService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.GetArenaAsync(http.User.GetAccountId(), characterId, ct), Results.Ok));
+        character.MapPost("/arena/challenge", async (Guid characterId, ArenaChallengeCommand body, [FromHeader(Name = "Idempotency-Key")] string? key, HttpContext http, CombatService svc, CancellationToken ct) =>
+            await Guard(async () => ApiResults.From(await svc.ChallengeArenaAsync(http.User.GetAccountId(), characterId, key, body, ct), v => Results.Created($"/api/v1/combat/battles/{v.Id}", v))));
+        character.MapPost("/arena/claim", async (Guid characterId, HttpContext http, CombatService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.ClaimArenaWeekAsync(http.User.GetAccountId(), characterId, ct), Results.Ok));
         character.MapGet("/battles", async (Guid characterId, HttpContext http, CombatService svc, CancellationToken ct) =>
             ApiResults.From(await svc.ListOpenAsync(http.User.GetAccountId(), characterId, ct), list => Results.Ok(new { items = list })));
 

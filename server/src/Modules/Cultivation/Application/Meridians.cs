@@ -110,7 +110,37 @@ internal sealed class CultivationCombatBonuses(ICultivationRepository repo) : IC
     public async Task<IReadOnlyDictionary<string, int>> BonusesAsync(IUnitOfWork uow, Guid characterId, CancellationToken ct)
     {
         var id = new CharacterId(characterId);
-        return MeridianRules.Bonuses(await repo.FindAsync(uow, id, ct), await repo.ListMeridiansAsync(uow, id, ct));
+        var state = await repo.FindAsync(uow, id, ct);
+        var bonuses = new Dictionary<string, int>(MeridianRules.Bonuses(state, await repo.ListMeridiansAsync(uow, id, ct)));
+        if (await repo.FindProfileAsync(uow, id, ct) is { } profile)
+            foreach (var (stat, v) in CultivationRules.CoreBonuses(profile)) bonuses[stat] = bonuses.GetValueOrDefault(stat) + v;
+        return bonuses;
+    }
+}
+
+/// <summary>Realm and stage for other modules (old-ladder rows are reported on the new ladder).</summary>
+internal sealed class CultivationStatusProvider(ICultivationRepository repo, CultivationConfig config) : JianghuGo.Modules.Cultivation.Contracts.ICultivationStatus
+{
+    public async Task<JianghuGo.Modules.Cultivation.Contracts.CultivationStatus> StatusAsync(IUnitOfWork uow, Guid characterId, CancellationToken ct)
+    {
+        var id = new CharacterId(characterId);
+        var s = await repo.FindAsync(uow, id, ct);
+        var realm = s?.RealmIndex ?? 0;
+        if (s is not null && await repo.FindProfileAsync(uow, id, ct) is null) realm = Math.Min(config.Realms.Count - 1, realm + 2);
+        var r = config.Realms[realm];
+        return new JianghuGo.Modules.Cultivation.Contracts.CultivationStatus(realm, s?.Stage ?? 1, r.Id, r.NamePl, r.Era);
+    }
+}
+
+/// <summary>Every realm reached grants its title (the era sets the plate colour).</summary>
+internal sealed class CultivationTitles(JianghuGo.Modules.Cultivation.Contracts.ICultivationStatus status, CultivationConfig config) : JianghuGo.Modules.Characters.Contracts.ITitleSource
+{
+    private static readonly string[] EraRarity = ["common", "common", "rare", "epic", "legendary", "mythic", "mythic"];
+
+    public async Task<IReadOnlyList<JianghuGo.Modules.Characters.Contracts.TitleGrant>> TitlesAsync(IUnitOfWork uow, Guid characterId, CancellationToken ct)
+    {
+        var s = await status.StatusAsync(uow, characterId, ct);
+        return [.. config.Realms.Take(s.Realm + 1).Select(r => new JianghuGo.Modules.Characters.Contracts.TitleGrant("realm_" + r.Id, r.TitlePl, EraRarity[Math.Clamp(r.Era, 0, 6)], "cultivation"))];
     }
 }
 

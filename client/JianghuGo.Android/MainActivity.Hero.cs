@@ -12,7 +12,7 @@ namespace JianghuGo.Android
     /// <summary>Hero hub: equipment silhouette, meridian constellation, technique slots, spirit pet and the Dao lab.</summary>
     public sealed partial class MainActivity
     {
-        private static readonly string[] HeroTabs = { "Postać", "Meridiany", "Techniki", "Towarzysz", "Dao" };
+        private static readonly string[] HeroTabs = { "Postać", "Meridiany", "Techniki", "Towarzysz", "Dao", "Sztuki" };
 
         private async Task ShowHeroTabAsync(int tab)
         {
@@ -29,6 +29,9 @@ namespace JianghuGo.Android
                     return;
                 case 4:
                     await ShowDaoLabAsync();
+                    return;
+                case 5:
+                    await ShowArtsAsync(0);
                     return;
                 default:
                     await ShowHeroAsync();

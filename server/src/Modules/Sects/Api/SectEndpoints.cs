@@ -24,6 +24,18 @@ public static class SectEndpoints
         g.MapPost("/", async (FoundSectCommand body, [FromHeader(Name = "Idempotency-Key")] string? key, HttpContext http, SectService svc, CancellationToken ct) =>
             await Guard(async () => ApiResults.From(await svc.FoundAsync(http.User.GetAccountId(), key, body, ct), v => Results.Created($"/api/v1/sects/{v.Sect.Id}", v))));
 
+        g.MapGet("/{sectId:guid}/development", async (Guid sectId, Guid characterId, HttpContext http, SectDevelopmentService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.GetAsync(http.User.GetAccountId(), sectId, characterId, ct), Results.Ok));
+
+        g.MapPost("/{sectId:guid}/buildings", async (Guid sectId, BuildCommand body, HttpContext http, SectDevelopmentService svc, CancellationToken ct) =>
+            await Guard(async () => ApiResults.From(await svc.BuildAsync(http.User.GetAccountId(), sectId, body, ct), Results.Ok)));
+
+        g.MapPost("/{sectId:guid}/missions/claim", async (Guid sectId, MissionClaimCommand body, HttpContext http, SectDevelopmentService svc, CancellationToken ct) =>
+            await Guard(async () => ApiResults.From(await svc.ClaimMissionAsync(http.User.GetAccountId(), sectId, body, ct), Results.Ok)));
+
+        g.MapPost("/{sectId:guid}/boss/fight", async (Guid sectId, ActorCommand body, HttpContext http, SectDevelopmentService svc, CancellationToken ct) =>
+            await Guard(async () => ApiResults.From(await svc.FightBossAsync(http.User.GetAccountId(), sectId, body, ct), Results.Ok)));
+
         g.MapGet("/{sectId:guid}", async (Guid sectId, SectService svc, CancellationToken ct) =>
             ApiResults.From(await svc.GetAsync(sectId, ct), Results.Ok));
 

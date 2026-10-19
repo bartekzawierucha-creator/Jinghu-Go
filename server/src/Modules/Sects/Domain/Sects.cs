@@ -12,7 +12,85 @@ public sealed record SectsConfig(
     int ApplicationMessageMaxLength,
     long MinDonation,
     long MaxDonation,
-    SeatRules Seat);
+    SeatRules Seat,
+    DevelopmentRules? Development = null);
+
+/// <summary>Sect buildings (bonuses for every member), weekly missions (shared goals) and the weekly sect boss.</summary>
+public sealed record DevelopmentRules(
+    IReadOnlyList<BuildingDefinition> Buildings,
+    IReadOnlyList<MissionDefinition> Missions,
+    int MissionsPerWeek,
+    SectBossRules Boss);
+
+/// <param name="Costs">Treasury cost of each level (index 0 = level 1).</param>
+/// <param name="PerLevel">Combat perks per level (Combat.Contracts.PerkBonus, ‰).</param>
+public sealed record BuildingDefinition(string Id, string NamePl, string DescriptionPl, IReadOnlyList<long> Costs,
+    JianghuGo.Modules.Combat.Contracts.PerkBonus? PerLevel = null, int AlchemyPermillePerLevel = 0, int ForgePermillePerLevel = 0, int MissionRewardPermillePerLevel = 0);
+
+/// <param name="Metric">battles_won / items_gathered / crafts / bosses_won.</param>
+public sealed record MissionDefinition(string Id, string NamePl, string DescriptionPl, string Metric, long Target, long TreasuryReward, long ContributionReward);
+
+public sealed record SectBossRules(string NpcId, string NamePl, int Seals, int PowerPermille, int RealmBonus, long TreasuryReward, long MemberStones, int AttemptsPerDay);
+
+public static class MissionMetrics
+{
+    public const string BattlesWon = "battles_won";
+    public const string ItemsGathered = "items_gathered";
+    public const string Crafts = "crafts";
+    public const string BossesWon = "bosses_won";
+    public static readonly string[] All = [BattlesWon, ItemsGathered, Crafts, BossesWon];
+}
+
+/// <summary>A sect's development: building levels and this week's missions and boss.</summary>
+public sealed record SectDevelopment(
+    Guid SectId,
+    IReadOnlyDictionary<string, int> Buildings,
+    string Week,
+    IReadOnlyDictionary<string, long> Missions,
+    IReadOnlyList<string> MissionsClaimed,
+    Guid BossReference,
+    int SealsBroken,
+    IReadOnlyList<Guid> BossFighters,
+    IReadOnlyDictionary<string, int> BossAttempts,
+    bool BossRewarded,
+    int Version)
+{
+    public static SectDevelopment New(Guid sectId, string week) =>
+        new(sectId, new Dictionary<string, int>(), week, new Dictionary<string, long>(), [], Guid.NewGuid(), 0, [], new Dictionary<string, int>(), false, 0);
+
+    /// <summary>A new week resets missions and summons a new boss (buildings stay).</summary>
+    public SectDevelopment ForWeek(string week) =>
+        Week == week ? this : this with { Week = week, Missions = new Dictionary<string, long>(), MissionsClaimed = [], BossReference = Guid.NewGuid(), SealsBroken = 0, BossFighters = [], BossAttempts = new Dictionary<string, int>(), BossRewarded = false };
+
+    public static string AttemptKey(Guid characterId, DateTimeOffset at) => characterId.ToString("N") + ":" + at.UtcDateTime.ToString("yyyyMMdd", CultureInfo.InvariantCulture);
+
+    public int Level(string building) => Buildings.GetValueOrDefault(building);
+}
+
+public static class SectDevelopmentRules
+{
+    public static string WeekOf(DateTimeOffset at) =>
+        ISOWeek.GetYear(at.UtcDateTime).ToString("0000", CultureInfo.InvariantCulture) + "-W" + ISOWeek.GetWeekOfYear(at.UtcDateTime).ToString("00", CultureInfo.InvariantCulture);
+
+    /// <summary>This week's missions for a sect (deterministic pick).</summary>
+    public static IReadOnlyList<MissionDefinition> MissionsFor(DevelopmentRules r, Guid sectId, string week)
+    {
+        var h = 14695981039346656037UL;
+        foreach (var b in sectId.ToByteArray()) h = (h ^ b) * 1099511628211UL;
+        foreach (var ch in week) h = (h ^ ch) * 1099511628211UL;
+        var rnd = new DeterministicRandom(h);
+        var pool = r.Missions.ToList();
+        var list = new List<MissionDefinition>();
+        while (list.Count < r.MissionsPerWeek && pool.Count > 0)
+        {
+            var i = rnd.NextInt(0, pool.Count);
+            list.Add(pool[i]);
+            pool.RemoveAt(i);
+        }
+
+        return list;
+    }
+}
 
 public sealed record SeatRules(long CostStones, int MoveCooldownDays, int PrecisionDecimals);
 
@@ -147,6 +225,21 @@ public static class SectsConfigValidator
         if (c.MaxPendingApplicationsPerCharacter is < 1 or > 20) e.Add("maxPendingApplicationsPerCharacter must be 1-20.");
         if (c.ApplicationMessageMaxLength is < 0 or > 1000) e.Add("applicationMessageMaxLength must be 0-1000.");
         if (c.MinDonation < 1 || c.MaxDonation < c.MinDonation) e.Add("donation range invalid.");
+        if (c.Development is { } d)
+        {
+            if (d.Buildings is null || d.Buildings.Count == 0 || d.Buildings.Select(b => b.Id).Distinct().Count() != d.Buildings.Count) e.Add("development.buildings invalid.");
+            foreach (var b in d.Buildings ?? [])
+                if (string.IsNullOrWhiteSpace(b.Id) || string.IsNullOrWhiteSpace(b.NamePl) || b.Costs is null || b.Costs.Count is < 1 or > 20 || b.Costs.Any(x => x < 0)
+                    || b.AlchemyPermillePerLevel is < 0 or > 100 || b.ForgePermillePerLevel is < 0 or > 100 || b.MissionRewardPermillePerLevel is < 0 or > 500)
+                    e.Add($"building '{b.Id}' invalid.");
+            if (d.Missions is null || d.Missions.Count < d.MissionsPerWeek || d.MissionsPerWeek is < 1 or > 6
+                || d.Missions.Any(m => !MissionMetrics.All.Contains(m.Metric) || m.Target < 1 || m.TreasuryReward < 0 || m.ContributionReward < 0))
+                e.Add("development.missions invalid.");
+            if (d.Boss is null || string.IsNullOrWhiteSpace(d.Boss.NpcId) || d.Boss.Seals is < 1 or > 1000 || d.Boss.PowerPermille is < 100 or > 10000 || d.Boss.AttemptsPerDay < 1
+                || d.Boss.TreasuryReward < 0 || d.Boss.MemberStones < 0)
+                e.Add("development.boss invalid.");
+        }
+
         if (c.Seat is null || c.Seat.CostStones < 0 || c.Seat.MoveCooldownDays < 0 || c.Seat.PrecisionDecimals is < 2 or > 4) e.Add("seat rules invalid (precision 2-4 decimals).");
         return e;
     }

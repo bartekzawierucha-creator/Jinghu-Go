@@ -27,6 +27,9 @@ internal static class QiCredit
         var updated = state with { Qi = checked(state.Qi + qi), Version = version + 1, UpdatedAt = message.OccurredAt };
         if (!await repo.TrySaveAsync(uow, updated, version, ct))
             throw new TransientConflictException("Cultivation state changed while crediting a reward.");
+        // a character's first cultivation row: start its profile on the current ladder (an old row without one is migrated on load)
+        if (stored is null && await repo.FindProfileAsync(uow, character.Id, ct) is null)
+            await repo.TrySaveProfileAsync(uow, CultivationProfile.New(character.Id, character.Path, message.OccurredAt) with { Version = 1 }, 0, ct);
         await audit.AppendAsync(uow, new AuditEntry(Uuid7.New(), account, "cultivation.reward_credited", "character", characterId.ToString(),
             JsonSerializer.Serialize(auditData, Idempotency.Json), message.CorrelationId, message.OccurredAt), ct);
     }

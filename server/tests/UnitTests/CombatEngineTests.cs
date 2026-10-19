@@ -268,11 +268,11 @@ public class CombatEngineTests
     /// deliberate rules-version bump (then update this hash). Replays of stored battles depend on it.
     /// </summary>
     [Fact]
-    public void Golden_battle_is_unchanged_for_rules_combat_3()
+    public void Golden_battle_is_unchanged_for_rules_combat_4()
     {
         var (final, log) = Simulate(FromNpc("mountain_bandit"), Player("poison"), 20261012);
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(final) + string.Join("\n", log))))[..16];
-        Assert.Equal("combat-3", Config.RulesVersion);
+        Assert.Equal("combat-4", Config.RulesVersion);
         Assert.Equal(GoldenHash, hash, $"outcome {final.Outcome} after {final.Turn} turns, {log.Count} events");
     }
 

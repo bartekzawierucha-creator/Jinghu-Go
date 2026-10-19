@@ -101,8 +101,87 @@ namespace JianghuGo.Client.Application
         public int MeditationMaxMinutes { get; set; }
         public int MeditationMinMinutes { get; set; }
 
-        public bool IsMeditating => MeditationStartedAt.HasValue;
-        public bool CanAttemptBreakthrough => !IsPeak && Qi >= QiRequired && !IsMeditating;
+        // cultivation-3: 66 realms × 12 stages, continuous Qi flow
+        public int RealmIndex { get; set; }
+        public int RealmCount { get; set; }
+        public string RealmHanzi { get; set; }
+        public int Era { get; set; }
+        public string EraNamePl { get; set; }
+        public string StageName { get; set; }
+        public string RealmUnlockPl { get; set; }
+        public string RealmTitlePl { get; set; }
+        public string NextRealmNamePl { get; set; }
+        public string NextRealmUnlockPl { get; set; }
+        public string NextTribulationPl { get; set; }
+        public string Mode { get; set; }
+        public DateTimeOffset? RetreatUntil { get; set; }
+        public List<int> RetreatOptions { get; set; } = new List<int>();
+        public long Vessel { get; set; }
+        public int VesselLevel { get; set; }
+        public long VesselUpgradeCrystals { get; set; }
+        public long Crystals { get; set; }
+        public double FlowPerHour { get; set; }
+        public double MeditationPerHour { get; set; }
+        public double RetreatPerHour { get; set; }
+        public int OfflineCapHours { get; set; }
+        public string MethodId { get; set; }
+        public List<MethodDto> Methods { get; set; } = new List<MethodDto>();
+        public int Instability { get; set; }
+        public Dictionary<string, string> Qualities { get; set; } = new Dictionary<string, string>();
+        public string CoreColor { get; set; }
+        public string CoreColorPl { get; set; }
+        public int Karma { get; set; }
+        public int Reincarnations { get; set; }
+        public bool CanReincarnate { get; set; }
+        public int KarmaOnReincarnation { get; set; }
+        public int? AutoBreakthroughPermille { get; set; }
+        public bool AutoBreakthroughAvailable { get; set; }
+        public bool AcceleratorAvailable { get; set; }
+        public int AcceleratorHours { get; set; }
+        public string BottleneckItem { get; set; }
+        public bool TribulationRequired { get; set; }
+        public Guid? TribulationBattleId { get; set; }
+        public int Enlightenments { get; set; }
+        public long LifetimeQi { get; set; }
+        public CultivationSummaryDto Summary { get; set; }
+        public bool CompressionAvailable { get; set; }
+        public int WeekendPermille { get; set; } = 1000;
+
+        public bool IsMeditating => MeditationStartedAt.HasValue || Mode == "meditation";
+        public bool IsInRetreat => Mode == "retreat";
+        public bool CanAttemptBreakthrough => !IsPeak && Qi >= QiRequired && !IsMeditating && !TribulationRequired;
+    }
+
+    public sealed class MethodDto
+    {
+        public string Id { get; set; }
+        public string NamePl { get; set; }
+        public string DescriptionPl { get; set; }
+        public bool Known { get; set; }
+        public bool Active { get; set; }
+        public int Mastery { get; set; }
+        public int MinRealm { get; set; }
+        public string Path { get; set; }
+        public string ItemId { get; set; }
+        public bool Available { get; set; }
+    }
+
+    /// <summary>What happened while the player was away (shown once, then acknowledged).</summary>
+    public sealed class CultivationSummaryDto
+    {
+        public DateTimeOffset From { get; set; }
+        public DateTimeOffset To { get; set; }
+        public long Qi { get; set; }
+        public int Enlightenments { get; set; }
+        public int AutoBreakthroughs { get; set; }
+        public bool VesselFull { get; set; }
+        public bool RetreatFinished { get; set; }
+    }
+
+    public sealed class TribulationStartDto
+    {
+        public Guid BattleId { get; set; }
+        public CultivationDto State { get; set; }
     }
 
     public sealed class MeditationResultDto
@@ -163,6 +242,12 @@ namespace JianghuGo.Client.Application
     public sealed class FighterDto
     {
         public string Name { get; set; }
+
+        /// <summary>The chosen title shown above the fighter, its plate colour (rarity), badges such as "+27" or "⚔4", element.</summary>
+        public string Title { get; set; }
+        public string TitleRarity { get; set; }
+        public List<string> Badges { get; set; } = new List<string>();
+        public string Element { get; set; }
         public int Hp { get; set; }
         public int MaxHp { get; set; }
         public int Qi { get; set; }
@@ -276,6 +361,22 @@ namespace JianghuGo.Client.Application
         public bool Harvested { get; set; }
         public long RewardQi { get; set; }
         public DateTimeOffset ExpiresAt { get; set; }
+        public string NpcId { get; set; }
+        public bool Hidden { get; set; }
+    }
+
+    /// <summary>The region you stand in: name, terrain, weather, day/night and its ruling boss.</summary>
+    public sealed class RegionDto
+    {
+        public string NamePl { get; set; }
+        public string Terrain { get; set; }
+        public string TerrainNamePl { get; set; }
+        public string Weather { get; set; }
+        public string WeatherNamePl { get; set; }
+        public DateTimeOffset WeatherEndsAt { get; set; }
+        public bool Night { get; set; }
+        public string BossNpcId { get; set; }
+        public string BossNamePl { get; set; }
     }
 
     public sealed class FlameSiteDto
@@ -319,6 +420,7 @@ namespace JianghuGo.Client.Application
         public WorldEventDto Event { get; set; }
         public List<NodeDto> Nodes { get; set; } = new List<NodeDto>();
         public FlameSiteDto NearestFlameSite { get; set; }
+        public RegionDto Region { get; set; }
     }
 
     public sealed class WorldInteractionDto

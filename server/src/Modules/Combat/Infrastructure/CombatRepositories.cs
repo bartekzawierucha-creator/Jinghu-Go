@@ -148,6 +148,45 @@ internal sealed class InMemoryCombatRepository : ICombatRepository
         Task.FromResult(U(uow).Table<Guid, Battle>(Battles).Values.Count(b =>
             b.CharacterA == characterId && b.Kind == kind && b.Context == context && b.CreatedAt >= since));
 
+    private const string Arena = "combat.arena_entries";
+    private const string ArenaClaims = "combat.arena_claims";
+
+    public Task<ArenaEntry?> FindArenaAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
+        Task.FromResult(U(uow).Table<CharacterId, ArenaEntry>(Arena).GetValueOrDefault(characterId));
+
+    public Task<bool> TrySaveArenaAsync(IUnitOfWork uow, ArenaEntry e, int expectedVersion, CancellationToken ct)
+    {
+        var t = U(uow).Table<CharacterId, ArenaEntry>(Arena);
+        if ((t.GetValueOrDefault(e.CharacterId)?.Version ?? 0) != expectedVersion) return Task.FromResult(false);
+        U(uow).SetTable(Arena, t.SetItem(e.CharacterId, e));
+        return Task.FromResult(true);
+    }
+
+    public Task<IReadOnlyList<ArenaEntry>> ListArenaAsync(IUnitOfWork uow, int minRating, int maxRating, int limit, CancellationToken ct)
+    {
+        IReadOnlyList<ArenaEntry> list = [.. U(uow).Table<CharacterId, ArenaEntry>(Arena).Values.Where(e => e.Rating >= minRating && e.Rating <= maxRating)
+            .OrderByDescending(e => e.Rating).ThenBy(e => e.CharacterId.Value).Take(limit)];
+        return Task.FromResult(list);
+    }
+
+    public Task<int> CountArenaAheadAsync(IUnitOfWork uow, ArenaEntry mine, CancellationToken ct) =>
+        Task.FromResult(U(uow).Table<CharacterId, ArenaEntry>(Arena).Values.Count(e =>
+            e.Rating > mine.Rating || (e.Rating == mine.Rating && e.CharacterId.Value.CompareTo(mine.CharacterId.Value) < 0)));
+
+    public Task<bool> ArenaWeekClaimedAsync(IUnitOfWork uow, CharacterId characterId, string week, CancellationToken ct) =>
+        Task.FromResult(U(uow).Table<(CharacterId, string), DateTimeOffset>(ArenaClaims).ContainsKey((characterId, week)));
+
+    public Task<int> CountBattlesOfKindSinceAsync(IUnitOfWork uow, CharacterId characterId, string kind, DateTimeOffset since, CancellationToken ct) =>
+        Task.FromResult(U(uow).Table<Guid, Battle>(Battles).Values.Count(b => b.CharacterA == characterId && b.Kind == kind && b.CreatedAt >= since));
+
+    public Task<bool> TryClaimArenaWeekAsync(IUnitOfWork uow, CharacterId characterId, string week, DateTimeOffset at, CancellationToken ct)
+    {
+        var t = U(uow).Table<(CharacterId, string), DateTimeOffset>(ArenaClaims);
+        if (t.ContainsKey((characterId, week))) return Task.FromResult(false);
+        U(uow).SetTable(ArenaClaims, t.Add((characterId, week), at));
+        return Task.FromResult(true);
+    }
+
     private const string Towers = "combat.tower_progress";
     private const string Bosses = "combat.world_bosses";
     private const string BossDamage = "combat.world_boss_damage";
@@ -389,6 +428,44 @@ internal sealed class PostgresCombatRepository : ICombatRepository
         (int)(await Pg(uow).QueryAsync(
             "SELECT count(*) FROM combat.battles WHERE character_a = $1 AND kind = $2 AND context = $3 AND created_at >= $4",
             r => r.GetInt64(0), ct, characterId.Value, kind, context, since)).Single();
+
+    private const string ArenaColumns = "character_id, account_id, name, rating, wins, losses, defense::text, updated_at, version";
+
+    private static ArenaEntry MapArena(NpgsqlDataReader r) =>
+        new(new CharacterId(r.GetGuid(0)), new AccountId(r.GetGuid(1)), r.GetString(2), r.GetInt32(3), r.GetInt32(4), r.GetInt32(5),
+            CombatJson.Read<Combatant>(r.GetString(6)), r.GetFieldValue<DateTimeOffset>(7), r.GetInt32(8));
+
+    public Task<ArenaEntry?> FindArenaAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
+        Pg(uow).QuerySingleOrDefaultAsync($"SELECT {ArenaColumns} FROM combat.arena_entries WHERE character_id = $1", MapArena, ct, characterId.Value);
+
+    public async Task<bool> TrySaveArenaAsync(IUnitOfWork uow, ArenaEntry e, int expectedVersion, CancellationToken ct) =>
+        expectedVersion == 0
+            ? await Pg(uow).ExecuteAsync(
+                "INSERT INTO combat.arena_entries (character_id, account_id, name, rating, wins, losses, defense, updated_at, version) " +
+                "VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9) ON CONFLICT (character_id) DO NOTHING",
+                ct, e.CharacterId.Value, e.AccountId.Value, e.Name, e.Rating, e.Wins, e.Losses, CombatJson.Write(e.Defense), e.UpdatedAt, e.Version) == 1
+            : await Pg(uow).ExecuteAsync(
+                "UPDATE combat.arena_entries SET name = $2, rating = $3, wins = $4, losses = $5, defense = $6::jsonb, updated_at = $7, version = $8 WHERE character_id = $1 AND version = $9",
+                ct, e.CharacterId.Value, e.Name, e.Rating, e.Wins, e.Losses, CombatJson.Write(e.Defense), e.UpdatedAt, e.Version, expectedVersion) == 1;
+
+    public async Task<IReadOnlyList<ArenaEntry>> ListArenaAsync(IUnitOfWork uow, int minRating, int maxRating, int limit, CancellationToken ct) =>
+        await Pg(uow).QueryAsync($"SELECT {ArenaColumns} FROM combat.arena_entries WHERE rating BETWEEN $1 AND $2 ORDER BY rating DESC, character_id LIMIT $3",
+            MapArena, ct, minRating, maxRating, limit);
+
+    public async Task<int> CountArenaAheadAsync(IUnitOfWork uow, ArenaEntry mine, CancellationToken ct) =>
+        (int)(await Pg(uow).QueryAsync("SELECT count(*) FROM combat.arena_entries WHERE rating > $1 OR (rating = $1 AND character_id < $2)",
+            r => r.GetInt64(0), ct, mine.Rating, mine.CharacterId.Value)).Single();
+
+    public async Task<bool> ArenaWeekClaimedAsync(IUnitOfWork uow, CharacterId characterId, string week, CancellationToken ct) =>
+        (await Pg(uow).QueryAsync("SELECT 1 FROM combat.arena_claims WHERE character_id = $1 AND week = $2", r => r.GetInt32(0), ct, characterId.Value, week)).Count > 0;
+
+    public async Task<int> CountBattlesOfKindSinceAsync(IUnitOfWork uow, CharacterId characterId, string kind, DateTimeOffset since, CancellationToken ct) =>
+        (int)(await Pg(uow).QueryAsync("SELECT count(*) FROM combat.battles WHERE character_a = $1 AND kind = $2 AND created_at >= $3",
+            r => r.GetInt64(0), ct, characterId.Value, kind, since)).Single();
+
+    public async Task<bool> TryClaimArenaWeekAsync(IUnitOfWork uow, CharacterId characterId, string week, DateTimeOffset at, CancellationToken ct) =>
+        await Pg(uow).ExecuteAsync("INSERT INTO combat.arena_claims (character_id, week, claimed_at) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING",
+            ct, characterId.Value, week, at) == 1;
 
     private const string TowerColumns = "character_id, account_id, name, best_floor, updated_at, version";
 

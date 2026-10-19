@@ -22,9 +22,10 @@ namespace JianghuGo.Android
             var hunt = tab == 1 ? (await _api.GetHuntAsync(c.Id, Ct)).Hunt : null;
             var tower = tab == 2 ? await _api.GetTowerAsync(c.Id, Ct) : null;
             var boss = tab == 3 ? await _api.GetWorldBossAsync(c.Id, Ct) : null;
+            var arena = tab == 5 ? await _api.GetArenaAsync(c.Id, Ct) : null;
             var ui = NewScreen(null, art: tab == 2 ? Resource.Drawable.arena_tower : Resource.Drawable.arena_courtyard, tab: TabCombat);
             var page = ui.Content;
-            ui.Tabs(page, new[] { "Trening", "Łowy", "Wieża", "Bossy", "PvP" }, tab, i => Run(() => ShowCombatTabAsync(i)));
+            ui.Tabs(page, new[] { "Trening", "Łowy", "Wieża", "Bossy", "PvP", "Arena" }, tab, i => Run(() => ShowCombatTabAsync(i)));
 
             if (tab == 0)
             {
@@ -59,6 +60,10 @@ namespace JianghuGo.Android
                     }, pixelArt: true, accent: Ui.Cinnabar, titleSp: 13, badge: "BOSS");
                 });
                 ui.Text("Bossowie legowisk walczą tylko w świecie — szukaj 👹 na mapie.", page, 11, Ui.Muted, center: true);
+            }
+            else if (tab == 5)
+            {
+                Arena(ui, page, arena);
             }
             else
             {
