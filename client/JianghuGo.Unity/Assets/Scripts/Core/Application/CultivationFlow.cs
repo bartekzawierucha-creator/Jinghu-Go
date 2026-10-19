@@ -64,6 +64,7 @@ namespace JianghuGo.Client.Application
 
         private void Set(CultivationDto state)
         {
+            if (state != null && state.ReceivedAt == null) state.ReceivedAt = DateTimeOffset.UtcNow;
             State = state;
             StateChanged?.Invoke(state);
         }

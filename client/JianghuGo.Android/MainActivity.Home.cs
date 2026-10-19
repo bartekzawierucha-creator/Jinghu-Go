@@ -26,7 +26,7 @@ namespace JianghuGo.Android
             var flow = new CultivationFlow(_api, c.Id);
 
             // realm line
-            var head = ui.HRow(page, 40, 0);
+            var head = ui.HRow(page, 48, 0); // the realm's hanzi use a taller CJK line
             var emblem = ui.Icon(head, "emblem_qi_condensation", 36);
             var titles = new LinearLayout(this) { Orientation = Orientation.Vertical };
             head.AddView(titles, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f) { LeftMargin = Px(8), Gravity = GravityFlags.CenterVertical });
@@ -50,9 +50,9 @@ namespace JianghuGo.Android
             }
 
             var more = ui.HRow(page, 40);
-            ui.Btn("Odosobnienie", () => RetreatSheet(flow, Render), more, secondary: true, sp: 12, heightDp: 40, icon: "menu_meditate");
-            ui.Btn("Rozwój", () => CultivationSheet(flow, Render), more, secondary: true, sp: 12, heightDp: 40, icon: "menu_breakthrough");
-            ui.Btn("Posiadłość", () => Run(() => ShowEstateAsync(0)), more, secondary: true, sp: 12, heightDp: 40, icon: "menu_sect");
+            ui.Btn("Odosobnienie", () => RetreatSheet(flow, Render), more, secondary: true, sp: 11, heightDp: 40);
+            ui.Btn("Rozwój", () => CultivationSheet(flow, Render), more, secondary: true, sp: 11, heightDp: 40);
+            ui.Btn("Posiadłość", () => Run(() => ShowEstateAsync(0)), more, secondary: true, sp: 11, heightDp: 40);
 
             // the day: three quests and the check-in seal
             var daily = ui.HRow(page, 74);
@@ -289,7 +289,7 @@ namespace JianghuGo.Android
             {
                 if (board.Story is { } st)
                 {
-                    var story = ui.Card(page, 1.6f, 10, st.Completed && !st.Finished ? Ui.Gold : Ui.GoldDim);
+                    var story = ui.Card(page, 1.4f, 10, st.Completed && !st.Finished ? Ui.Gold : Ui.GoldDim);
                     ui.Text("ROZDZIAŁ " + st.Chapter + " / " + st.Chapters + " — " + st.TitlePl.ToUpperInvariant(), story, 14, Ui.Gold, bold: true);
                     ui.Text(st.TextPl, story, 12, Ui.Ink, maxLines: 5);
                     ui.Box(story, 1f, marginDp: 0);
@@ -312,7 +312,7 @@ namespace JianghuGo.Android
 
                 ui.Text(board.Seasonal.Count > 0 ? "WYDARZENIA SEZONOWE" : "Brak wydarzeń sezonowych — zajrzyj w święta.", page, 12, Ui.Gold, bold: true, center: true);
                 var seasonal = board.Seasonal;
-                ui.Pages(page, seasonal.Count, 1, 2, (i, cell) => QuestCard(cell, seasonal[i], true));
+                ui.Pages(page, seasonal.Count, 1, 1, (i, cell) => QuestCard(cell, seasonal[i], true));
             }
         }
 

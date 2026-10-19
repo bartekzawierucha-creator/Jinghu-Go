@@ -36,14 +36,19 @@ namespace JianghuGo.Client.Application
             var f = new MeditationForecast();
             if (s == null) return f;
             var rate = Math.Max(0, s.MeditationQiPerMinute);
-            var dailyLeft = Math.Max(0, s.DailyMeditationQiCap - s.DailyMeditationQi);
+            // cultivation-3 has no daily cap (cap 0): the vessel is the only limit
+            var dailyLeft = s.DailyMeditationQiCap > 0 ? Math.Max(0, s.DailyMeditationQiCap - s.DailyMeditationQi)
+                : s.Vessel > 0 ? Math.Max(0, s.Vessel - s.Qi) : long.MaxValue;
             if (s.IsMeditating && s.MeditationStartedAt.HasValue)
             {
                 var elapsed = (int)Math.Floor(Math.Max(0, (now - s.MeditationStartedAt.Value).TotalMinutes));
                 var max = s.MeditationMaxMinutes > 0 ? s.MeditationMaxMinutes : int.MaxValue;
                 f.SessionMinutes = Math.Min(elapsed, max);
                 f.SessionFull = elapsed >= max;
-                f.PendingQi = f.SessionMinutes < s.MeditationMinMinutes ? 0 : Math.Min((long)Math.Floor(f.SessionMinutes * rate), dailyLeft);
+                // the flow up to ReceivedAt is already in s.Qi (cultivation-3 settles on every read)
+                var from = s.ReceivedAt.HasValue && s.ReceivedAt.Value > s.MeditationStartedAt.Value ? s.ReceivedAt.Value : s.MeditationStartedAt.Value;
+                var fresh = (int)Math.Floor(Math.Max(0, (now - from).TotalMinutes));
+                f.PendingQi = f.SessionMinutes < s.MeditationMinMinutes ? 0 : Math.Min((long)Math.Floor(Math.Min(fresh, f.SessionMinutes) * rate), dailyLeft);
             }
 
             if (s.QiRequired <= 0)
@@ -56,7 +61,7 @@ namespace JianghuGo.Client.Application
             f.Progress = Math.Min(1.0, have / (double)s.QiRequired);
             var missing = s.QiRequired - have;
             if (missing <= 0) return f;
-            f.LimitedByDailyCap = missing > dailyLeft - f.PendingQi;
+            f.LimitedByDailyCap = s.DailyMeditationQiCap > 0 && missing > dailyLeft - f.PendingQi;
             f.MinutesToFull = rate <= 0 ? -1 : (int)Math.Ceiling(missing / rate);
             return f;
         }

@@ -147,6 +147,10 @@ namespace JianghuGo.Client.Application
         public bool CompressionAvailable { get; set; }
         public int WeekendPermille { get; set; } = 1000;
 
+        /// <summary>Client-side: when this state was received. The server settled the Qi flow up to then, so a running
+        /// session only adds what flowed after it.</summary>
+        public DateTimeOffset? ReceivedAt { get; set; }
+
         public bool IsMeditating => MeditationStartedAt.HasValue || Mode == "meditation";
         public bool IsInRetreat => Mode == "retreat";
         public bool CanAttemptBreakthrough => !IsPeak && Qi >= QiRequired && !IsMeditating && !TribulationRequired;

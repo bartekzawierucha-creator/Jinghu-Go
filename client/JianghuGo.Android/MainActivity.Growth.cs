@@ -379,7 +379,7 @@ namespace JianghuGo.Android
 
             var owned = t.Venoms.Where(v => v.Owned > 0).ToList();
             ui.Text("JADY W SAKWIE — dotknij, by wchłonąć", page, 11, Ui.GoldDim, bold: true);
-            ui.Pages(page, owned.Count, 2, 2, (i, cell) =>
+            ui.Pages(page, owned.Count, 2, 1, (i, cell) =>
             {
                 var v = owned[i];
                 var card = ui.Card(cell, 1f, 6, Ui.RarityOf(v.Rarity).Color, 0);
@@ -395,7 +395,7 @@ namespace JianghuGo.Android
             }, empty: "Brak jadów — zbieraj je z bestii, bagien i wypraw uczniów.", weight: 0.9f);
 
             ui.Text("POWŁOKI", page, 11, Ui.GoldDim, bold: true);
-            ui.Pages(page, t.Coatings.Count, 1, 2, (i, cell) =>
+            ui.Pages(page, t.Coatings.Count, 1, 1, (i, cell) =>
             {
                 var co = t.Coatings[i];
                 var card = ui.Card(cell, 1f, 6, co.Craftable ? Ui.Gold : (Color?)null, 0);
