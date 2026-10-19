@@ -6,11 +6,13 @@ namespace JianghuGo.Modules.Combat.Domain;
 /// A technique in a fighter's snapshot. <see cref="Definition"/> is set for Dao Lab (player-designed) techniques: their
 /// rules are frozen into the battle, so the battle replays identically whatever happens to the design later.
 /// </summary>
-public sealed record EquippedTechnique(string Id, int Level, TechniqueDefinition? Definition = null);
+/// <param name="Awakening">1.7: the extra effect a level-10 technique awakened for this cultivator (null below the level).</param>
+public sealed record EquippedTechnique(string Id, int Level, TechniqueDefinition? Definition = null, EffectSpec? Awakening = null);
 
 /// <summary>Immutable snapshot of a fighter's build, frozen when the battle starts (later loadout changes do not leak in).</summary>
 public sealed record Combatant(string Name, IReadOnlyDictionary<string, int> Stats, IReadOnlyList<EquippedTechnique?> Slots, int? HpOverride, int HpBonusPermille = 0,
-    PathPerks? Perks = null, string? Element = null, string? Title = null, IReadOnlyList<string>? Badges = null, string? TitleRarity = null)
+    PathPerks? Perks = null, string? Element = null, string? Title = null, IReadOnlyList<string>? Badges = null, string? TitleRarity = null,
+    string? Path = null, bool Enrages = false)
 {
     public int Stat(string id) => Stats.GetValueOrDefault(id);
 }
@@ -65,7 +67,8 @@ public sealed record TurnEvent(
     int Healed = 0,
     int Momentum = 0,
     bool Exploit = false,
-    bool Crit = false);
+    bool Crit = false,
+    string? Mechanic = null);
 
 /// <summary>
 /// The whole combat ruleset as a pure function: (config, combatants, state, intents, rng) → (state', events).
@@ -123,7 +126,39 @@ public static class CombatEngine
             if (stacks > 0) Effects.Add(new Effect(EffectTypes.Momentum, stacks, 0, 1));
         }
 
-        public bool Weakened => Effects.Any(e => e.Type is EffectTypes.Bleed or EffectTypes.Weaken or EffectTypes.Stun);
+        public bool Weakened => Effects.Any(e => EffectTypes.Ailments.Contains(e.Type));
+
+        public int Count(string type) => Effects.Count(e => e.Type == type);
+
+        public int Value(string type) => Effects.FirstOrDefault(e => e.Type == type)?.Magnitude ?? 0;
+
+        public void SetValue(string type, int value)
+        {
+            Effects.RemoveAll(e => e.Type == type);
+            if (value > 0) Effects.Add(new Effect(type, value, 0, 1));
+        }
+
+        /// <summary>Adds an effect; at the stack limit the oldest stack of that type is replaced (its duration refreshed).</summary>
+        public void Add(Effect e, int maxStacks)
+        {
+            if (maxStacks > 0 && Count(e.Type) >= maxStacks)
+            {
+                var oldest = Effects.Where(x => x.Type == e.Type).OrderBy(x => x.TurnsLeft).First();
+                Effects.Remove(oldest);
+            }
+
+            Effects.Add(e);
+        }
+
+        /// <summary>Heals, reduced while poisoned (1.7).</summary>
+        public int Heal(int amount, int poisonBlockPermille)
+        {
+            if (amount <= 0 || Hp <= 0) return 0;
+            if (Count(EffectTypes.Poison) > 0) amount = amount * (1000 - poisonBlockPermille) / 1000;
+            var healed = Math.Max(0, Math.Min(MaxHp, Hp + amount) - Hp);
+            Hp += healed;
+            return healed;
+        }
         public Fighter Freeze() => new(Math.Max(0, Hp), MaxHp, Qi, MaxQi, [.. Cd], [.. Effects]);
     }
 
@@ -137,9 +172,9 @@ public static class CombatEngine
         var distance = s.Distance;
         var events = new List<TurnEvent>();
         void Log(char actor, string action, string? tech = null, bool? hit = null, int dmg = 0, int reflected = 0, int stolen = 0, string? fx = null, int healed = 0,
-            bool exploit = false, bool crit = false) =>
+            bool exploit = false, bool crit = false, string? mechanic = null) =>
             events.Add(new TurnEvent(actor.ToString(), action, tech, hit, dmg, reflected, stolen, fx, distance, Math.Max(0, a.Hp), Math.Max(0, b.Hp), a.Qi, b.Qi, healed,
-                (actor == 'a' ? a : b).Momentum, exploit, crit));
+                (actor == 'a' ? a : b).Momentum, exploit, crit, mechanic));
 
         // 1. Effective intents: stun consumes the action; anything no longer legal degrades to rest (defence in depth).
         (Intent? Intent, bool Stunned) Effective(Combatant who, Fighter f, W w, Intent intent)
@@ -161,8 +196,8 @@ public static class CombatEngine
             intent?.Slot is { } slot && c.Technique(who.Slots[slot]!) is var t && (t.Attack is not null || t.Special is { Power: > 0 }) ? 1 : 0;
         int Speed(Combatant who, Intent? intent) => intent?.Slot is { } slot ? c.Technique(who.Slots[slot]!).Speed : 0;
 
-        var initA = ca.Stat("agility") + Speed(ca, effA) + rng.NextInt(0, c.InitiativeRandom);
-        var initB = cb.Stat("agility") + Speed(cb, effB) + rng.NextInt(0, c.InitiativeRandom);
+        var initA = ca.Stat("agility") + Speed(ca, effA) + rng.NextInt(0, c.InitiativeRandom) + a.Sum(EffectTypes.Haste) - a.Sum(EffectTypes.Slow);
+        var initB = cb.Stat("agility") + Speed(cb, effB) + rng.NextInt(0, c.InitiativeRandom) + b.Sum(EffectTypes.Haste) - b.Sum(EffectTypes.Slow);
         var (pA, pB) = (Priority(ca, effA), Priority(cb, effB));
         bool aFirst = pA != pB ? pA < pB : initA != initB ? initA > initB : rng.NextInt(0, 2) == 0;
         char[] order = aFirst ? ['a', 'b'] : ['b', 'a'];
@@ -176,6 +211,7 @@ public static class CombatEngine
             if (stunned)
             {
                 me.SetMomentum(0);
+                me.SetValue(EffectTypes.Charge, 0); // a stun breaks the Qi charge
                 Log(side, "stunned");
                 continue;
             }
@@ -184,6 +220,7 @@ public static class CombatEngine
             {
                 me.Qi = Math.Min(me.MaxQi, me.Qi + c.Vitals.RestQiGain);
                 me.SetMomentum(0);
+                if (c.Mechanics is { } restMech && who.Path == "qi") me.SetValue(EffectTypes.Charge, Math.Min(100, me.Value(EffectTypes.Charge) + restMech.ChargeOnRest));
                 Log(side, "rest");
                 continue;
             }
@@ -196,6 +233,7 @@ public static class CombatEngine
             if (t.Defense is { } d)
             {
                 me.Effects.Add(new Effect(EffectTypes.Guard, Math.Min(900, d.BlockPermille + (who.Perks?.GuardPermille ?? 0)), 0, 1));
+                if (c.Mechanics is { } guardMech && who.Path == "qi") me.SetValue(EffectTypes.Charge, Math.Min(100, me.Value(EffectTypes.Charge) + guardMech.ChargeOnRest));
                 Log(side, "defend", t.Id);
             }
             else if (t.Movement is { } m)
@@ -214,17 +252,13 @@ public static class CombatEngine
                 if (sp.EvasionPermille > 0) me.Effects.Add(new Effect(EffectTypes.Evasion, sp.EvasionPermille, 0, 1));
                 if (sp.GuardPermille > 0) me.Effects.Add(new Effect(EffectTypes.Guard, Math.Min(900, sp.GuardPermille + (who.Perks?.GuardPermille ?? 0)), 0, 1));
                 var healed = 0;
-                if (sp.HealPermille > 0)
-                {
-                    var heal = me.MaxHp * (sp.HealPermille + (who.Perks?.HealPermille ?? 0)) / 1000;
-                    healed = Math.Max(0, Math.Min(me.MaxHp, me.Hp + heal) - me.Hp);
-                    me.Hp += healed;
-                }
+                if (sp.HealPermille > 0) healed = me.Heal(me.MaxHp * (sp.HealPermille + (who.Perks?.HealPermille ?? 0)) / 1000, c.PoisonHealBlockPermille);
+                if (sp.SelfEffect is { } self) ApplySelf(me, self);
 
                 if (sp.Power > 0)
                 {
-                    var (hit, damage, reflected, stolen, applied, exploit, crit) = Strike(me, foe, who, foeWho, eq, sp.Power, sp.Scaling!, sp.AccuracyPermille, sp.Effect);
-                    Log(side, "special", t.Id, hit: hit, dmg: damage, reflected: reflected, stolen: stolen, fx: applied, healed: healed, exploit: exploit, crit: crit);
+                    var (hit, damage, reflected, stolen, applied, exploit, crit, mechanic) = Strike(me, foe, who, foeWho, eq, sp.Power, sp.Scaling!, sp.AccuracyPermille, sp.Effect);
+                    Log(side, "special", t.Id, hit: hit, dmg: damage, reflected: reflected, stolen: stolen, fx: applied, healed: healed, exploit: exploit, crit: crit, mechanic: mechanic);
                 }
                 else
                 {
@@ -233,8 +267,8 @@ public static class CombatEngine
             }
             else if (t.Attack is { } atk)
             {
-                var (hit, damage, reflected, stolen, applied, exploit, crit) = Strike(me, foe, who, foeWho, eq, atk.Power, atk.Scaling, atk.AccuracyPermille, atk.Effect);
-                Log(side, "attack", t.Id, hit: hit, dmg: damage, reflected: reflected, stolen: stolen, fx: applied, exploit: exploit, crit: crit);
+                var (hit, damage, reflected, stolen, applied, exploit, crit, mechanic) = Strike(me, foe, who, foeWho, eq, atk.Power, atk.Scaling, atk.AccuracyPermille, atk.Effect);
+                Log(side, "attack", t.Id, hit: hit, dmg: damage, reflected: reflected, stolen: stolen, fx: applied, exploit: exploit, crit: crit, mechanic: mechanic);
             }
         }
 
@@ -243,7 +277,7 @@ public static class CombatEngine
         // A landed strike builds momentum, a miss loses it (as do resting and being stunned).
         // 1.6: the agility edge is relative, Focus (vs Willpower) gives critical strikes, Willpower (vs Focus) resists effects,
         // Elemental Affinity weights the element modifier and bleeding grows with the attacker's stat like damage does.
-        (bool Hit, int Damage, int Reflected, int Stolen, string? Applied, bool Exploit, bool Crit) Strike(W me, W foe, Combatant who, Combatant foeWho, EquippedTechnique eq,
+        (bool Hit, int Damage, int Reflected, int Stolen, string? Applied, bool Exploit, bool Crit, string? Mechanic) Strike(W me, W foe, Combatant who, Combatant foeWho, EquippedTechnique eq,
             int power, string scaling, int accuracy, EffectSpec? effect)
         {
             var chance = c.HitChance.BasePermille
@@ -255,9 +289,11 @@ public static class CombatEngine
             if (!hit)
             {
                 me.SetMomentum(0);
-                return (false, 0, 0, 0, null, false, false);
+                return (false, 0, 0, 0, null, false, false, null);
             }
 
+            var mech = c.Mechanics;
+            string? mechanic = null;
             var combo = c.Combo;
             var exploit = combo is not null && combo.ExploitPermille > 0 && foe.Weakened;
             long dmg = power;
@@ -268,15 +304,47 @@ public static class CombatEngine
             if (c.Elements is { } el)
                 dmg = dmg * (1000 + el.Modifier(el.OfTechnique(c.Technique(eq).Id) ?? who.Element, foeWho.Element, who.Stat("elementalAffinity"), foeWho.Stat("elementalAffinity"))) / 1000;
             if (s.Turn == 1 && (who.Perks?.FirstStrikePermille ?? 0) > 0) dmg = dmg * (1000 + who.Perks!.FirstStrikePermille) / 1000;
-            dmg = dmg * (1000 - me.Sum(EffectTypes.Weaken)) / 1000;
+            dmg = dmg * (1000 - me.Sum(EffectTypes.Weaken) + me.Sum(EffectTypes.Empower)) / 1000;
+
+            // path mechanics on the attacker's side (1.7)
+            var piercing = false;
+            if (mech is not null && who.Path == "qi" && scaling == "spirit" && me.Value(EffectTypes.Charge) >= 100)
+            {
+                dmg = dmg * (1000 + mech.ChargeDamagePermille) / 1000;
+                piercing = true;
+                me.SetValue(EffectTypes.Charge, 0);
+                var buff = foe.Effects.FirstOrDefault(e => EffectTypes.Buffs.Contains(e.Type));
+                if (buff is not null) foe.Effects.Remove(buff);
+                mechanic = "charge";
+            }
+
+            if (mech is not null && who.Path == "body") dmg = dmg * (1000 + (me.Value(EffectTypes.Fury) * mech.FuryDamagePermille)) / 1000;
+
             dmg = dmg * (1000 + variance) / 1000;
             var crit = c.Crit is { } cr && rng.NextInt(0, 1000) < cr.ChancePermille(who.Stat("focus"), foeWho.Stat("willpower"));
             if (crit) dmg = dmg * (1000 + c.Crit!.DamagePermille) / 1000;
-            dmg = dmg * (1000 - foe.Sum(EffectTypes.Guard)) / 1000;
+
+            // the defender's side: defence, fury, frailty, poison bloom, fortify, guard (scorched or pierced guards do not hold)
+            if (c.Defense is { } def) dmg = dmg * (1000 - def.ReductionPermille(foeWho.Stat("constitution"), foeWho.Stat("willpower"), who.Stat(scaling))) / 1000;
+            if (mech is not null && foeWho.Path == "body") dmg = dmg * (1000 - Math.Min(600, foe.Value(EffectTypes.Fury) * mech.FuryReductionPermille)) / 1000;
+            var blossom = mech is not null && EffectTypes.Toxins.Count(t => foe.Count(t) > 0) >= 3 ? mech.BlossomPermille : 0;
+            dmg = dmg * (1000 + foe.Sum(EffectTypes.Frail) + blossom - foe.Sum(EffectTypes.Fortify)) / 1000;
+            if (!piercing && foe.Count(EffectTypes.Scorched) == 0) dmg = dmg * (1000 - foe.Sum(EffectTypes.Guard)) / 1000;
             var damage = (int)Math.Max(1, dmg);
+
+            // a shield soaks the blow first
+            if (foe.Effects.FirstOrDefault(e => e.Type == EffectTypes.Shield) is { } shield)
+            {
+                var soaked = Math.Min(shield.Magnitude, damage);
+                foe.Effects.Remove(shield);
+                if (shield.Magnitude > soaked) foe.Effects.Add(shield with { Magnitude = shield.Magnitude - soaked });
+                damage -= soaked;
+            }
+
             foe.Hp -= damage;
             Survive(foe, foeWho);
-            if ((who.Perks?.LifestealPermille ?? 0) > 0) me.Hp = Math.Min(me.MaxHp, me.Hp + (damage * who.Perks!.LifestealPermille / 1000));
+            if (mech is not null && foeWho.Path == "body" && damage > 0) foe.SetValue(EffectTypes.Fury, Math.Min(mech.FuryMaxStacks, foe.Value(EffectTypes.Fury) + 1));
+            if ((who.Perks?.LifestealPermille ?? 0) > 0) me.Heal(damage * who.Perks!.LifestealPermille / 1000, c.PoisonHealBlockPermille);
             if ((foeWho.Perks?.ReflectPermille ?? 0) > 0 && foe.Hp > 0)
             {
                 me.Hp -= damage * foeWho.Perks!.ReflectPermille / 1000;
@@ -286,26 +354,96 @@ public static class CombatEngine
             int reflected = 0, stolen = 0;
             if (foe.Effects.FirstOrDefault(e => e.Type == EffectTypes.Counter) is { } counter)
             {
-                reflected = damage * counter.Magnitude / 1000;
+                var fullFury = mech is not null && foeWho.Path == "body" && foe.Value(EffectTypes.Fury) >= mech.FuryMaxStacks;
+                reflected = damage * counter.Magnitude / 1000 * (fullFury ? 2 : 1);
                 me.Hp -= reflected;
                 stolen = Math.Min(counter.Extra, me.Qi);
                 me.Qi -= stolen;
                 foe.Qi = Math.Min(foe.MaxQi, foe.Qi + stolen);
+                if (fullFury) mechanic = "fury";
             }
 
             string? applied = null;
             var resist = c.Resist?.ResistPermille(foeWho.Stat("willpower"), who.Stat("focus")) ?? 0;
-            if (effect is { } fx && foe.Hp > 0 && rng.NextInt(0, 1000) < Math.Min(1000, fx.ChancePermille + (who.Perks?.EffectChancePermille ?? 0)) * (1000 - resist) / 1000)
+            var milestone = c.Milestones is { } ms && eq.Level >= 5 ? ms.Level5EffectPermille : 0;
+            if (effect is { } fx && foe.Hp > 0 && rng.NextInt(0, 1000) < Math.Min(1000, fx.ChancePermille + milestone + (who.Perks?.EffectChancePermille ?? 0)) * (1000 - resist) / 1000)
             {
-                var magnitude = fx.Type == EffectTypes.Bleed ? fx.Magnitude * (1000 + (who.Perks?.BleedPermille ?? 0)) / 1000 : fx.Magnitude;
-                if (fx.Type == EffectTypes.Bleed && c.Damage.BleedStatScalingPermille > 0)
-                    magnitude = (int)((long)magnitude * (1000 + ((long)who.Stat(scaling) * c.Damage.BleedStatScalingPermille)) / 1000); // bleeding grows with the stat (1.6)
-                foe.Effects.Add(new Effect(fx.Type, magnitude, 0, fx.Duration));
+                Apply(me, foe, who, fx, scaling);
                 applied = fx.Type;
             }
 
+            // an awakened technique (level 10) carries a second effect
+            if (eq.Awakening is { } aw && foe.Hp > 0 && rng.NextInt(0, 1000) < aw.ChancePermille * (1000 - resist) / 1000)
+            {
+                Apply(me, foe, who, aw, scaling);
+                applied ??= aw.Type;
+            }
+
+            // Flame: embers pile up and burst; Poison: a random toxin
+            if (mech is not null && foe.Hp > 0 && who.Path == "flame" && rng.NextInt(0, 1000) < mech.EmberChancePermille * (1000 - resist) / 1000)
+            {
+                Apply(me, foe, who, new EffectSpec(EffectTypes.Burn, 1000, mech.EmberMagnitude, 3), scaling, mech.EmberStacks);
+                if (foe.Count(EffectTypes.Burn) >= mech.EmberStacks)
+                {
+                    var burst = Math.Max(1, (int)((long)foe.MaxHp * mech.EmberBurstPermille / 1000));
+                    foe.Hp -= burst;
+                    Survive(foe, foeWho);
+                    foe.Effects.RemoveAll(e => e.Type == EffectTypes.Burn);
+                    foe.Effects.Add(new Effect(EffectTypes.Scorched, 1, 0, 1));
+                    damage += burst;
+                    mechanic = "ember_burst";
+                }
+            }
+            else if (mech is not null && foe.Hp > 0 && who.Path == "poison" && rng.NextInt(0, 1000) < mech.ToxinChancePermille * (1000 - resist) / 1000)
+            {
+                var toxin = EffectTypes.Toxins[rng.NextInt(0, EffectTypes.Toxins.Count)];
+                var magnitude = toxin == EffectTypes.Slow ? 10 : toxin == EffectTypes.Poison ? mech.ToxinMagnitude : 100;
+                Apply(me, foe, who, new EffectSpec(toxin, 1000, magnitude, mech.ToxinDuration), scaling);
+                if (EffectTypes.Toxins.Count(t => foe.Count(t) > 0) >= 3) mechanic = "blossom";
+            }
+
             if (combo is not null) me.SetMomentum(Math.Min(combo.MaxMomentum, me.Momentum + 1));
-            return (true, damage, reflected, stolen, applied, exploit, crit);
+            return (true, damage, reflected, stolen, applied, exploit, crit, mechanic);
+        }
+
+        // Puts an effect on the target (or acts at once: dispel, drain); damage over time grows with the attacker's stat.
+        void Apply(W me, W foe, Combatant who, EffectSpec fx, string scaling, int? maxStacks = null)
+        {
+            switch (fx.Type)
+            {
+                case EffectTypes.Dispel:
+                    var buff = foe.Effects.FirstOrDefault(e => EffectTypes.Buffs.Contains(e.Type));
+                    if (buff is not null) foe.Effects.Remove(buff);
+                    return;
+                case EffectTypes.Drain:
+                    var taken = Math.Min(fx.Magnitude, foe.Qi);
+                    foe.Qi -= taken;
+                    me.Qi = Math.Min(me.MaxQi, me.Qi + taken);
+                    return;
+                case EffectTypes.Shield or EffectTypes.Empower or EffectTypes.Fortify or EffectTypes.Haste or EffectTypes.Cleanse:
+                    ApplySelf(me, fx);
+                    return;
+            }
+
+            var magnitude = fx.Type == EffectTypes.Bleed ? fx.Magnitude * (1000 + (who.Perks?.BleedPermille ?? 0)) / 1000 : fx.Magnitude;
+            if (EffectTypes.DamageOverTime.Contains(fx.Type) && c.Damage.BleedStatScalingPermille > 0)
+                magnitude = (int)((long)magnitude * (1000 + ((long)who.Stat(scaling) * c.Damage.BleedStatScalingPermille)) / 1000); // grows with the stat (1.6)
+            if (fx.Type == EffectTypes.Burn) magnitude = magnitude * (1000 + (who.Perks?.BleedPermille ?? 0)) / 1000; // the Flame path's burn perk
+            foe.Add(new Effect(fx.Type, magnitude, 0, fx.Duration), maxStacks ?? (fx.Type == EffectTypes.Stun ? 1 : c.MaxEffectStacks));
+        }
+
+        // Effects a fighter puts on itself (special skills, awakenings): shields are stored as HP points.
+        void ApplySelf(W me, EffectSpec fx)
+        {
+            if (fx.Type == EffectTypes.Cleanse)
+            {
+                var ailment = me.Effects.FirstOrDefault(e => EffectTypes.Ailments.Contains(e.Type));
+                if (ailment is not null) me.Effects.Remove(ailment);
+                return;
+            }
+
+            var magnitude = fx.Type == EffectTypes.Shield ? (int)((long)me.MaxHp * fx.Magnitude / 1000) : fx.Magnitude;
+            me.Add(new Effect(fx.Type, magnitude, 0, fx.Duration), fx.Type == EffectTypes.Shield ? 1 : c.MaxEffectStacks);
         }
 
         // "survive once" perk: the first lethal blow of the battle leaves 1 HP (remembered as a permanent effect)
@@ -330,9 +468,8 @@ public static class CombatEngine
         foreach (var (w, who, side) in new[] { (a, ca, 'a'), (b, cb, 'b') })
         {
             if (w.Hp <= 0 || (who.Perks?.RegenPermille ?? 0) <= 0) continue;
-            var heal = Math.Min(w.MaxHp - w.Hp, Math.Max(1, w.MaxHp * who.Perks!.RegenPermille / 1000));
+            var heal = w.Heal(Math.Max(1, w.MaxHp * who.Perks!.RegenPermille / 1000), c.PoisonHealBlockPermille);
             if (heal <= 0) continue;
-            w.Hp += heal;
             Log(side, "regen", healed: heal);
         }
 
@@ -340,11 +477,12 @@ public static class CombatEngine
         foreach (var (w, side) in new[] { (a, 'a'), (b, 'b') })
         {
             if (w.Hp <= 0) continue;
-            var bleed = w.Effects.Where(e => e.Type == EffectTypes.Bleed).Sum(e => e.Magnitude);
-            if (bleed > 0)
+            foreach (var dot in EffectTypes.DamageOverTime)
             {
-                w.Hp -= bleed;
-                Log(side, "bleed", dmg: bleed);
+                var ticks = w.Effects.Where(e => e.Type == dot).Sum(e => e.Magnitude);
+                if (ticks <= 0) continue;
+                w.Hp -= ticks;
+                Log(side, dot, dmg: ticks); // "bleed" / "burn" / "poison"
             }
         }
 
@@ -353,11 +491,11 @@ public static class CombatEngine
             for (var i = w.Effects.Count - 1; i >= 0; i--)
             {
                 var e = w.Effects[i];
-                if (e.Type is EffectTypes.Guard or EffectTypes.Evasion or EffectTypes.Counter)
+                if (e.Type is EffectTypes.Guard or EffectTypes.Evasion or EffectTypes.Counter or EffectTypes.Scorched)
                 {
                     w.Effects.RemoveAt(i);
                 }
-                else if (e.Type is not (EffectTypes.Stun or EffectTypes.Momentum or EffectTypes.Survived))
+                else if (!EffectTypes.Persistent.Contains(e.Type))
                 {
                     w.Effects[i] = e with { TurnsLeft = e.TurnsLeft - 1 };
                     if (e.TurnsLeft - 1 <= 0) w.Effects.RemoveAt(i);
@@ -365,6 +503,15 @@ public static class CombatEngine
             }
 
             for (var i = 0; i < 8; i++) w.Cd[i] = Math.Max(0, w.Cd[i] - 1);
+            var owner = ReferenceEquals(w, a) ? ca : cb;
+            if (w.Hp > 0 && c.Mechanics is { } turnMech && owner.Path == "qi")
+                w.SetValue(EffectTypes.Charge, Math.Min(100, w.Value(EffectTypes.Charge) + turnMech.ChargePerTurn));
+            // bosses enter a second phase at half health: stronger blows for the rest of the battle
+            if (w.Hp > 0 && owner.Enrages && c.EnragePermille > 0 && w.Hp * 2 < w.MaxHp && w.Count(EffectTypes.Enraged) == 0)
+            {
+                w.Effects.Add(new Effect(EffectTypes.Enraged, 1, 0, 1));
+                w.Effects.Add(new Effect(EffectTypes.Empower, c.EnragePermille, 0, 99));
+            }
             if (w.Hp > 0) w.Qi = Math.Min(w.MaxQi, w.Qi + c.Vitals.QiRegenPerTurn + ((ReferenceEquals(w, a) ? ca : cb).Perks?.QiRegen ?? 0));
         }
 
@@ -391,10 +538,13 @@ public static class CombatEngine
 public static class CombatAi
 {
     /// <summary>Weighted random choice among legal actions: attacks first, the special skill when it pays off, guards now and then.</summary>
-    public static Intent Choose(CombatConfig c, Combatant self, Fighter me, int distance, DeterministicRandom rng)
+    public static Intent Choose(CombatConfig c, Combatant self, Fighter me, int distance, DeterministicRandom rng, Combatant? foe = null, Fighter? foeState = null)
     {
         if (me.IsStunned) return Intent.Rest;
         var options = new List<(Intent Intent, int Weight)> { (Intent.Rest, me.Qi < 10 ? 4 : 1) };
+        var foeBuffed = foeState?.Effects.Any(e => EffectTypes.Buffs.Contains(e.Type)) == true;
+        var charged = self.Path == "qi" && me.Effects.Any(e => e.Type == EffectTypes.Charge && e.Magnitude >= 100);
+        var furious = c.Mechanics is { } m && self.Path == "body" && me.Effects.Any(e => e.Type == EffectTypes.Fury && e.Magnitude >= m.FuryMaxStacks);
         for (var slot = 0; slot < 8; slot++)
         {
             if (self.Slots[slot] is not { } eq) continue;
@@ -402,9 +552,16 @@ public static class CombatAi
             if (CombatEngine.Validate(c, self, me, distance, candidate) is not null) continue;
             var t = c.Technique(eq);
             var weight = t.Attack is not null ? 6
-                : t.Special is { } sp ? (sp.HealPermille > 0 && me.Hp * 2 < me.MaxHp ? 9 : sp.Power > 0 ? 7 : 3)
+                : t.Special is { } sp ? (sp.HealPermille > 0 && me.Hp * 2 < me.MaxHp ? 9 : sp.SelfEffect?.Type == EffectTypes.Shield && me.Hp * 5 < me.MaxHp * 3 ? 8 : sp.Power > 0 ? 7 : 3)
                 : t.Movement is not null ? 2
                 : 2;
+            // 1.7: read the fight — strike with the overcoming element, strip buffs, spend a full charge, counter in full fury
+            var effect = t.Attack?.Effect ?? t.Special?.Effect;
+            if (foe is not null && c.Elements is { } el && (t.Attack is not null || t.Special is { Power: > 0 })
+                && el.Modifier(el.OfTechnique(t.Id) ?? self.Element, foe.Element) > 0) weight += 3;
+            if (foeBuffed && effect?.Type == EffectTypes.Dispel) weight += 6;
+            if (charged && (t.Attack?.Scaling ?? t.Special?.Scaling) == "spirit") weight += 6;
+            if (furious && t.Counter is not null) weight += 5;
             options.Add((candidate, weight));
         }
 

@@ -536,7 +536,13 @@ public sealed class CultivationService(
             if (stored.MeditationStartedAt is not null) profile = profile with { Mode = CultivationModes.Meditation };
         }
 
-        return new Loaded(character, state, stored?.Version ?? 0, profile, storedProfile?.Version ?? 0);
+        // 1.7: Insight, Willpower and Fate count for breakthroughs with everything the cultivator built (meridians, realm
+        // bonus), measured against the realm's stat budget, so investing in them helps and the chance never saturates.
+        var allocated = await repo.ListMeridiansAsync(uow, character.Id, ct);
+        var chanceStats = new Dictionary<string, int>(character.Stats);
+        foreach (var stat in CultivationRules.ChanceStats)
+            chanceStats[stat] = CultivationRules.RelativeStat(character.Stats.GetValueOrDefault(stat) + allocated.GetValueOrDefault(stat) + MeridianRules.RealmBonus(state), state.RealmIndex);
+        return new Loaded(character with { Stats = chanceStats }, state, stored?.Version ?? 0, profile, storedProfile?.Version ?? 0);
     }
 
     /// <summary>Credits the Qi flow since the last settlement, then runs automatic breakthroughs if enabled.</summary>

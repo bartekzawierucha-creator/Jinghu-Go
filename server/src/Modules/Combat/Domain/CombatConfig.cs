@@ -29,7 +29,14 @@ public sealed record CombatConfig(
     ScalingRules? Scaling = null,
     CritRules? Crit = null,
     ResistRules? Resist = null,
-    PerkCaps? PerkCaps = null)
+    PerkCaps? PerkCaps = null,
+    int MaxEffectStacks = 0,
+    DefenseRules? Defense = null,
+    PathMechanicRules? Mechanics = null,
+    PerkCaps? PvpPerkCaps = null,
+    MilestoneRules? Milestones = null,
+    int PoisonHealBlockPermille = 0,
+    int EnragePermille = 0)
 {
     /// <summary>Combat perks of a cultivation path (none for an unknown path or a config without them).</summary>
     public PathPerks? Perks(string? path) => path is not null && PathPerks is not null && PathPerks.TryGetValue(path, out var p) ? p : null;
@@ -266,9 +273,31 @@ public sealed record PerkCaps(int DamagePermille, int GuardPermille, int EffectC
 /// fighter's realm by the ratio of the expected stat budgets (<see cref="StatBase"/> + <see cref="StatPerRealm"/> × realm),
 /// its techniques gain a level every <see cref="RealmsPerTechniqueLevel"/> realms, and its Qi and stones grow with it.
 /// </summary>
+/// <remarks>
+/// 1.7: rewards no longer come from each NPC's own number (weak foes paid relatively the most): a won battle pays
+/// <see cref="RewardPermilleByTier"/>‰ of the Qi the cultivator's current stage needs (bosses ×<see cref="BossRewardPermille"/>‰),
+/// and <see cref="StonesByTier"/> stones × (1 + <see cref="StonesPermillePerRealm"/>‰ per realm).
+/// </remarks>
 public sealed record ScalingRules(int StatBase, int StatPerRealm, int QiGrowthPermille, int StonesPermillePerRealm, int RealmsPerTechniqueLevel,
-    IReadOnlyList<int> TierHomeRealm, int MaxRealm = 65)
+    IReadOnlyList<int> TierHomeRealm, int MaxRealm = 65, IReadOnlyList<int>? RewardPermilleByTier = null, int BossRewardPermille = 2000,
+    IReadOnlyList<int>? StonesByTier = null)
 {
+    /// <summary>Qi for a won battle as a share of the stage requirement (null when the tier table is not configured).</summary>
+    public long? TierQi(NpcDefinition n, long stageQi)
+    {
+        if (RewardPermilleByTier is not { Count: > 0 } t || stageQi <= 0) return null;
+        var p = (long)t[Math.Clamp(n.Tier, 1, t.Count) - 1] * (n.Boss ? BossRewardPermille : 1000) / 1000;
+        return Math.Max(1, stageQi * p / 1000);
+    }
+
+    /// <summary>Stones for a won battle by tier and the fighter's realm (null when not configured).</summary>
+    public long? TierStones(NpcDefinition n, int realm)
+    {
+        if (StonesByTier is not { Count: > 0 } t) return null;
+        var baseStones = (long)t[Math.Clamp(n.Tier, 1, t.Count) - 1] * (n.Boss ? BossRewardPermille : 1000) / 1000;
+        return baseStones * (1000 + ((long)StonesPermillePerRealm * Math.Clamp(realm, 0, MaxRealm))) / 1000;
+    }
+
     public int Home(NpcDefinition n) => n.HomeRealm ?? TierHomeRealm[Math.Clamp(n.Tier, 1, TierHomeRealm.Count) - 1];
 
     public long Budget(int realm) => StatBase + ((long)StatPerRealm * Math.Clamp(realm, 0, MaxRealm));
@@ -351,7 +380,34 @@ public sealed record MovementSpec(int EvasionPermille);
 /// Special skill: any mix of a strike (power &gt; 0, scaled by a stat), healing (‰ of max HP), evasion and a guard for the
 /// turn, and an effect on the target. Usually expensive with a long cooldown.
 /// </summary>
-public sealed record SpecialSpec(int Power, string? Scaling, int AccuracyPermille, int HealPermille, int EvasionPermille, int GuardPermille, EffectSpec? Effect);
+public sealed record SpecialSpec(int Power, string? Scaling, int AccuracyPermille, int HealPermille, int EvasionPermille, int GuardPermille, EffectSpec? Effect,
+    EffectSpec? SelfEffect = null);
+
+/// <summary>Defence (1.7): Constitution + Willpower against the attacker's stat reduce damage: Permille × (con+will) / (con+will+2×stat), at most MaxPermille.</summary>
+public sealed record DefenseRules(int Permille, int MaxPermille)
+{
+    public int ReductionPermille(int constitution, int willpower, int attackStat)
+    {
+        long guard = Math.Max(0, constitution) + Math.Max(0, willpower);
+        var denominator = guard + (2L * Math.Max(0, attackStat));
+        return denominator <= 0 ? 0 : (int)Math.Min(MaxPermille, Permille * guard / denominator);
+    }
+}
+
+/// <summary>
+/// Path mechanics (1.7). Qi: a charge grows every turn (more when resting or guarding); full charge makes the next Spirit strike
+/// heavier, pierce guard and strip a buff. Body: every blow taken adds fury (more damage dealt, less taken; full fury doubles
+/// counters). Flame: strikes kindle embers (burn stacks); a full pile bursts for a share of the foe's max HP and scorches its
+/// guard. Poison: strikes seed one of four toxins; three different toxins at once make the foe "bloom" (takes more from everything).
+/// </summary>
+public sealed record PathMechanicRules(
+    int ChargePerTurn, int ChargeOnRest, int ChargeDamagePermille,
+    int FuryMaxStacks, int FuryDamagePermille, int FuryReductionPermille,
+    int EmberChancePermille, int EmberMagnitude, int EmberStacks, int EmberBurstPermille,
+    int ToxinChancePermille, int ToxinMagnitude, int ToxinDuration, int BlossomPermille);
+
+/// <summary>Technique level milestones (1.7): from level 5 effects land more often; at level 10 the technique awakens an extra effect.</summary>
+public sealed record MilestoneRules(int Level5EffectPermille, int AwakenLevel, IReadOnlyDictionary<string, IReadOnlyList<EffectSpec>> AwakeningPools);
 
 public sealed record CounterSpec(int ReflectPermille, int QiSteal);
 
@@ -390,7 +446,32 @@ public static class EffectTypes
     public const string Counter = "counter"; // this turn: magnitude = ‰ reflected, second value = qi steal
     public const string Momentum = "momentum"; // combo stacks (consecutive landed strikes); never expires on its own
     public const string Survived = "survived"; // the "survive once" perk was used in this battle
-    public static readonly IReadOnlyList<string> Applicable = [Bleed, Stun, Weaken];
+    // 1.7
+    public const string Burn = "burn";       // magnitude = damage per turn (Flame embers stack up to the burst)
+    public const string Poison = "poison";   // magnitude = damage per turn; healing is blocked in part
+    public const string Slow = "slow";       // magnitude = initiative lost
+    public const string Frail = "frail";     // magnitude = ‰ more damage taken
+    public const string Dispel = "dispel";   // instant: strips one buff from the target
+    public const string Drain = "drain";     // instant: steals magnitude Qi
+    public const string Shield = "shield";   // self: magnitude = ‰ of max HP absorbed (stored as HP points)
+    public const string Empower = "empower"; // self: ‰ more damage dealt
+    public const string Fortify = "fortify"; // self: ‰ less damage taken
+    public const string Haste = "haste";     // self: initiative gained
+    public const string Cleanse = "cleanse"; // self, instant: removes one ailment
+    public const string Charge = "charge";   // Qi path: 0-100
+    public const string Fury = "fury";       // Body path: stacks
+    public const string Scorched = "scorched"; // guard does not work this turn (ember burst)
+    public const string Enraged = "enraged"; // marker: the boss has entered its second phase
+
+    public static readonly IReadOnlyList<string> Applicable = [Bleed, Stun, Weaken, Burn, Poison, Slow, Frail, Dispel, Drain];
+    public static readonly IReadOnlyList<string> SelfApplicable = [Shield, Empower, Fortify, Haste, Cleanse];
+    public static readonly IReadOnlyList<string> Ailments = [Bleed, Stun, Weaken, Burn, Poison, Slow, Frail];
+    public static readonly IReadOnlyList<string> Buffs = [Shield, Empower, Fortify, Haste];
+    public static readonly IReadOnlyList<string> Toxins = [Weaken, Slow, Frail, Poison];
+    public static readonly IReadOnlyList<string> DamageOverTime = [Bleed, Burn, Poison];
+
+    /// <summary>Kept until removed (not counted down at the end of a turn).</summary>
+    public static readonly IReadOnlyList<string> Persistent = [Stun, Momentum, Survived, Charge, Fury, Enraged];
 }
 
 public static class CombatConfigValidator
@@ -447,6 +528,17 @@ public static class CombatConfigValidator
         if (c.Techniques is not null && c.Techniques.Any(t => t.MinRealm is < 0 or > 65)) e.Add("technique minRealm must be 0-65.");
         if (c.Progression is { } pr && (pr.InsightXpPermille is < 0 or > 100 || pr.LevelCapBase is < 0 or > 10 || pr.LevelCapRealmsPerLevel is < 0 or > 20))
             e.Add("progression: insightXpPermille 0-100, levelCapBase 0-10, levelCapRealmsPerLevel 0-20.");
+        if (c.MaxEffectStacks is < 0 or > 10) e.Add("maxEffectStacks must be 0-10.");
+        if (c.Defense is { } def && (def.Permille is < 0 or > 1000 || def.MaxPermille is < 0 or > 600)) e.Add("defense: permille 0-1000, max 0-600.");
+        if (c.Mechanics is { } mech && (mech.ChargeDamagePermille is < 0 or > 2000 || mech.FuryMaxStacks is < 0 or > 30 || mech.EmberStacks is < 2 or > 10
+                || mech.EmberBurstPermille is < 0 or > 300 || mech.BlossomPermille is < 0 or > 1000 || mech.ToxinDuration is < 1 or > 5))
+            e.Add("mechanics values out of range.");
+        if (c.Milestones is { } ms && (ms.AwakenLevel is < 2 or > 10 || ms.Level5EffectPermille is < 0 or > 500
+                || ms.AwakeningPools.Values.SelectMany(p => p).Any(fx => !EffectTypes.Applicable.Contains(fx.Type) && !EffectTypes.SelfApplicable.Contains(fx.Type))))
+            e.Add("milestones: awakenLevel 2-10, level5 0-500‰, awakening effects of known types.");
+        if (c.PoisonHealBlockPermille is < 0 or > 1000 || c.EnragePermille is < 0 or > 1000) e.Add("poisonHealBlockPermille and enragePermille must be 0-1000.");
+        if (c.Scaling is { RewardPermilleByTier: { } rt } && (rt.Count != 9 || rt.Any(v => v is < 1 or > 1000))) e.Add("scaling.rewardPermilleByTier: 9 values 1-1000.");
+        if (c.Scaling is { StonesByTier: { } st } && (st.Count != 9 || st.Any(v => v < 0))) e.Add("scaling.stonesByTier: 9 values >= 0.");
         if (c.Combo is { } combo && (combo.MomentumPermillePerStack is < 0 or > 300 || combo.MaxMomentum is < 0 or > 10 || combo.ExploitPermille is < 0 or > 500))
             e.Add("combo: momentum 0-300‰ per stack, max 0-10 stacks, exploit 0-500‰.");
         if (c.Tower is { } tower)
@@ -506,6 +598,8 @@ public static class CombatConfigValidator
                         e.Add($"technique {t.Id}: special values invalid (power 0-300 with a scaling stat, heal/evasion 0-600‰, guard 0-900‰, something to do).");
                     if (sp.Effect is { } sfx && (!EffectTypes.Applicable.Contains(sfx.Type) || sfx.ChancePermille is < 1 or > 1000 || sfx.Duration is < 1 or > 5 || sfx.Magnitude is < 0 or > 900))
                         e.Add($"technique {t.Id}: invalid effect.");
+                    if (sp.SelfEffect is { } self && (!EffectTypes.SelfApplicable.Contains(self.Type) || self.ChancePermille is < 1 or > 1000 || self.Duration is < 1 or > 5 || self.Magnitude is < 0 or > 900))
+                        e.Add($"technique {t.Id}: selfEffect must be shield, empower, fortify, haste or cleanse with sane values.");
                     break;
                 case SlotKinds.Counter when t.Counter is { } k:
                     if (k.ReflectPermille is < 0 or > 1000 || k.QiSteal is < 0 or > 100) e.Add($"technique {t.Id}: counter values invalid.");

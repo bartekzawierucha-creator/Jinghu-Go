@@ -56,4 +56,7 @@ public interface ICombatPerkBonuses
 public interface ICombatRealm
 {
     Task<int> RealmAsync(IUnitOfWork uow, Guid characterId, CancellationToken ct);
+
+    /// <summary>Qi the cultivator's current stage needs (rewards are a share of it, 1.7).</summary>
+    Task<long> StageQiAsync(IUnitOfWork uow, Guid characterId, CancellationToken ct);
 }

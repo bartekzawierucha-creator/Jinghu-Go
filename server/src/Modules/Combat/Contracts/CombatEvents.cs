@@ -21,7 +21,7 @@ public static class CombatEvents
 /// MaxHp lets damage-based progress (tempering) be measured relative to the fighter's health.
 /// </summary>
     public sealed record Participant(Guid AccountId, Guid CharacterId, string Side, string Result, long RewardQi, int DamageTaken = 0,
-        int StonesPermille = 1000, int LuckPermille = 0, int MaxHp = 0);
+        int StonesPermille = 1000, int LuckPermille = 0, int MaxHp = 0, long? Stones = null);
 
     /// <summary>Result per participant: won / lost / draw. NPC sides are not listed.</summary>
     public sealed record BattleFinishedV1(Guid BattleId, string Kind, string Outcome, string? NpcId, IReadOnlyList<Participant> Participants, bool Boss = false,

@@ -60,7 +60,7 @@ public sealed partial class CombatService
     private async Task<ArenaEntry> RefreshArenaAsync(IUnitOfWork uow, CharacterSummary c, DateTimeOffset now, CancellationToken ct)
     {
         var stored = await repo.FindArenaAsync(uow, c.Id, ct);
-        var defense = await SnapshotAsync(uow, c, ct);
+        var defense = await SnapshotAsync(uow, c, ct, pvp: true);
         var entry = stored is null
             ? new ArenaEntry(c.Id, c.AccountId, c.Name, ArenaCfg.StartRating, 0, 0, defense, now, 1)
             : stored with { Name = c.Name, Defense = defense, UpdatedAt = now, Version = stored.Version + 1 };
@@ -74,12 +74,20 @@ public sealed partial class CombatService
         return await repo.CountBattlesOfKindSinceAsync(uow, id, BattleKinds.Arena, dayStart, ct);
     }
 
+    /// <summary>Arena rivals are looked for within this many realms first (1.7).</summary>
+    public const int ArenaRealmWindow = 3;
+
     private async Task<ArenaView> ArenaViewAsync(IUnitOfWork uow, CharacterSummary c, ArenaEntry mine, DateTimeOffset now, CancellationToken ct)
     {
         var a = ArenaCfg;
         var league = LeagueOf(mine.Rating);
         var next = a.Leagues.Where(l => l.MinRating > mine.Rating).OrderBy(l => l.MinRating).FirstOrDefault();
-        var near = (await repo.ListArenaAsync(uow, mine.Rating - a.OpponentWindow, mine.Rating + a.OpponentWindow, 12, ct)).Where(e => e.CharacterId != c.Id).Take(5).ToList();
+        var pool = (await repo.ListArenaAsync(uow, mine.Rating - a.OpponentWindow, mine.Rating + a.OpponentWindow, 30, ct)).Where(e => e.CharacterId != c.Id).ToList();
+        // 1.7: rivals within ±3 realms first, then by rating
+        var myRealm = await RealmOfAsync(uow, c.Id, ct);
+        var withRealm = new List<(ArenaEntry Entry, int Gap)>();
+        foreach (var e in pool) withRealm.Add((e, Math.Abs(await RealmOfAsync(uow, e.CharacterId, ct) - myRealm)));
+        var near = withRealm.OrderBy(x => x.Gap <= ArenaRealmWindow ? 0 : 1).ThenBy(x => Math.Abs(x.Entry.Rating - mine.Rating)).Select(x => x.Entry).Take(5).ToList();
         if (near.Count < 3)
             near = [.. near.Concat((await repo.ListArenaAsync(uow, 0, 10000, 20, ct)).Where(e => e.CharacterId != c.Id && near.All(n => n.CharacterId != e.CharacterId))).Take(5)];
         var opponents = near.Select(e =>
@@ -114,7 +122,7 @@ public sealed partial class CombatService
                     return Error.LimitReached("arena_attempts", $"At most {ArenaCfg.AttemptsPerDay} arena fights a day.");
                 if (await HasActiveBattleAsync(uow, c.Id, now, ct)) return Error.Conflict("already_in_battle", "This character is already fighting.");
                 await RefreshArenaAsync(uow, c, now, ct);
-                var a = await SnapshotAsync(uow, c, ct);
+                var a = await SnapshotAsync(uow, c, ct, pvp: true);
                 var b = foe.Defense with { Name = foe.Name };
                 var battle = NewBattle(BattleKinds.Arena, BattleStatuses.Active, c, null, "arena_copy", now) with
                 {

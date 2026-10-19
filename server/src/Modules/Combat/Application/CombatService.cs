@@ -90,6 +90,10 @@ public sealed partial class CombatService(
     /// <summary>Resonance of flat bonuses (gear, pets, titles) with the realm: (10 + realm) / 10, in ‰.</summary>
     public static int ResonancePermille(int realm) => (10 + Math.Clamp(realm, 0, 65)) * 100;
 
+    /// <summary>Fate measured against the realm's stat budget, on the realm-0 scale (1.7: luck and taming never saturate).</summary>
+    private int RelativeFate(Combatant? c, int realm) =>
+        c is null ? 0 : config.Scaling is { } sc ? (int)(c.Stat("fate") * sc.Budget(0) / sc.Budget(realm)) : c.Stat("fate");
+
     /// <summary>Luck from Fate: +3‰ drop chance per point, at most +50 %.</summary>
     public static int LuckPermille(int fate) => Math.Clamp(fate * 3, 0, 500);
 
@@ -171,7 +175,7 @@ public sealed partial class CombatService(
         return new LoadoutView(c.Id.Value, version, slotViews, known);
     }
 
-    private async Task<Combatant> SnapshotAsync(IUnitOfWork uow, CharacterSummary c, CancellationToken ct)
+    private async Task<Combatant> SnapshotAsync(IUnitOfWork uow, CharacterSummary c, CancellationToken ct, bool pvp = false)
     {
         var (slots, _) = await CurrentLoadoutAsync(uow, c, ct);
         var levelCap = config.Progression.LevelCap(await RealmOfAsync(uow, c.Id, ct));
@@ -197,20 +201,35 @@ public sealed partial class CombatService(
 
         var stats = c.Stats.ToDictionary(s => s.Key, s => s.Value + bonuses.GetValueOrDefault(s.Key));
         foreach (var provider in perkBonuses) perks += await provider.BonusAsync(uow, c.Id.Value, ct);
-        var path = (config.Perks(c.Path) ?? new PathPerks(string.Empty)).With(perks).Capped(config.PerkCaps);
+        // PvP (duels, arena) uses its own, lower caps so stacked arts cannot decide a fight between players (1.7)
+        var path = (config.Perks(c.Path) ?? new PathPerks(string.Empty)).With(perks).Capped(pvp && config.PvpPerkCaps is not null ? config.PvpPerkCaps : config.PerkCaps);
         // pets (and Gu pets) grow with their owner's realm like everything else
         if (config.Scaling is { } sc && path.PetPower > 0)
             path = path with { PetPower = (int)(path.PetPower * sc.Budget(await RealmOfAsync(uow, c.Id, ct)) / sc.Budget(0)) };
         var hpBonus = config.PathHpBonusPermille[c.Path] + perks.HpPermille;
-        if (config.PerkCaps is { } caps) hpBonus = Math.Min(hpBonus, caps.HpPermille);
+        if ((pvp && config.PvpPerkCaps is not null ? config.PvpPerkCaps : config.PerkCaps) is { } caps) hpBonus = Math.Min(hpBonus, caps.HpPermille);
         var deco = await CharacterDecorations.ForAsync(decorations, uow, c.Id.Value, ct);
-        return new Combatant(c.Name, stats, [.. slots.Select(id => id is null ? null : new EquippedTechnique(id, mastery.GetValueOrDefault(id, 1), dao.GetValueOrDefault(id)))],
-            null, hpBonus, path, config.Elements?.Paths.GetValueOrDefault(c.Path), deco.Title, deco.Badges, deco.TitleRarity);
+        return new Combatant(c.Name, stats, [.. slots.Select(id => id is null ? null : new EquippedTechnique(id, mastery.GetValueOrDefault(id, 1), dao.GetValueOrDefault(id),
+                Awakening(c, id, mastery.GetValueOrDefault(id, 1))))],
+            null, hpBonus, path, config.Elements?.Paths.GetValueOrDefault(c.Path), deco.Title, deco.Badges, deco.TitleRarity, c.Path);
     }
 
     private Combatant NpcCombatant(NpcDefinition n) =>
         new(n.NamePl, n.Stats, [.. n.Loadout.Select(s => s is null ? null : new EquippedTechnique(s.Id, s.Level))], n.HpOverride,
-            Element: config.Elements?.Npcs.GetValueOrDefault(n.Id));
+            Element: config.Elements?.Npcs.GetValueOrDefault(n.Id), Enrages: n.Boss);
+
+    /// <summary>
+    /// The extra effect a technique awakens at the milestone level (1.7): picked from the path's pool by a stable hash of the
+    /// character and the technique, so the same character always awakens the same effect.
+    /// </summary>
+    private EffectSpec? Awakening(CharacterSummary c, string techniqueId, int level)
+    {
+        if (config.Milestones is not { } ms || level < ms.AwakenLevel) return null;
+        if (!ms.AwakeningPools.TryGetValue(c.Path, out var pool) && !ms.AwakeningPools.TryGetValue("any", out pool)) return null;
+        if (pool.Count == 0) return null;
+        var bytes = System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(c.Id.Value.ToString("N") + ":" + techniqueId));
+        return pool[(int)(BitConverter.ToUInt32(bytes, 0) % (uint)pool.Count)];
+    }
 
     // ---------------------------------------------------------------- starting battles
 
@@ -305,8 +324,8 @@ public sealed partial class CombatService(
 
             var ca = await characters.FindAsync(uow, battle.CharacterA.Value, ct);
             var cb = await characters.FindAsync(uow, battle.CharacterB!.Value.Value, ct);
-            var a = await SnapshotAsync(uow, ca!, ct);
-            var b = await SnapshotAsync(uow, cb!, ct);
+            var a = await SnapshotAsync(uow, ca!, ct, pvp: true);
+            var b = await SnapshotAsync(uow, cb!, ct, pvp: true);
             var started = battle with
             {
                 Status = BattleStatuses.Active,
@@ -506,7 +525,8 @@ public sealed partial class CombatService(
     /// before they act — the telegraph — and is exactly what B then does.
     /// </summary>
     private Intent NpcIntent(Battle battle) =>
-        CombatAi.Choose(config, battle.CombatantB!, battle.State!.B, battle.State.Distance, CombatEngine.TurnRng(battle.Seed ^ 0xA1A1A1A1A1A1A1A1UL, battle.State.Turn));
+        CombatAi.Choose(config, battle.CombatantB!, battle.State!.B, battle.State.Distance, CombatEngine.TurnRng(battle.Seed ^ 0xA1A1A1A1A1A1A1A1UL, battle.State.Turn),
+            battle.CombatantA, battle.State.A);
 
     private async Task<Battle?> FinishAsync(IUnitOfWork uow, Battle battle, int expectedVersion, DateTimeOffset at, CancellationToken ct)
     {
@@ -519,16 +539,25 @@ public sealed partial class CombatService(
             _ => 0,
         };
         var stonesPermille = 1000;
+        long? stones = null;
         if (battle.Kind == BattleKinds.Pve && config.Npc(battle.NpcId!) is { } scaledNpc && config.Scaling is { } scaling)
         {
-            var above = scaling.RealmsAbove(scaledNpc, await RealmOfAsync(uow, battle.CharacterA, ct));
-            stonesPermille = scaling.StonesPermille(above);
+            var fighterRealm = await RealmOfAsync(uow, battle.CharacterA, ct);
+            stonesPermille = scaling.StonesPermille(scaling.RealmsAbove(scaledNpc, fighterRealm));
+            stones = scaling.TierStones(scaledNpc, fighterRealm);
         }
 
         if (battle.Kind == BattleKinds.Pve && outcome == Outcomes.AWon && config.Npc(battle.NpcId!) is { } npc && npc.RewardQi > 0
             && await repo.CountRewardedPveWinsSinceAsync(uow, battle.CharacterA, at.AddDays(-1), ct) < config.Progression.DailyRewardedPveWins)
         {
-            reward = config.Scaling is { } sc ? sc.Qi(npc.RewardQi, sc.RealmsAbove(npc, await RealmOfAsync(uow, battle.CharacterA, ct))) : npc.RewardQi;
+            reward = npc.RewardQi;
+            if (config.Scaling is { } sc)
+            {
+                // 1.7: a share of the stage the cultivator is working on, by threat tier (bosses ×2)
+                long stageQi = 0;
+                foreach (var r in realms) { stageQi = await r.StageQiAsync(uow, battle.CharacterA.Value, ct); break; }
+                reward = sc.TierQi(npc, stageQi) ?? sc.Qi(npc.RewardQi, sc.RealmsAbove(npc, await RealmOfAsync(uow, battle.CharacterA, ct)));
+            }
         }
 
         var finished = battle with
@@ -547,7 +576,7 @@ public sealed partial class CombatService(
             var pet = await repo.FindPetAsync(uow, battle.CharacterA, ct);
             if (pet is null)
             {
-                if (foe.Tameable && SpiritPetRules.Tamed(battle.Seed, SpiritPetRules.TameChancePermille(battle.CombatantA!.Stats.GetValueOrDefault("fate"))))
+                if (foe.Tameable && SpiritPetRules.Tamed(battle.Seed, SpiritPetRules.TameChancePermille(RelativeFate(battle.CombatantA, await RealmOfAsync(uow, battle.CharacterA, ct)))))
                     await repo.SavePetAsync(uow, new SpiritPet(battle.CharacterA, foe.Id, 0, battle.Id, at), ct);
             }
             else
@@ -565,16 +594,18 @@ public sealed partial class CombatService(
         static string ResultFor(char side, string outcome) =>
             outcome == Outcomes.Draw ? "draw" : (outcome == Outcomes.AWon) == (side == 'a') ? "won" : "lost";
         // damage each side took (Body path tempering grows from blows received)
-        var takenA = turns.SelectMany(t => t.Events).Where(e => e.Actor == "b").Sum(e => e.Damage) + turns.SelectMany(t => t.Events).Where(e => e.Actor == "a" && e.Action == "bleed").Sum(e => e.Damage);
-        var takenB = turns.SelectMany(t => t.Events).Where(e => e.Actor == "a" && e.Action != "bleed").Sum(e => e.Damage) + turns.SelectMany(t => t.Events).Where(e => e.Actor == "b" && e.Action == "bleed").Sum(e => e.Damage);
+        static bool Dot(TurnEvent e) => EffectTypes.DamageOverTime.Contains(e.Action);
+        var events = turns.SelectMany(t => t.Events).ToList();
+        var takenA = events.Where(e => e.Actor == "b" && !Dot(e)).Sum(e => e.Damage) + events.Where(e => e.Actor == "a" && Dot(e)).Sum(e => e.Damage);
+        var takenB = events.Where(e => e.Actor == "a" && !Dot(e)).Sum(e => e.Damage) + events.Where(e => e.Actor == "b" && Dot(e)).Sum(e => e.Damage);
         var participants = new List<CombatEvents.Participant>
         {
             new(battle.AccountA.Value, battle.CharacterA.Value, "a", ResultFor('a', outcome), reward, takenA, stonesPermille,
-                LuckPermille(battle.CombatantA?.Stat("fate") ?? 0), battle.State!.A.MaxHp),
+                LuckPermille(RelativeFate(battle.CombatantA, await RealmOfAsync(uow, battle.CharacterA, ct))), battle.State!.A.MaxHp, stones),
         };
         if (battle.Kind == BattleKinds.Pvp)
             participants.Add(new(battle.AccountB!.Value.Value, battle.CharacterB!.Value.Value, "b", ResultFor('b', outcome), 0, takenB, 1000,
-                LuckPermille(battle.CombatantB?.Stat("fate") ?? 0), battle.State!.B.MaxHp));
+                LuckPermille(RelativeFate(battle.CombatantB, await RealmOfAsync(uow, battle.CharacterB!.Value, ct))), battle.State!.B.MaxHp));
 
         await outbox.EnqueueAsync(uow, OutboxMessage.Create(CombatEvents.BattleFinished,
             new CombatEvents.BattleFinishedV1(battle.Id, battle.Kind, outcome, battle.NpcId, participants, battle.NpcId is { } nid && config.Npc(nid)?.Boss == true, battle.Context),

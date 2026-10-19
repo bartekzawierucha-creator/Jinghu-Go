@@ -179,4 +179,10 @@ internal sealed class CultivationCombatRealm(ICultivationRepository repo, Cultiv
 {
     public async Task<int> RealmAsync(IUnitOfWork uow, Guid characterId, CancellationToken ct) =>
         (await new CultivationStatusProvider(repo, config).StatusAsync(uow, characterId, ct)).Realm;
+
+    public async Task<long> StageQiAsync(IUnitOfWork uow, Guid characterId, CancellationToken ct)
+    {
+        var status = await new CultivationStatusProvider(repo, config).StatusAsync(uow, characterId, ct);
+        return CultivationRules.QiRequired(config, status.Realm, Math.Clamp(status.Stage, 1, 12));
+    }
 }

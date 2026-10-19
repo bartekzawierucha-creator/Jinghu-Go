@@ -8,6 +8,15 @@ public static class CultivationRules
     /// <summary>Each realm's tribulation is a little fiercer than the last (on top of being raised to the realm by Combat's scaling).</summary>
     public const int TribulationPowerPerRealmPermille = 3;
 
+    /// <summary>Stats that shape breakthrough chances.</summary>
+    public static readonly string[] ChanceStats = ["insight", "willpower", "fate"];
+
+    /// <summary>Expected stat budget of a realm (same curve as Combat's scaling): 10 + 3 × realm.</summary>
+    public static int StatBudget(int realm) => 10 + (3 * Math.Max(0, realm));
+
+    /// <summary>A stat measured against its realm's budget, expressed on the realm-0 scale (10 = average).</summary>
+    public static int RelativeStat(int value, int realm) => (int)((long)Math.Max(0, value) * 10 / StatBudget(realm));
+
     /// <summary>A flat Qi amount (tuned for realm 0) at a realm: × realmGrowth^realm, like the Qi a stage needs.</summary>
     public static long RealmScaledQi(CultivationConfig c, long qi, int realm)
     {

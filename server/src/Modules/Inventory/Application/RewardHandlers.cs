@@ -20,7 +20,7 @@ internal static class EventMirrors
 
     public sealed record CombatItemsRewarded1(Guid AccountId, Guid CharacterId, string Source, string ReferenceId, long Stones, IReadOnlyList<RewardLine> Items);
 
-    public sealed record BattleParticipant(Guid AccountId, Guid CharacterId, string Side, string Result, long RewardQi, int StonesPermille = 1000, int LuckPermille = 0);
+    public sealed record BattleParticipant(Guid AccountId, Guid CharacterId, string Side, string Result, long RewardQi, int StonesPermille = 1000, int LuckPermille = 0, long? Stones = null);
 
     public sealed record BattleFinished1(Guid BattleId, string Kind, string Outcome, string? NpcId, IReadOnlyList<BattleParticipant> Participants);
 
@@ -89,7 +89,7 @@ internal sealed class CombatLootHandler(IInventoryRepository repo, InventoryLedg
             // Seed from the outbox message id: generated server-side, never exposed, stable across handler retries.
             // stones grow with the realm the opponent was raised to; Fate (luck) raises every drop chance (1.6)
             var (stones, items) = InventoryRules.RollLoot(table, InventoryRules.SeedFrom(message.Id, p.CharacterId), p.LuckPermille);
-            stones = stones * Math.Max(1000, p.StonesPermille) / 1000;
+            stones = p.Stones ?? (stones * Math.Max(1000, p.StonesPermille) / 1000); // 1.7: Combat sends the stones by threat tier
             await RewardGrant.ApplyAsync(repo, ledger, characters, audit, uow, message, p.AccountId, p.CharacterId,
                 "loot", e.BattleId.ToString(), stones, items, config, ct);
         }
