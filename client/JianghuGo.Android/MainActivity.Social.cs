@@ -77,6 +77,12 @@ namespace JianghuGo.Android
             var list = new LinearLayout(this) { Orientation = Orientation.Vertical };
             list.SetGravity(GravityFlags.Bottom);
             body.AddView(list, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0, 1f));
+            var row = _ui.HRow(body, 46, 6);
+            var field = _ui.Field("Napisz…", parent: row);
+            field.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 1f);
+            field.SetFilters(new global::Android.Text.IInputFilter[] { new global::Android.Text.InputFilterLengthFilter(300) });
+            var lines = new List<DirectMessageDto>();
+            const int MaxShown = 9;
             var mod = _ui.HRow(body, 30, 2);
             _ui.Btn("Zgłoś", () =>
             {
@@ -97,12 +103,6 @@ namespace JianghuGo.Android
                 await ShowFriendsAsync();
                 SetStatus(friend.Name + " zablokowany — nie napisze ani nie wyśle zaproszenia.");
             }), mod, secondary: true, sp: 11, heightDp: 30);
-            var row = _ui.HRow(body, 46, 6);
-            var field = _ui.Field("Napisz…", parent: row);
-            field.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 1f);
-            field.SetFilters(new global::Android.Text.IInputFilter[] { new global::Android.Text.InputFilterLengthFilter(300) });
-            var lines = new List<DirectMessageDto>();
-            const int MaxShown = 9;
 
             void Render()
             {
