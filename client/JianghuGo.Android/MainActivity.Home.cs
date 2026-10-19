@@ -188,9 +188,9 @@ namespace JianghuGo.Android
             var page = ui.Content;
             var claimableAch = board.Achievements.Count(a => a.Completed && !a.Claimed);
             var storyReady = board.Story != null && board.Story.Completed && !board.Story.Finished ? 1 : 0;
-            ui.Tabs(page, new[] { "Dziś", "Osiągnięcia", "Tytuły", "Opowieść" }, tab, i => Run(() => ShowQuestsAsync(i)),
+            ui.Tabs(page, new[] { "Dziś", "Osiągnięcia", "Tytuły", "Opowieść", "Sezon" }, tab, i => Run(() => ShowQuestsAsync(i)),
                 badges: new[] { board.Daily.Count(q => q.Completed && !q.Claimed) + (board.Checkin.CheckedInToday ? 0 : 1), claimableAch,
-                    0, storyReady + board.Seasonal.Count(q => q.Completed && !q.Claimed) + WeeklyClaimable(board.Weekly) });
+                    0, storyReady + board.Seasonal.Count(q => q.Completed && !q.Claimed) + WeeklyClaimable(board.Weekly), board.Pass?.Claimable ?? 0 });
 
             async Task Claim(QuestDto q)
             {
@@ -285,6 +285,42 @@ namespace JianghuGo.Android
                         });
                     });
                     ui.Text("Dotknij tytułu, aby nosić go nad postacią (widzą go inni gracze i rywale w walce).", page, 11, Ui.Muted, center: true, maxLines: 2);
+                }
+            }
+            else if (tab == 4)
+            {
+                var pass = board.Pass;
+                if (pass == null)
+                {
+                    ui.Text("Przepustka sezonu jest nieczynna.", page, 13, Ui.Muted, center: true);
+                }
+                else
+                {
+                    var head = ui.Card(page, 0f, 8, pass.Claimable > 0 ? Ui.Gold : Ui.Jade);
+                    head.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, Px(118)) { TopMargin = Px(6) };
+                    ui.Text("SEZON " + pass.Season + " · do " + pass.EndsOn + " · Żetony Losu: " + board.DestinyTokens, head, 12, Ui.Gold, bold: true);
+                    var inLevel = pass.Level >= pass.Levels ? pass.XpPerLevel : pass.Xp % pass.XpPerLevel;
+                    ui.MeterIn(head, Ui.Gold, "Poziom " + pass.Level + " / " + pass.Levels + " · " + inLevel + " / " + pass.XpPerLevel + " PD", inLevel, pass.XpPerLevel, 16);
+                    ui.Text("PD za: walki, medytację, rzemiosło, zbiory, wieżę, wyprawy, przełomy, kroki i meldunki. Sezon zeruje się co kwartał.", head, 10, Ui.Muted, maxLines: 2);
+                    if (pass.Claimable > 0)
+                        ui.Btn("Odbierz nagrody (" + pass.Claimable + ")", () => Run(async () =>
+                        {
+                            var r = await _api.ClaimQuestAsync(c.Id, "pass", Ct);
+                            Sfx.Play(Sfx.Coin);
+                            _board = r.Board;
+                            _balance = r.Balance;
+                            await ShowQuestsAsync(4);
+                            ShowBanner("PRZEPUSTKA SEZONU", "Nagrody odebrane", "+" + r.Stones + " kamieni", "menu_quests");
+                        }), page, sp: 13, heightDp: 38);
+                    var rewards = pass.Rewards;
+                    var startAt = Math.Max(0, Math.Min(pass.Level, rewards.Count - 1));
+                    ui.Pages(page, rewards.Count, 1, 5, (i, cell) =>
+                    {
+                        var r = rewards[i];
+                        var row = ui.Card(cell, 1f, 6, r.Reached && !r.Claimed ? Ui.Gold : (Color?)null, 0);
+                        var extra = (r.ItemNamePl != null ? " + " + r.ItemQuantity + "× " + r.ItemNamePl : string.Empty) + (r.Tokens > 0 ? " + " + r.Tokens + " Żeton Losu" : string.Empty);
+                        ui.Text((r.Claimed ? "✓ " : string.Empty) + "Poziom " + r.Level + ": " + r.Stones + " KD" + extra, row, 12, r.Claimed ? Ui.Muted : r.Reached ? Ui.Gold : Ui.Ink, bold: r.Tokens > 0 || r.ItemNamePl != null);
+                    }, startPage: startAt / 5);
                 }
             }
             else

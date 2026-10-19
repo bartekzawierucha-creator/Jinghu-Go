@@ -18,6 +18,12 @@ public sealed record ChallengeTierView(int Tier, long Threshold, long Stones, bo
 public sealed record WeeklyView(string Id, string NamePl, string DescriptionPl, string Metric, string Until, QuestView Personal, long CommunityTotal, long CommunityTarget,
     long MyContribution, long MinContribution, IReadOnlyList<ChallengeTierView> Tiers);
 
+public sealed record PassLevelView(int Level, long Stones, string? Item, string? ItemNamePl, int ItemQuantity, int Tokens, bool Reached, bool Claimed);
+
+/// <summary>The season pass (1.9): resets every quarter.</summary>
+public sealed record SeasonPassView(string Season, string EndsOn, long Xp, int Level, int Levels, int XpPerLevel, int Claimable, IReadOnlyList<PassLevelView> Rewards,
+    IReadOnlyDictionary<string, int> XpPerMetric);
+
 public sealed record TitleView(string Id, string NamePl, string Rarity, string Source, bool Selected);
 
 public sealed record SelectTitleCommand(string? TitleId);
@@ -26,7 +32,7 @@ public sealed record CheckinView(int Streak, int BestStreak, bool CheckedInToday
 
 public sealed record QuestBoard(string Day, IReadOnlyList<QuestView> Daily, IReadOnlyList<QuestView> Achievements, CheckinView Checkin, IReadOnlyList<string> Titles,
     IReadOnlyDictionary<string, int>? TitleBonuses = null, IReadOnlyList<QuestView>? Seasonal = null, StoryView? Story = null, IReadOnlyList<TitleView>? AllTitles = null,
-    string? SelectedTitleId = null, int SecretsFound = 0, int SecretsTotal = 0, WeeklyView? Weekly = null);
+    string? SelectedTitleId = null, int SecretsFound = 0, int SecretsTotal = 0, WeeklyView? Weekly = null, SeasonPassView? Pass = null, int DestinyTokens = 0);
 
 public sealed record ClaimResult(string QuestId, long Stones, long Balance, QuestBoard Board);
 
@@ -45,7 +51,8 @@ public sealed class QuestService(
     QuestsConfig config,
     TimeProvider clock,
     QuestTitles titles,
-    JianghuGo.Modules.Cultivation.Contracts.ICultivationStatus cultivation)
+    JianghuGo.Modules.Cultivation.Contracts.ICultivationStatus cultivation,
+    IDestinyTokens tokens)
 {
     /// <summary>Daily quests and check-ins pay more as the cultivator climbs: +15 % per realm (1.6).</summary>
     public static long RealmStones(long stones, int realm) => stones * (1000 + (150L * Math.Clamp(realm, 0, 65))) / 1000;
@@ -69,6 +76,7 @@ public sealed class QuestService(
             var now = clock.GetUtcNow();
             var board = await BoardAsync(uow, c.Id, now, ct);
             if (board.Story is { } story && story.Id == questId) return await ClaimStoryAsync(uow, accountId, c.Id, story, now, ct);
+            if (questId == "pass" && board.Pass is { } pass) return await ClaimPassAsync(uow, accountId, c, pass, now, ct);
             if (board.Weekly is { } week && (questId == week.Id || questId.StartsWith(week.Id + "_t", StringComparison.Ordinal)))
                 return await ClaimWeeklyAsync(uow, accountId, c.Id, week, questId, now, ct);
             var quest = board.Daily.Concat(board.Achievements).Concat(board.Seasonal ?? []).FirstOrDefault(q => q.Id == questId);
@@ -114,6 +122,44 @@ public sealed class QuestService(
         var after = await BoardAsync(uow, id, now, ct);
         await uow.CommitAsync(ct);
         return new ClaimResult(story.Id, story.Stones, balance, after);
+    }
+
+    /// <summary>Claims every reached, unclaimed pass level at once (stones, items, Destiny Tokens).</summary>
+    private async Task<Result<ClaimResult>> ClaimPassAsync(IUnitOfWork uow, AccountId accountId, CharacterSummary c, SeasonPassView pass, DateTimeOffset now, CancellationToken ct)
+    {
+        var due = pass.Rewards.Where(r => r.Reached && !r.Claimed).ToList();
+        if (due.Count == 0) return Error.Conflict("quest_not_completed", "No pass rewards to claim.");
+        var period = "Q" + pass.Season;
+        long stones = 0;
+        foreach (var r in due)
+        {
+            if (!await repo.TryClaimAsync(uow, c.Id, period, "pass_" + r.Level, now, ct)) continue;
+            stones += r.Stones;
+            if (r.Item is not null && r.ItemQuantity > 0)
+            {
+                var added = await inventory.AddItemsAsync(uow, c.Id, r.Item, r.ItemQuantity, "season_pass", period + ":" + r.Level, ct);
+                if (!added.IsSuccess) return added.Error!;
+            }
+
+            if (r.Tokens > 0)
+            {
+                var granted = await tokens.GrantOnceAsync(uow, accountId, r.Tokens, DestinyTokenSources.Season, period + ":" + r.Level, ct);
+                if (!granted.IsSuccess) return granted.Error!;
+            }
+        }
+
+        var balance = await inventory.BalanceAsync(uow, c.Id, ct);
+        if (stones > 0)
+        {
+            var credited = await inventory.CreditAsync(uow, c.Id, stones, "season_pass", period + ":" + due[0].Level + "-" + due[^1].Level, ct);
+            if (!credited.IsSuccess) return credited.Error!;
+            balance = credited.Value;
+        }
+
+        await AuditAsync(uow, accountId, "quests.pass_claimed", c.Id.Value, $"{{\"season\":\"{pass.Season}\",\"levels\":{due.Count},\"stones\":{stones}}}", now, ct);
+        var after = await BoardAsync(uow, c.Id, now, ct);
+        await uow.CommitAsync(ct);
+        return new ClaimResult("pass", stones, balance, after);
     }
 
     private async Task<Result<ClaimResult>> ClaimWeeklyAsync(IUnitOfWork uow, AccountId accountId, CharacterId id, WeeklyView week, string questId, DateTimeOffset now, CancellationToken ct)
@@ -203,7 +249,14 @@ public sealed class QuestService(
             if (!credited.IsSuccess) return credited.Error!;
             await repo.AddProgressAsync(uow, c.Id, QuestRules.Period(today), "m_" + Metrics.Checkins, 1, ct);
             await repo.AddProgressAsync(uow, c.Id, QuestRules.Life, "m_" + Metrics.Checkins, 1, ct);
+            if (config.Pass?.XpPerMetric.ContainsKey(Metrics.Checkins) == true)
+                await repo.AddProgressAsync(uow, c.Id, QuestRules.QuarterPeriod(today), "m_" + Metrics.Checkins, 1, ct);
             await repo.MaxProgressAsync(uow, c.Id, QuestRules.Life, "m_" + Metrics.CheckinStreak, streak, ct);
+            if (config.StreakTokenList.FirstOrDefault(s => s.Days == streak) is { } bonus)
+            {
+                var granted = await tokens.GrantOnceAsync(uow, accountId, bonus.Tokens, DestinyTokenSources.Streak, c.Id.Value + ":" + QuestRules.Period(today), ct);
+                if (!granted.IsSuccess) return granted.Error!;
+            }
             await AuditAsync(uow, accountId, "quests.checked_in", characterId, $"{{\"streak\":{streak},\"stones\":{stones}}}", now, ct);
             var after = await BoardAsync(uow, c.Id, now, ct);
             await uow.CommitAsync(ct);
@@ -281,6 +334,24 @@ public sealed class QuestService(
             weekly = new WeeklyView(ev.Id, ev.NamePl, ev.DescriptionPl, ev.Metric, until, personal, total, ev.CommunityTarget, mine, ev.MinContribution, tiers);
         }
 
+        SeasonPassView? passView = null;
+        if (config.Pass is { } pass)
+        {
+            var qperiod = QuestRules.QuarterPeriod(today);
+            var qrows = (await repo.ListAsync(uow, id, qperiod, ct)).ToDictionary(r => r.Key);
+            var counters = pass.XpPerMetric.Keys.ToDictionary(m => m, m => qrows.GetValueOrDefault("m_" + m)?.Progress ?? 0);
+            var xp = QuestRules.PassXp(pass, counters);
+            var level = (int)Math.Min(pass.Levels, xp / pass.XpPerLevel);
+            var rewards = Enumerable.Range(1, pass.Levels).Select(l =>
+            {
+                var m = pass.Milestones?.FirstOrDefault(x => x.Level == l);
+                return new PassLevelView(l, RealmStones(pass.StonesPerLevel, realm), m?.Item, m?.Item is null ? null : catalog.Find(m.Item)?.NamePl ?? m.Item, m?.ItemQuantity ?? 0,
+                    m?.Tokens ?? 0, l <= level, qrows.ContainsKey("q_pass_" + l));
+            }).ToList();
+            passView = new SeasonPassView(qperiod[1..], QuestRules.Period(QuestRules.QuarterEnd(today)), xp, level, pass.Levels, pass.XpPerLevel,
+                rewards.Count(r => r.Reached && !r.Claimed), rewards, pass.XpPerMetric);
+        }
+
         var checkin = await repo.FindCheckinAsync(uow, id, ct);
         var checkedToday = checkin?.LastDay == today;
         var nextStreak = checkedToday ? checkin!.Streak + 1 : QuestRules.NextStreak(checkin, today).Streak;
@@ -290,7 +361,8 @@ public sealed class QuestService(
         return new QuestBoard(day, daily, achievements,
             new CheckinView(checkedToday ? checkin!.Streak : checkin is not null && checkin.LastDay == today.AddDays(-1) ? checkin.Streak : 0, checkin?.BestStreak ?? 0, checkedToday,
                 RealmStones(QuestRules.CheckinStones(config, nextStreak), realm)), titleNames, titleBonuses, seasonal, story, all, all.FirstOrDefault(t => t.Selected)?.Id,
-            config.Achievements.Count(q => q.Secret && (lifeRows.GetValueOrDefault("m_" + q.Metric)?.Progress ?? 0) >= q.Target), config.Achievements.Count(q => q.Secret), weekly);
+            config.Achievements.Count(q => q.Secret && (lifeRows.GetValueOrDefault("m_" + q.Metric)?.Progress ?? 0) >= q.Target), config.Achievements.Count(q => q.Secret), weekly, passView,
+            await characters.FindAsync(uow, id.Value, ct) is { } owner ? await tokens.BalanceAsync(uow, owner.AccountId, ct) : 0);
     }
 
     private Task AuditAsync(IUnitOfWork uow, AccountId accountId, string action, Guid characterId, string json, DateTimeOffset now, CancellationToken ct) =>
@@ -312,6 +384,7 @@ internal static class QuestCounter
         var day = QuestRules.Period(date);
         var season = config.SeasonalList.Any(q => QuestRules.SeasonActive(q, date)) ? QuestRules.SeasonPeriod(date) : null;
         var weekly = QuestRules.WeeklyFor(config, date);
+        var quarter = config.Pass is null ? null : QuestRules.QuarterPeriod(date);
         foreach (var (metric, amount) in items)
         {
             if (Metrics.Max.Contains(metric))
@@ -324,6 +397,7 @@ internal static class QuestCounter
             await repo.AddProgressAsync(uow, c.Id, QuestRules.Life, "m_" + metric, amount, ct);
             if (season is not null) await repo.AddProgressAsync(uow, c.Id, season, "m_" + metric, amount, ct);
             if (weekly?.Metric == metric) await repo.AddProgressAsync(uow, c.Id, QuestRules.WeekPeriod(date), "m_" + metric, amount, ct);
+            if (quarter is not null && config.Pass!.XpPerMetric.ContainsKey(metric)) await repo.AddProgressAsync(uow, c.Id, quarter, "m_" + metric, amount, ct);
         }
     }
 

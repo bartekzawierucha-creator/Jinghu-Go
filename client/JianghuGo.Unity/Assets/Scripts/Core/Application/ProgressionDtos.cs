@@ -82,6 +82,35 @@ namespace JianghuGo.Client.Application
 
         /// <summary>This week's world event and community challenge (1.9).</summary>
         public WeeklyDto Weekly { get; set; }
+
+        /// <summary>Season pass of this quarter (1.9) and the account's Destiny Tokens.</summary>
+        public SeasonPassDto Pass { get; set; }
+        public int DestinyTokens { get; set; }
+    }
+
+    public sealed class PassLevelDto
+    {
+        public int Level { get; set; }
+        public long Stones { get; set; }
+        public string Item { get; set; }
+        public string ItemNamePl { get; set; }
+        public int ItemQuantity { get; set; }
+        public int Tokens { get; set; }
+        public bool Reached { get; set; }
+        public bool Claimed { get; set; }
+    }
+
+    public sealed class SeasonPassDto
+    {
+        public string Season { get; set; }
+        public string EndsOn { get; set; }
+        public long Xp { get; set; }
+        public int Level { get; set; }
+        public int Levels { get; set; }
+        public int XpPerLevel { get; set; }
+        public int Claimable { get; set; }
+        public List<PassLevelDto> Rewards { get; set; } = new List<PassLevelDto>();
+        public Dictionary<string, int> XpPerMetric { get; set; } = new Dictionary<string, int>();
     }
 
     /// <summary>One realm on the Road of 66 Realms (1.9).</summary>

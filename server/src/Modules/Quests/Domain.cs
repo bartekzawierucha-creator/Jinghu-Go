@@ -29,6 +29,18 @@ public sealed record WeeklyEvent(string Id, string NamePl, string DescriptionPl,
         CommunityTarget <= 0 || TierStones is null ? [] : [.. TierStones.Select((s, i) => (CommunityTarget * (i + 1 == TierStones.Count ? 4 : i + 1) / 4, s))];
 }
 
+/// <summary>A season pass milestone: an item and/or Destiny Tokens at a level (stones are paid on every level).</summary>
+public sealed record PassMilestone(int Level, string? Item = null, int ItemQuantity = 0, int Tokens = 0);
+
+/// <summary>
+/// The season pass (1.9): a free track that resets every quarter. Season experience is a weighted sum of what the
+/// cultivator does that season; every level pays stones, milestones add items and Destiny Tokens.
+/// </summary>
+public sealed record SeasonPassConfig(int XpPerLevel, int Levels, IReadOnlyDictionary<string, int> XpPerMetric, long StonesPerLevel, IReadOnlyList<PassMilestone> Milestones);
+
+/// <summary>Destiny Tokens for check-in streaks (at exactly these streak days).</summary>
+public sealed record StreakToken(int Days, int Tokens);
+
 /// <summary>Title for having collected a weekly reward in an arena league.</summary>
 public sealed record LeagueTitle(string League, string TitlePl, string Rarity);
 
@@ -44,8 +56,12 @@ public sealed record QuestsConfig(
     IReadOnlyList<SeasonalQuest>? Seasonal = null,
     IReadOnlyList<StoryChapter>? Story = null,
     IReadOnlyList<LeagueTitle>? ArenaTitles = null,
-    IReadOnlyList<WeeklyEvent>? Weekly = null)
+    IReadOnlyList<WeeklyEvent>? Weekly = null,
+    SeasonPassConfig? Pass = null,
+    IReadOnlyList<StreakToken>? StreakTokens = null)
 {
+    public IReadOnlyList<StreakToken> StreakTokenList => StreakTokens ?? [];
+
     public IReadOnlyList<WeeklyEvent> WeeklyList => Weekly ?? [];
 
     public IReadOnlyList<SeasonalQuest> SeasonalList => Seasonal ?? [];
@@ -175,6 +191,19 @@ public static class QuestRules
         return c.WeeklyList[index % c.WeeklyList.Count];
     }
 
+    /// <summary>Quarter season period, e.g. "Q2026-4"; the pass resets when it changes.</summary>
+    public static string QuarterPeriod(DateOnly day) =>
+        "Q" + day.Year.ToString("0000", System.Globalization.CultureInfo.InvariantCulture) + "-" + (((day.Month - 1) / 3) + 1).ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    public static DateOnly QuarterEnd(DateOnly day)
+    {
+        var lastMonth = (((day.Month - 1) / 3) + 1) * 3;
+        return new DateOnly(day.Year, lastMonth, DateTime.DaysInMonth(day.Year, lastMonth));
+    }
+
+    public static long PassXp(SeasonPassConfig p, IReadOnlyDictionary<string, long> counters) =>
+        p.XpPerMetric.Sum(kv => counters.GetValueOrDefault(kv.Key) * kv.Value);
+
     public static long CheckinStones(QuestsConfig c, int streak) => c.Checkin.BaseStones + (c.Checkin.PerDayStones * (Math.Min(streak, c.Checkin.MaxBonusDays) - 1));
 
     private static ulong Fnv(byte[] bytes)
@@ -249,6 +278,18 @@ public static class QuestsConfigValidator
                 e.Add($"weekly {w.Id}: community challenge invalid.");
             if (string.IsNullOrWhiteSpace(w.NamePl) || string.IsNullOrWhiteSpace(w.DescriptionPl)) e.Add($"weekly {w.Id}: texts required.");
         }
+
+        if (c.Pass is { } pass)
+        {
+            if (pass.XpPerLevel < 1 || pass.Levels is < 1 or > 100 || pass.StonesPerLevel < 0) e.Add("pass: levels/xp invalid.");
+            if (pass.XpPerMetric is null || pass.XpPerMetric.Count == 0 || pass.XpPerMetric.Any(kv => !Metrics.All.Contains(kv.Key) || Metrics.Max.Contains(kv.Key) || kv.Value < 1))
+                e.Add("pass: xpPerMetric must name summed metrics with positive weights.");
+            foreach (var m in pass.Milestones ?? [])
+                if (m.Level < 1 || m.Level > pass.Levels || (m.Item is null) != (m.ItemQuantity == 0) || m.Tokens < 0) e.Add($"pass milestone {m.Level} invalid.");
+        }
+
+        foreach (var s in c.StreakTokenList)
+            if (s.Days < 2 || s.Tokens is < 1 or > 10) e.Add($"streak token {s.Days} invalid.");
 
         foreach (var t in c.ArenaTitleList)
             if (string.IsNullOrWhiteSpace(t.League) || string.IsNullOrWhiteSpace(t.TitlePl) || !Rarities.Contains(t.Rarity)) e.Add($"arena title '{t.League}' invalid.");

@@ -312,6 +312,9 @@ public sealed partial class CombatService
             await outbox.EnqueueAsync(uow, OutboxMessage.Create(CombatEvents.ItemsRewarded,
                 new CombatEvents.ItemsRewardedV1(accountId.Value, c.Id.Value, "world_boss", "cycle-" + cycle, Boss.KillStones, Lines(Boss.KillItems)), now, correlation.CorrelationId), ct);
             await ForgeScrollAsync(uow, c, TechniqueForge.EraOf(await RealmOfAsync(uow, c.Id, ct)), null, 2, ForgedRules, "forge_boss", "cycle-" + cycle, now, ct);
+            // A share in the world boss's fall also brings a Destiny Token (1.9), once per cycle and account.
+            var token = await destiny.GrantOnceAsync(uow, accountId, 1, DestinyTokenSources.Boss, "cycle-" + cycle, ct);
+            if (!token.IsSuccess) return token.Error!;
             await AuditAsync(uow, accountId, "combat.world_boss_claimed", Guid.Empty, new { characterId, cycle }, now, ct);
             var view = await BossViewAsync(uow, c, now, ct);
             await uow.CommitAsync(ct);

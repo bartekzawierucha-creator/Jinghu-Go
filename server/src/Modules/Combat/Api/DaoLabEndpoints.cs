@@ -44,8 +44,8 @@ public static class DaoLabEndpoints
                 HttpContext http, DaoLabService svc, CancellationToken ct) =>
             await Guard(async () => ApiResults.From(await svc.LearnAsync(http.User.GetAccountId(), characterId, instanceId, key, body, ct), Results.Ok)));
 
-        c.MapPost("/meditate", async (Guid characterId, [FromHeader(Name = "Idempotency-Key")] string? key, HttpContext http, CombatService svc, CancellationToken ct) =>
-            await Guard(async () => ApiResults.From(await svc.MeditateOnDaoAsync(http.User.GetAccountId(), characterId, key, ct), Results.Ok)));
+        c.MapPost("/meditate", async (Guid characterId, bool? useToken, [FromHeader(Name = "Idempotency-Key")] string? key, HttpContext http, CombatService svc, CancellationToken ct) =>
+            await Guard(async () => ApiResults.From(await svc.MeditateOnDaoAsync(http.User.GetAccountId(), characterId, key, ct, useToken ?? false), Results.Ok)));
         c.MapPost("/transmute", async (Guid characterId, TransmuteCommand body, [FromHeader(Name = "Idempotency-Key")] string? key, HttpContext http, CombatService svc, CancellationToken ct) =>
             await Guard(async () => ApiResults.From(await svc.TransmuteAsync(http.User.GetAccountId(), characterId, key, body, ct), Results.Ok)));
 

@@ -134,5 +134,7 @@
     {"id": "w_harvest_festival", "namePl": "Święto Zbiorów", "descriptionPl": "Tydzień plonów i zbieractwa w terenie.", "metric": "items_gathered", "target": 150, "stones": 600, "item": "spirit_herb", "itemQuantity": 10, "communityTarget": 60000, "minContribution": 20, "tierStones": [200, 500, 1200]},
     {"id": "w_beast_tide", "namePl": "Przypływ Bestii", "descriptionPl": "Bestie duchowe wychodzą z gór: pokonuj je i oswajaj.", "metric": "spirits_won", "target": 20, "stones": 700, "item": "demon_blood", "itemQuantity": 2, "communityTarget": 8000, "minContribution": 3, "tierStones": [250, 600, 1500]},
     {"id": "w_arena_banners", "namePl": "Sztandary Areny", "descriptionPl": "Tydzień pojedynków: wygrywaj na arenie.", "metric": "arena_won", "target": 25, "stones": 800, "item": "thunder_feather", "itemQuantity": 2, "communityTarget": 8000, "minContribution": 3, "tierStones": [250, 600, 1500]}
-  ]
+  ],
+  "pass": {"xpPerLevel": 1000, "levels": 40, "stonesPerLevel": 150, "xpPerMetric": {"battles_won": 20, "meditation_minutes": 2, "crafts": 30, "items_gathered": 10, "tower_won": 40, "expeditions": 40, "harvests": 20, "breakthroughs": 100, "world_boss_fights": 60, "steps": 1, "pvp_won": 40, "spirits_won": 30, "checkins": 150}, "milestones": [{"level": 5, "item": "greater_qi_pill", "itemQuantity": 3}, {"level": 10, "tokens": 1}, {"level": 15, "item": "soul_jade", "itemQuantity": 1}, {"level": 20, "tokens": 1}, {"level": 25, "item": "heaven_dew", "itemQuantity": 3}, {"level": 30, "tokens": 1}, {"level": 35, "item": "dragon_scale", "itemQuantity": 2}, {"level": 40, "item": "dao_essence", "itemQuantity": 10, "tokens": 2}]},
+  "streakTokens": [{"days": 7, "tokens": 1}, {"days": 30, "tokens": 2}, {"days": 100, "tokens": 3}, {"days": 365, "tokens": 5}]
 }

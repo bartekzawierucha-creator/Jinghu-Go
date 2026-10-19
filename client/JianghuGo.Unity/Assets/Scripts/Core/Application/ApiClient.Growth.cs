@@ -112,8 +112,8 @@ namespace JianghuGo.Client.Application
         public Task<ForgedScrollDto> GetScrollInfoAsync(string techniqueId, CancellationToken ct) =>
             SendAsync<ForgedScrollDto>("GET", "/api/v1/dao-lab/scrolls/" + techniqueId, null, true, null, ct);
 
-        public Task<ForgedScrollDto> MeditateOnDaoAsync(Guid characterId, CancellationToken ct) =>
-            SendAsync<ForgedScrollDto>("POST", Character(characterId) + "/dao-lab/meditate", null, true, NewIdempotencyKey(), ct);
+        public Task<ForgedScrollDto> MeditateOnDaoAsync(Guid characterId, CancellationToken ct, bool useToken = false) =>
+            SendAsync<ForgedScrollDto>("POST", Character(characterId) + "/dao-lab/meditate" + (useToken ? "?useToken=true" : string.Empty), null, true, NewIdempotencyKey(), ct);
 
         public Task<ForgedScrollDto> TransmuteAsync(Guid characterId, string path, CancellationToken ct) =>
             SendAsync<ForgedScrollDto>("POST", Character(characterId) + "/dao-lab/transmute", new { path }, true, NewIdempotencyKey(), ct);

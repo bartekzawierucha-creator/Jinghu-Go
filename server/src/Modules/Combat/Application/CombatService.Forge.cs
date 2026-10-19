@@ -54,20 +54,26 @@ public sealed partial class CombatService
     }
 
     /// <summary>Once a world day: meditate on the Dao for a scroll of your era (costs stones that grow with the era).</summary>
-    public Task<Result<ForgedScrollView>> MeditateOnDaoAsync(AccountId accountId, Guid characterId, string? key, CancellationToken ct) =>
+    /// <param name="useToken">After today's meditation, one more costs a Destiny Token (on top of the stones).</param>
+    public Task<Result<ForgedScrollView>> MeditateOnDaoAsync(AccountId accountId, Guid characterId, string? key, CancellationToken ct, bool useToken = false) =>
         uowFactory.RunAsync<Result<ForgedScrollView>>(async uow =>
         {
-            var result = await Idempotency.ExecuteAsync(idempotency, uow, clock, accountId, "combat.dao_meditation", key, new { characterId }, async Task<Result<ForgedScrollView>> () =>
+            var result = await Idempotency.ExecuteAsync(idempotency, uow, clock, accountId, "combat.dao_meditation", key, new { characterId, useToken }, async Task<Result<ForgedScrollView>> () =>
             {
                 if (config.Forge is not { } f) return Error.NotFound("forge_disabled", "The forge is not available.");
                 var c = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
                 if (c is null) return CharacterNotFound;
                 var now = clock.GetUtcNow();
                 var dayStart = new DateTimeOffset(now.UtcDateTime.Date, TimeSpan.Zero);
-                if (await repo.CountForgedSinceAsync(uow, c.Id, MeditationRules, dayStart, ct) > 0)
-                    return Error.LimitReached("dao_meditation_done", "You already meditated on the Dao today.");
-                var era = TechniqueForge.EraOf(await RealmOfAsync(uow, c.Id, ct));
                 var reference = Uuid7.New().ToString("N");
+                if (await repo.CountForgedSinceAsync(uow, c.Id, MeditationRules, dayStart, ct) > 0)
+                {
+                    if (!useToken) return Error.LimitReached("dao_meditation_done", "You already meditated on the Dao today (another costs a Destiny Token).");
+                    var spent = await destiny.SpendAsync(uow, accountId, 1, DestinyTokenSources.DaoMeditation, reference, ct);
+                    if (!spent.IsSuccess) return spent.Error!;
+                }
+
+                var era = TechniqueForge.EraOf(await RealmOfAsync(uow, c.Id, ct));
                 var paid = await inventory.DebitAsync(uow, c.Id, f.MeditationStonesPerEra * (era + 1), "dao_meditation", reference, ct);
                 if (!paid.IsSuccess) return paid.Error!;
                 var scroll = await ForgeScrollAsync(uow, c, era, null, 0, MeditationRules, "dao_meditation", reference, now, ct);

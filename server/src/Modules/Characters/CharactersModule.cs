@@ -32,6 +32,7 @@ public static class CharactersModule
         }
         services.AddScoped<CharacterService>();
         services.AddSingleton<Contracts.ICharacterDirectory, Contracts.CharacterDirectory>();
+        services.AddSingleton<Contracts.IDestinyTokens, Contracts.DestinyTokens>();
         return services;
     }
 

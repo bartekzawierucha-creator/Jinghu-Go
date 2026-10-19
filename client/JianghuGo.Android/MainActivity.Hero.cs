@@ -526,9 +526,24 @@ namespace JianghuGo.Android
 
             // 1.8: the forge — a daily meditation and essence transmutation
             var forge = ui.HRow(page, 42);
-            ui.Btn("☯ Medytacja nad Dao", () => Run(async () =>
+            var useToken = false;
+            Button meditate = null;
+            meditate = ui.Btn("☯ Medytacja nad Dao", () => Run(async () =>
             {
-                var s = await _api.MeditateOnDaoAsync(c.Id, Ct);
+                ForgedScrollDto s;
+                try
+                {
+                    s = await _api.MeditateOnDaoAsync(c.Id, Ct, useToken);
+                }
+                catch (ApiException e) when (e.Code == "dao_meditation_done")
+                {
+                    // Today's is used: the next tap spends a Destiny Token (1.9).
+                    useToken = true;
+                    meditate.Text = "☯ Jeszcze raz (1 Żeton Losu)";
+                    SetStatus("Dziś już medytowano. Kolejna medytacja kosztuje Żeton Losu.");
+                    return;
+                }
+
                 Sfx.Play(Sfx.Breakthrough, 0.7f);
                 await ShowDaoLabAsync();
                 ShowBanner("ZWÓJ " + s.RarityPl.ToUpperInvariant(), s.NamePl, s.DescriptionPl, "item_technique_scroll");

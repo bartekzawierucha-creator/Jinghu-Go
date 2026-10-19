@@ -93,7 +93,8 @@ public sealed partial class CombatService(
     TimeProvider clock,
     IItemCatalog items,
     IEnumerable<ICombatRealm> realms,
-    IInventory inventory) : ICombatEncounters
+    IInventory inventory,
+    IDestinyTokens destiny) : ICombatEncounters
 {
     /// <summary>Resonance of flat bonuses (gear, pets, titles) with the realm: (10 + realm) / 10, in ‰.</summary>
     public static int ResonancePermille(int realm) => (10 + Math.Clamp(realm, 0, 65)) * 100;
