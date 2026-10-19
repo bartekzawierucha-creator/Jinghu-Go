@@ -65,6 +65,7 @@ namespace JianghuGo.Android
                 if (st == null || gen != _screen) return;
                 _cultivation = st;
                 RenderHud();
+                MaybeShowMilestone(st.RealmIndex);
                 realm.Text = (string.IsNullOrEmpty(st.RealmHanzi) ? string.Empty : st.RealmHanzi + " ") + st.RealmNamePl + " · " + (st.StageName ?? "etap") + " " + st.Stage + "/" + st.StagesInRealm;
                 var id = ui.ArtId("emblem_" + st.RealmId);
                 if (id != 0) emblem.SetImageBitmap(Ui.Art(this, id));

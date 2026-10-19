@@ -118,6 +118,45 @@ namespace JianghuGo.Android
 
         // ---- tutorial: the mentor points at the real controls ---------------------------------------------------
 
+        private static readonly (int Realm, string Title, string Text)[] Milestones =
+        {
+            (3, "Fundament", "Od teraz odosobnienie (×8 Qi) i metody kultywacji. Wybierz metodę pasującą do twojej ścieżki — rośnie z każdą minutą."),
+            (11, "Nowa era", "Wkraczasz w nową erę: węzły świata dają lepsze materiały, a zwoje technik są mocniejsze. Zajrzyj na Drogę 66 królestw w karcie postaci."),
+            (21, "Gałąź ścieżki", "Twoja ścieżka się rozwidla — wybierz gałąź w Rozwoju. Kolejne stopnie przyjdą w 34., 45. i 56. królestwie."),
+            (33, "Druga ścieżka", "Możesz przyjąć drugą ścieżkę: jej sztuki działają w 60% zamiast 30%. Wybór w Rozwoju."),
+            (44, "Era Świętych", "Wyprawy uczniów sięgają dalej, a wspólne wyzwania tygodnia dają więcej. Nie zapominaj o przyjaciołach — listy mogą nieść dary."),
+            (65, "Umiejętność ostateczna", "Szczyt ścieżki: wybierz umiejętność ostateczną w Rozwoju. Pierwszy wybór jest darmowy."),
+        };
+
+        /// <summary>Once per milestone realm, Mistrz Lao explains what just opened (1.9). Only after the first-run tutorial.</summary>
+        private void MaybeShowMilestone(int realm)
+        {
+            if (!_prefs.GetBoolean(TutorialKey, false) || _overlayOpen) return;
+            var due = Milestones.Where(m => realm >= m.Realm && !_prefs.GetBoolean("jianghu.milestone." + m.Realm, false)).ToList();
+            if (due.Count == 0) return;
+            using (var e = _prefs.Edit())
+            {
+                foreach (var m in due) e.PutBoolean("jianghu.milestone." + m.Realm, true);
+                e.Apply();
+            }
+
+            var (_, title, text) = due[due.Count - 1];
+            var view = new CoachMarkView(this, null, "Mistrz Lao — " + title, text, "Rozumiem");
+            System.Action close = null;
+            close = () =>
+            {
+                _overlayOpen = false;
+                PopOverlay(view);
+                _frame.RemoveView(view);
+            };
+            view.Done += close;
+            _overlayOpen = true;
+            _frame.AddView(view, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+            PushOverlay(view, close);
+        }
+
+        private bool _overlayOpen;
+
         /// <summary>First run: Mistrz Lao highlights the real controls one by one (tap anywhere to continue).</summary>
         private void MaybeShowTutorial(CharacterDto c)
         {
