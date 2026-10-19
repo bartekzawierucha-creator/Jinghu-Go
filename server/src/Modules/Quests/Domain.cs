@@ -17,6 +17,18 @@ public sealed record SeasonalQuest(string Id, string NamePl, string DescriptionP
 /// <summary>One chapter of the story: chapters open one after another; each goal is a lifetime counter.</summary>
 public sealed record StoryChapter(string Id, int Number, string TitlePl, string TextPl, string GoalPl, string Metric, long Target, long Stones, string? Item = null, int ItemQuantity = 0);
 
+/// <summary>
+/// A weekly world event (1.9): one per ISO week in rotation. Everyone has a personal goal on <paramref name="Metric"/>, and all
+/// cultivators together push a community challenge: each reached tier pays everyone who contributed at least <paramref name="MinContribution"/>.
+/// </summary>
+public sealed record WeeklyEvent(string Id, string NamePl, string DescriptionPl, string Metric, long Target, long Stones, string? Item = null, int ItemQuantity = 0,
+    long CommunityTarget = 0, long MinContribution = 1, IReadOnlyList<long>? TierStones = null)
+{
+    /// <summary>Community tiers at 25 %, 50 % and 100 % of the target.</summary>
+    public IReadOnlyList<(long Threshold, long Stones)> Tiers =>
+        CommunityTarget <= 0 || TierStones is null ? [] : [.. TierStones.Select((s, i) => (CommunityTarget * (i + 1 == TierStones.Count ? 4 : i + 1) / 4, s))];
+}
+
 /// <summary>Title for having collected a weekly reward in an arena league.</summary>
 public sealed record LeagueTitle(string League, string TitlePl, string Rarity);
 
@@ -31,8 +43,11 @@ public sealed record QuestsConfig(
     CheckinConfig Checkin,
     IReadOnlyList<SeasonalQuest>? Seasonal = null,
     IReadOnlyList<StoryChapter>? Story = null,
-    IReadOnlyList<LeagueTitle>? ArenaTitles = null)
+    IReadOnlyList<LeagueTitle>? ArenaTitles = null,
+    IReadOnlyList<WeeklyEvent>? Weekly = null)
 {
+    public IReadOnlyList<WeeklyEvent> WeeklyList => Weekly ?? [];
+
     public IReadOnlyList<SeasonalQuest> SeasonalList => Seasonal ?? [];
 
     public IReadOnlyList<StoryChapter> StoryList => Story ?? [];
@@ -143,6 +158,23 @@ public static class QuestRules
 
     public static string SeasonPeriod(DateOnly day) => "S" + day.Year.ToString("0000", System.Globalization.CultureInfo.InvariantCulture);
 
+    /// <summary>ISO week period, e.g. "W2026-43".</summary>
+    public static string WeekPeriod(DateOnly day) =>
+        "W" + System.Globalization.ISOWeek.GetYear(day.ToDateTime(TimeOnly.MinValue)).ToString("0000", System.Globalization.CultureInfo.InvariantCulture) + "-"
+        + System.Globalization.ISOWeek.GetWeekOfYear(day.ToDateTime(TimeOnly.MinValue)).ToString("00", System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>Last day (Sunday) of the ISO week containing <paramref name="day"/>.</summary>
+    public static DateOnly WeekEnd(DateOnly day) => day.AddDays((7 - (int)day.DayOfWeek) % 7);
+
+    /// <summary>This week's event: a fixed rotation by ISO week number (the same for everyone).</summary>
+    public static WeeklyEvent? WeeklyFor(QuestsConfig c, DateOnly day)
+    {
+        if (c.WeeklyList.Count == 0) return null;
+        var dt = day.ToDateTime(TimeOnly.MinValue);
+        var index = (System.Globalization.ISOWeek.GetYear(dt) * 53) + System.Globalization.ISOWeek.GetWeekOfYear(dt);
+        return c.WeeklyList[index % c.WeeklyList.Count];
+    }
+
     public static long CheckinStones(QuestsConfig c, int streak) => c.Checkin.BaseStones + (c.Checkin.PerDayStones * (Math.Min(streak, c.Checkin.MaxBonusDays) - 1));
 
     private static ulong Fnv(byte[] bytes)
@@ -206,6 +238,16 @@ public static class QuestsConfigValidator
             if (!ids.Add(ch.Id) || !System.Text.RegularExpressions.Regex.IsMatch(ch.Id, "^[a-z0-9_]{1,60}$")) e.Add($"story '{ch.Id}' invalid or duplicated.");
             if (!Metrics.All.Contains(ch.Metric) || ch.Target < 1 || ch.Stones < 0 || (ch.Item is null) != (ch.ItemQuantity == 0) || ch.ItemQuantity < 0) e.Add($"story {ch.Id}: goal/reward invalid.");
             if (string.IsNullOrWhiteSpace(ch.TitlePl) || string.IsNullOrWhiteSpace(ch.TextPl) || string.IsNullOrWhiteSpace(ch.GoalPl)) e.Add($"story {ch.Id}: texts required.");
+        }
+
+        foreach (var w in c.WeeklyList)
+        {
+            if (!ids.Add(w.Id) || !System.Text.RegularExpressions.Regex.IsMatch(w.Id, "^[a-z0-9_]{1,56}$")) e.Add($"weekly '{w.Id}' invalid or duplicated.");
+            if (!Metrics.All.Contains(w.Metric) || Metrics.Max.Contains(w.Metric) || w.Target < 1 || w.Stones < 0 || (w.Item is null) != (w.ItemQuantity == 0))
+                e.Add($"weekly {w.Id}: goal/reward invalid.");
+            if (w.CommunityTarget < 0 || w.MinContribution < 1 || (w.CommunityTarget > 0 && (w.TierStones is null || w.TierStones.Count is < 1 or > 3 || w.TierStones.Any(s => s < 0))))
+                e.Add($"weekly {w.Id}: community challenge invalid.");
+            if (string.IsNullOrWhiteSpace(w.NamePl) || string.IsNullOrWhiteSpace(w.DescriptionPl)) e.Add($"weekly {w.Id}: texts required.");
         }
 
         foreach (var t in c.ArenaTitleList)

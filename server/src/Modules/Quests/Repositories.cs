@@ -24,6 +24,9 @@ public interface IQuestRepository
     Task SaveCheckinAsync(IUnitOfWork uow, CheckinState state, CancellationToken ct);
     Task<IReadOnlyList<(CharacterId CharacterId, long Value)>> TopLifeAsync(IUnitOfWork uow, string key, int limit, CancellationToken ct);
 
+    /// <summary>Sum of one counter over all characters in a period (community challenge).</summary>
+    Task<long> SumAsync(IUnitOfWork uow, string period, string key, CancellationToken ct);
+
     /// <summary>progress = max(progress, value) — for "best reached" metrics (realm, tempering...).</summary>
     Task MaxProgressAsync(IUnitOfWork uow, CharacterId characterId, string period, string key, long value, CancellationToken ct);
 
@@ -103,6 +106,10 @@ internal sealed class InMemoryQuestRepository : IQuestRepository
         return Task.CompletedTask;
     }
 
+    public Task<long> SumAsync(IUnitOfWork uow, string period, string key, CancellationToken ct) =>
+        Task.FromResult(InMemoryUnitOfWork.From(uow).Table<(CharacterId, string, string), ProgressRow>(Progress)
+            .Where(kv => kv.Key.Item2 == period && kv.Key.Item3 == key).Sum(kv => kv.Value.Progress));
+
     public Task<IReadOnlyList<(CharacterId CharacterId, long Value)>> TopLifeAsync(IUnitOfWork uow, string key, int limit, CancellationToken ct)
     {
         IReadOnlyList<(CharacterId, long)> list = [.. InMemoryUnitOfWork.From(uow).Table<(CharacterId, string, string), ProgressRow>(Progress)
@@ -161,6 +168,10 @@ internal sealed class PostgresQuestRepository : IQuestRepository
             "INSERT INTO quests.checkins (character_id, last_day, streak, best_streak, updated_at) VALUES ($1, $2, $3, $4, $5) " +
             "ON CONFLICT (character_id) DO UPDATE SET last_day = EXCLUDED.last_day, streak = EXCLUDED.streak, best_streak = EXCLUDED.best_streak, updated_at = EXCLUDED.updated_at",
             ct, s.CharacterId.Value, s.LastDay, s.Streak, s.BestStreak, s.UpdatedAt);
+
+    public async Task<long> SumAsync(IUnitOfWork uow, string period, string key, CancellationToken ct) =>
+        (await PostgresUnitOfWork.From(uow).QueryAsync("SELECT COALESCE(SUM(progress), 0)::bigint FROM quests.progress WHERE period = $1 AND quest_id = $2",
+            r => r.GetInt64(0), ct, period, key))[0];
 
     public async Task<IReadOnlyList<(CharacterId CharacterId, long Value)>> TopLifeAsync(IUnitOfWork uow, string key, int limit, CancellationToken ct) =>
         await PostgresUnitOfWork.From(uow).QueryAsync(

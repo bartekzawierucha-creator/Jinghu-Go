@@ -12,6 +12,12 @@ public sealed record QuestView(string Id, string NamePl, string DescriptionPl, s
 public sealed record StoryView(int Chapter, int Chapters, string Id, string TitlePl, string TextPl, string GoalPl, string Metric, long Target, long Progress, long Stones,
     string? Item, string? ItemNamePl, int ItemQuantity, bool Completed, bool Finished);
 
+public sealed record ChallengeTierView(int Tier, long Threshold, long Stones, bool Reached, bool Claimed);
+
+/// <summary>This week's world event: a personal goal and the community challenge everyone pushes together (1.9).</summary>
+public sealed record WeeklyView(string Id, string NamePl, string DescriptionPl, string Metric, string Until, QuestView Personal, long CommunityTotal, long CommunityTarget,
+    long MyContribution, long MinContribution, IReadOnlyList<ChallengeTierView> Tiers);
+
 public sealed record TitleView(string Id, string NamePl, string Rarity, string Source, bool Selected);
 
 public sealed record SelectTitleCommand(string? TitleId);
@@ -20,7 +26,7 @@ public sealed record CheckinView(int Streak, int BestStreak, bool CheckedInToday
 
 public sealed record QuestBoard(string Day, IReadOnlyList<QuestView> Daily, IReadOnlyList<QuestView> Achievements, CheckinView Checkin, IReadOnlyList<string> Titles,
     IReadOnlyDictionary<string, int>? TitleBonuses = null, IReadOnlyList<QuestView>? Seasonal = null, StoryView? Story = null, IReadOnlyList<TitleView>? AllTitles = null,
-    string? SelectedTitleId = null, int SecretsFound = 0, int SecretsTotal = 0);
+    string? SelectedTitleId = null, int SecretsFound = 0, int SecretsTotal = 0, WeeklyView? Weekly = null);
 
 public sealed record ClaimResult(string QuestId, long Stones, long Balance, QuestBoard Board);
 
@@ -63,6 +69,8 @@ public sealed class QuestService(
             var now = clock.GetUtcNow();
             var board = await BoardAsync(uow, c.Id, now, ct);
             if (board.Story is { } story && story.Id == questId) return await ClaimStoryAsync(uow, accountId, c.Id, story, now, ct);
+            if (board.Weekly is { } week && (questId == week.Id || questId.StartsWith(week.Id + "_t", StringComparison.Ordinal)))
+                return await ClaimWeeklyAsync(uow, accountId, c.Id, week, questId, now, ct);
             var quest = board.Daily.Concat(board.Achievements).Concat(board.Seasonal ?? []).FirstOrDefault(q => q.Id == questId);
             if (quest is null) return Error.NotFound("quest_not_found", "This quest is not available today.");
             if (quest.Claimed) return Error.Conflict("quest_already_claimed", "Reward already claimed.");
@@ -106,6 +114,51 @@ public sealed class QuestService(
         var after = await BoardAsync(uow, id, now, ct);
         await uow.CommitAsync(ct);
         return new ClaimResult(story.Id, story.Stones, balance, after);
+    }
+
+    private async Task<Result<ClaimResult>> ClaimWeeklyAsync(IUnitOfWork uow, AccountId accountId, CharacterId id, WeeklyView week, string questId, DateTimeOffset now, CancellationToken ct)
+    {
+        var period = QuestRules.WeekPeriod(QuestRules.WorldDate(config, now));
+        long stones;
+        string? item = null;
+        var quantity = 0;
+        if (questId == week.Id)
+        {
+            if (week.Personal.Claimed) return Error.Conflict("quest_already_claimed", "Reward already claimed.");
+            if (!week.Personal.Completed) return Error.Conflict("quest_not_completed", "The weekly goal is not reached yet.");
+            stones = week.Personal.Stones;
+            var def = config.WeeklyList.First(w => w.Id == week.Id);
+            (item, quantity) = (def.Item, def.ItemQuantity);
+        }
+        else
+        {
+            var tier = week.Tiers.FirstOrDefault(t => questId == week.Id + "_t" + t.Tier);
+            if (tier is null) return Error.NotFound("quest_not_found", "No such tier.");
+            if (tier.Claimed) return Error.Conflict("quest_already_claimed", "Reward already claimed.");
+            if (!tier.Reached) return Error.Conflict("quest_not_completed", "The community has not reached this tier yet.");
+            if (week.MyContribution < week.MinContribution) return Error.Conflict("contribution_too_low", $"Contribute at least {week.MinContribution} to share the reward.");
+            stones = tier.Stones;
+        }
+
+        if (!await repo.TryClaimAsync(uow, id, period, questId, now, ct)) return Error.Conflict("quest_already_claimed", "Reward already claimed.");
+        var balance = await inventory.BalanceAsync(uow, id, ct);
+        if (stones > 0)
+        {
+            var credited = await inventory.CreditAsync(uow, id, stones, "weekly_event", period + ":" + questId, ct);
+            if (!credited.IsSuccess) return credited.Error!;
+            balance = credited.Value;
+        }
+
+        if (item is not null && quantity > 0)
+        {
+            var added = await inventory.AddItemsAsync(uow, id, item, quantity, "weekly_event", period + ":" + questId, ct);
+            if (!added.IsSuccess) return added.Error!;
+        }
+
+        await AuditAsync(uow, accountId, "quests.weekly_claimed", id.Value, $"{{\"quest\":\"{questId}\",\"period\":\"{period}\",\"stones\":{stones}}}", now, ct);
+        var after = await BoardAsync(uow, id, now, ct);
+        await uow.CommitAsync(ct);
+        return new ClaimResult(questId, stones, balance, after);
     }
 
     /// <summary>All titles the character has earned (achievements, seasons, arena leagues, realms, arts) and the one shown.</summary>
@@ -213,6 +266,21 @@ public sealed class QuestService(
             story = new StoryView(ch.Number, chapters.Count, ch.Id, ch.TitlePl, ch.TextPl, ch.GoalPl, ch.Metric, ch.Target, Math.Min(progress, ch.Target), ch.Stones, ch.Item,
                 ch.Item is null ? null : catalog.Find(ch.Item)?.NamePl ?? ch.Item, ch.ItemQuantity, progress >= ch.Target, next is null);
         }
+        WeeklyView? weekly = null;
+        if (QuestRules.WeeklyFor(config, today) is { } ev)
+        {
+            var period = QuestRules.WeekPeriod(today);
+            var weekRows = (await repo.ListAsync(uow, id, period, ct)).ToDictionary(r => r.Key);
+            var mine = weekRows.GetValueOrDefault("m_" + ev.Metric)?.Progress ?? 0;
+            var until = QuestRules.Period(QuestRules.WeekEnd(today));
+            var personal = new QuestView(ev.Id, ev.NamePl, ev.DescriptionPl, ev.Metric, ev.Target, Math.Min(mine, ev.Target), RealmStones(ev.Stones, realm), mine >= ev.Target,
+                weekRows.ContainsKey("q_" + ev.Id), null, null, false, null, "epic", until);
+            var total = ev.CommunityTarget > 0 ? await repo.SumAsync(uow, period, "m_" + ev.Metric, ct) : 0;
+            var tiers = ev.Tiers.Select((t, i) => new ChallengeTierView(i + 1, t.Threshold, RealmStones(t.Stones, realm), total >= t.Threshold,
+                weekRows.ContainsKey("q_" + ev.Id + "_t" + (i + 1)))).ToList();
+            weekly = new WeeklyView(ev.Id, ev.NamePl, ev.DescriptionPl, ev.Metric, until, personal, total, ev.CommunityTarget, mine, ev.MinContribution, tiers);
+        }
+
         var checkin = await repo.FindCheckinAsync(uow, id, ct);
         var checkedToday = checkin?.LastDay == today;
         var nextStreak = checkedToday ? checkin!.Streak + 1 : QuestRules.NextStreak(checkin, today).Streak;
@@ -222,7 +290,7 @@ public sealed class QuestService(
         return new QuestBoard(day, daily, achievements,
             new CheckinView(checkedToday ? checkin!.Streak : checkin is not null && checkin.LastDay == today.AddDays(-1) ? checkin.Streak : 0, checkin?.BestStreak ?? 0, checkedToday,
                 RealmStones(QuestRules.CheckinStones(config, nextStreak), realm)), titleNames, titleBonuses, seasonal, story, all, all.FirstOrDefault(t => t.Selected)?.Id,
-            config.Achievements.Count(q => q.Secret && (lifeRows.GetValueOrDefault("m_" + q.Metric)?.Progress ?? 0) >= q.Target), config.Achievements.Count(q => q.Secret));
+            config.Achievements.Count(q => q.Secret && (lifeRows.GetValueOrDefault("m_" + q.Metric)?.Progress ?? 0) >= q.Target), config.Achievements.Count(q => q.Secret), weekly);
     }
 
     private Task AuditAsync(IUnitOfWork uow, AccountId accountId, string action, Guid characterId, string json, DateTimeOffset now, CancellationToken ct) =>
@@ -243,6 +311,7 @@ internal static class QuestCounter
         var date = QuestRules.WorldDate(config, message.OccurredAt);
         var day = QuestRules.Period(date);
         var season = config.SeasonalList.Any(q => QuestRules.SeasonActive(q, date)) ? QuestRules.SeasonPeriod(date) : null;
+        var weekly = QuestRules.WeeklyFor(config, date);
         foreach (var (metric, amount) in items)
         {
             if (Metrics.Max.Contains(metric))
@@ -254,6 +323,7 @@ internal static class QuestCounter
             await repo.AddProgressAsync(uow, c.Id, day, "m_" + metric, amount, ct);
             await repo.AddProgressAsync(uow, c.Id, QuestRules.Life, "m_" + metric, amount, ct);
             if (season is not null) await repo.AddProgressAsync(uow, c.Id, season, "m_" + metric, amount, ct);
+            if (weekly?.Metric == metric) await repo.AddProgressAsync(uow, c.Id, QuestRules.WeekPeriod(date), "m_" + metric, amount, ct);
         }
     }
 

@@ -189,7 +189,7 @@ namespace JianghuGo.Android
             var storyReady = board.Story != null && board.Story.Completed && !board.Story.Finished ? 1 : 0;
             ui.Tabs(page, new[] { "Dziś", "Osiągnięcia", "Tytuły", "Opowieść" }, tab, i => Run(() => ShowQuestsAsync(i)),
                 badges: new[] { board.Daily.Count(q => q.Completed && !q.Claimed) + (board.Checkin.CheckedInToday ? 0 : 1), claimableAch,
-                    0, storyReady + board.Seasonal.Count(q => q.Completed && !q.Claimed) });
+                    0, storyReady + board.Seasonal.Count(q => q.Completed && !q.Claimed) + WeeklyClaimable(board.Weekly) });
 
             async Task Claim(QuestDto q)
             {
@@ -311,11 +311,41 @@ namespace JianghuGo.Android
                         }), srow, sp: 12, heightDp: 32);
                 }
 
+                if (board.Weekly is { } wk && wk.Personal != null)
+                {
+                    var card = ui.Card(page, 1.2f, 8, WeeklyClaimable(wk) > 0 ? Ui.Gold : Ui.Jade);
+                    ui.Text("WYDARZENIE TYGODNIA — " + wk.NamePl.ToUpperInvariant() + " (do " + wk.Until.Substring(5) + ")", card, 12, Ui.Gold, bold: true);
+                    ui.Text(wk.DescriptionPl, card, 11, Ui.Ink, maxLines: 2);
+                    var prow = ui.HRow(card, 30, 2);
+                    var pb = ui.Box(prow, 1.4f, marginDp: 0);
+                    pb.SetGravity(GravityFlags.CenterVertical);
+                    ui.MeterIn(pb, Ui.Gold, "Ty: " + wk.Personal.Progress + " / " + wk.Personal.Target + " · " + wk.Personal.Stones + " KD", wk.Personal.Progress, wk.Personal.Target, 14);
+                    if (wk.Personal.Completed && !wk.Personal.Claimed)
+                        ui.Btn("Odbierz", () => Run(() => Claim(wk.Personal)), prow, sp: 12, heightDp: 30);
+                    if (wk.CommunityTarget > 0)
+                    {
+                        var crow = ui.HRow(card, 30, 2);
+                        var cb = ui.Box(crow, 1.4f, marginDp: 0);
+                        cb.SetGravity(GravityFlags.CenterVertical);
+                        var reached = wk.Tiers.Count(t => t.Reached);
+                        ui.MeterIn(cb, Ui.Jade, "Całe Jianghu: " + wk.CommunityTotal + " / " + wk.CommunityTarget + " · próg " + reached + "/" + wk.Tiers.Count,
+                            Math.Min(wk.CommunityTotal, wk.CommunityTarget), Math.Max(1, wk.CommunityTarget), 14);
+                        var tier = wk.Tiers.FirstOrDefault(t => t.Reached && !t.Claimed);
+                        if (tier != null && wk.MyContribution >= wk.MinContribution)
+                            ui.Btn("+" + tier.Stones + " KD", () => Run(() => Claim(new QuestDto { Id = wk.Id + "_t" + tier.Tier })), crow, sp: 12, heightDp: 30);
+                        else if (wk.MyContribution < wk.MinContribution)
+                            ui.Text("wkład min. " + wk.MinContribution, crow, 10, Ui.Muted);
+                    }
+                }
+
                 ui.Text(board.Seasonal.Count > 0 ? "WYDARZENIA SEZONOWE" : "Brak wydarzeń sezonowych — zajrzyj w święta.", page, 12, Ui.Gold, bold: true, center: true);
                 var seasonal = board.Seasonal;
                 ui.Pages(page, seasonal.Count, 1, 1, (i, cell) => QuestCard(cell, seasonal[i], true));
             }
         }
+
+        private static int WeeklyClaimable(WeeklyDto w) => w?.Personal == null ? 0
+            : (w.Personal.Completed && !w.Personal.Claimed ? 1 : 0) + (w.MyContribution >= w.MinContribution ? w.Tiers.Count(t => t.Reached && !t.Claimed) : 0);
 
         private static int RarityRank(string r) => r switch { "mythic" => 5, "legendary" => 4, "epic" => 3, "rare" => 2, _ => 1 };
 

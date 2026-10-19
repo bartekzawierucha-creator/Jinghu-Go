@@ -79,6 +79,33 @@ namespace JianghuGo.Client.Application
         public string SelectedTitleId { get; set; }
         public int SecretsFound { get; set; }
         public int SecretsTotal { get; set; }
+
+        /// <summary>This week's world event and community challenge (1.9).</summary>
+        public WeeklyDto Weekly { get; set; }
+    }
+
+    public sealed class ChallengeTierDto
+    {
+        public int Tier { get; set; }
+        public long Threshold { get; set; }
+        public long Stones { get; set; }
+        public bool Reached { get; set; }
+        public bool Claimed { get; set; }
+    }
+
+    public sealed class WeeklyDto
+    {
+        public string Id { get; set; }
+        public string NamePl { get; set; }
+        public string DescriptionPl { get; set; }
+        public string Metric { get; set; }
+        public string Until { get; set; }
+        public QuestDto Personal { get; set; }
+        public long CommunityTotal { get; set; }
+        public long CommunityTarget { get; set; }
+        public long MyContribution { get; set; }
+        public long MinContribution { get; set; }
+        public List<ChallengeTierDto> Tiers { get; set; } = new List<ChallengeTierDto>();
     }
 
     public sealed class ClaimResultDto
