@@ -21,6 +21,12 @@ public static class MarketEndpoints
         g.MapGet("/listings", async (string? itemId, Guid? before, int? limit, MarketService svc, CancellationToken ct) =>
             ApiResults.From(await svc.BrowseAsync(itemId, before, limit, ct), list => Results.Ok(new { items = list, next = list.Count > 0 ? list[^1].Id : (Guid?)null })));
 
+        g.MapGet("/search", async (string? q, string? type, string? rarity, long? maxPrice, string? sort, int? offset, int? limit, MarketService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.SearchAsync(q, type, rarity, maxPrice, sort, offset, limit, ct), list => Results.Ok(new { items = list })));
+
+        g.MapGet("/prices/{itemId}", async (string itemId, MarketService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.PricesAsync(itemId, ct), Results.Ok));
+
         g.MapGet("/listings/{listingId:guid}", async (Guid listingId, MarketService svc, CancellationToken ct) =>
             ApiResults.From(await svc.GetAsync(listingId, ct), Results.Ok));
 

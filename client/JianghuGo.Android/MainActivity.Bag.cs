@@ -351,6 +351,8 @@ namespace JianghuGo.Android
 
         // ---- Targ ---------------------------------------------------------------------------------------------
 
+        private string _marketQuery;
+
         private void Market(EconomyFlow economy, Ui ui, LinearLayout page, ListingPageDto offersPage, List<MyListingDto> mine, bool showMine)
         {
             var c = _me;
@@ -371,6 +373,16 @@ namespace JianghuGo.Android
 
             if (!showMine)
             {
+                var search = ui.HRow(page, 40, 4);
+                var term = ui.Field("Szukaj na targu…", parent: search, value: _marketQuery);
+                term.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 1f);
+                ui.Btn("Szukaj", () => Run(async () =>
+                {
+                    _marketQuery = term.Text?.Trim();
+                    var found = await _api.SearchMarketAsync(_marketQuery, "unit_price", 50, Ct);
+                    ShowBag(economy, 2, found, mine, 0, false);
+                    SetStatus(string.IsNullOrEmpty(_marketQuery) ? "Najtańsze oferty (za sztukę)." : "Wyniki: " + _marketQuery + " — najtańsze za sztukę.");
+                }), search, sp: 12, heightDp: 40).LayoutParameters = new LinearLayout.LayoutParams(Px(84), ViewGroup.LayoutParams.MatchParent) { LeftMargin = Px(6) };
                 var offers = (offersPage?.Items ?? new List<ListingDto>()).Where(l => l.SellerCharacterId != c.Id).ToList();
                 ui.Pages(page, offers.Count, 1, 4, (i, cell) =>
                 {
@@ -380,7 +392,15 @@ namespace JianghuGo.Android
                     ui.Icon(row, ui.ArtId("item_" + l.ItemId) != 0 ? "item_" + l.ItemId : "item_slot_empty", 38);
                     var col = ui.Box(row, 1f, marginDp: 8);
                     ui.Text(l.ItemNamePl + (l.UpgradeLevel > 0 ? " +" + l.UpgradeLevel : string.Empty) + " ×" + l.Quantity, col, 13, Ui.Ink, bold: true);
-                    ui.Text(l.SellerName + " · " + l.Price + " KD", col, 11, Ui.Gold);
+                    ui.Text(l.SellerName + " · " + l.Price + " KD" + (l.Quantity > 1 ? " (" + l.Price / l.Quantity + "/szt.)" : string.Empty), col, 11, Ui.Gold);
+                    col.Clickable = true;
+                    col.Click += (_, __) => Run(async () =>
+                    {
+                        var pr = await _api.GetPricesAsync(l.ItemId, Ct);
+                        SetStatus(pr.ItemNamePl + ": " + (pr.AverageUnitPrice7d.HasValue ? "średnio " + pr.AverageUnitPrice7d + " KD/szt. (" + pr.Sales7d + " sprzedaży w 7 dni, "
+                            + pr.MinUnitPrice7d + "–" + pr.MaxUnitPrice7d + ")" : "brak sprzedaży w 7 dni")
+                            + (pr.LowestActiveUnitPrice.HasValue ? " · najtaniej teraz " + pr.LowestActiveUnitPrice + " KD/szt." : string.Empty));
+                    });
                     ui.Btn("Kup", () => Run(async () =>
                     {
                         var bought = await economy.BuyAsync(l, Ct);

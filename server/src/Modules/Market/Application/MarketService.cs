@@ -19,7 +19,19 @@ public interface IMarketRepository
     Task<int> CountActiveAsync(IUnitOfWork uow, CharacterId seller, CancellationToken ct);
     Task<IReadOnlyList<Listing>> BrowseAsync(IUnitOfWork uow, string? itemId, Guid? before, int limit, DateTimeOffset now, CancellationToken ct);
     Task<IReadOnlyList<Listing>> ListBySellerAsync(IUnitOfWork uow, CharacterId seller, Guid? before, int limit, CancellationToken ct);
+
+    /// <summary>Active listings among <paramref name="itemIds"/> (null = all), cheapest unit price or newest first (1.9 search).</summary>
+    Task<IReadOnlyList<Listing>> SearchAsync(IUnitOfWork uow, IReadOnlyList<string>? itemIds, long? maxPrice, string sort, int offset, int limit, DateTimeOffset now, CancellationToken ct);
+
+    /// <summary>Sales of one item since a moment, newest first.</summary>
+    Task<IReadOnlyList<Listing>> SalesAsync(IUnitOfWork uow, string itemId, DateTimeOffset since, int limit, CancellationToken ct);
 }
+
+/// <summary>Price history of an item (1.9): sales of the last 7 days and the cheapest offer now. Unit prices = price ÷ quantity.</summary>
+public sealed record PriceView(string ItemId, string ItemNamePl, int Sales7d, long Volume7d, long? AverageUnitPrice7d, long? MinUnitPrice7d, long? MaxUnitPrice7d,
+    long? LowestActiveUnitPrice, int ActiveListings, IReadOnlyList<SaleView> RecentSales);
+
+public sealed record SaleView(long UnitPrice, long Quantity, DateTimeOffset At);
 
 public sealed record CreateListingCommand(Guid CharacterId, string? ItemId, long Quantity, Guid? InstanceId, int? ExpectedVersion, long Price);
 
@@ -206,6 +218,44 @@ public sealed class MarketService(
             var now = clock.GetUtcNow();
             var rows = await repo.BrowseAsync(uow, itemId, before, Math.Clamp(limit ?? 50, 1, MaxPageSize), now, ct);
             return Result<IReadOnlyList<ListingView>>.Success([.. rows.Select(l => View(l, now))]);
+        }, ct);
+
+    public static readonly string[] Sorts = ["newest", "unit_price", "price"];
+
+    /// <summary>Search by name (any part, case-insensitive), type, rarity and a price ceiling; paged by offset.</summary>
+    public Task<Result<IReadOnlyList<ListingView>>> SearchAsync(string? q, string? type, string? rarity, long? maxPrice, string? sort, int? offset, int? limit, CancellationToken ct) =>
+        uowFactory.RunAsync<Result<IReadOnlyList<ListingView>>>(async uow =>
+        {
+            var order = sort ?? "newest";
+            if (!Sorts.Contains(order)) return Error.Validation("sort_invalid", "sort: newest, unit_price or price.");
+            if (q is { Length: > 40 } || offset is < 0 or > 10_000) return Error.Validation("search_invalid", "Query too long or offset out of range.");
+            IReadOnlyList<string>? ids = null;
+            if (!string.IsNullOrWhiteSpace(q) || type is not null || rarity is not null)
+            {
+                var term = q?.Trim();
+                ids = [.. catalog.All.Where(i => (term is null || term.Length == 0 || i.NamePl.Contains(term, StringComparison.OrdinalIgnoreCase) || i.Id.Contains(term, StringComparison.OrdinalIgnoreCase))
+                    && (type is null || i.Type == type) && (rarity is null || i.Rarity == rarity)).Select(i => i.Id)];
+                if (ids.Count == 0) return Result<IReadOnlyList<ListingView>>.Success([]);
+            }
+
+            var now = clock.GetUtcNow();
+            var rows = await repo.SearchAsync(uow, ids, maxPrice, order, offset ?? 0, Math.Clamp(limit ?? 50, 1, MaxPageSize), now, ct);
+            return Result<IReadOnlyList<ListingView>>.Success([.. rows.Select(l => View(l, now))]);
+        }, ct);
+
+    public Task<Result<PriceView>> PricesAsync(string itemId, CancellationToken ct) =>
+        uowFactory.RunAsync<Result<PriceView>>(async uow =>
+        {
+            if (catalog.Find(itemId) is not { } item) return Error.NotFound("item_unknown", "Unknown item.");
+            var now = clock.GetUtcNow();
+            var sales = await repo.SalesAsync(uow, itemId, now.AddDays(-7), 500, ct);
+            var units = sales.Select(s => s.Price / Math.Max(1, s.Quantity)).ToList();
+            var volume = sales.Sum(s => s.Quantity);
+            var active = await repo.SearchAsync(uow, [itemId], null, "unit_price", 0, MaxPageSize, now, ct);
+            return new PriceView(itemId, item.NamePl, sales.Count, volume,
+                volume == 0 ? null : sales.Sum(s => s.Price) / volume, units.Count == 0 ? null : units.Min(), units.Count == 0 ? null : units.Max(),
+                active.Count == 0 ? null : active.Min(l => l.Price / Math.Max(1, l.Quantity)), active.Count,
+                [.. sales.Take(10).Select(s => new SaleView(s.Price / Math.Max(1, s.Quantity), s.Quantity, s.ClosedAt ?? s.CreatedAt))]);
         }, ct);
 
     public Task<Result<ListingView>> GetAsync(Guid listingId, CancellationToken ct) =>

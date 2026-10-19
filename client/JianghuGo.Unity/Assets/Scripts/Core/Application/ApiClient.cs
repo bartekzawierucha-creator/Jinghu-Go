@@ -312,6 +312,14 @@ namespace JianghuGo.Client.Application
         public Task<MarketRulesDto> GetMarketRulesAsync(CancellationToken ct) =>
             SendAsync<MarketRulesDto>("GET", "/api/v1/market/rules", null, true, null, ct);
 
+        /// <summary>Search by name/type/rarity, cheapest per unit first (1.9).</summary>
+        public Task<ListingPageDto> SearchMarketAsync(string q, string sort, int limit, CancellationToken ct) =>
+            SendAsync<ListingPageDto>("GET", "/api/v1/market/search?limit=" + limit + "&sort=" + Uri.EscapeDataString(sort ?? "unit_price")
+                + (!string.IsNullOrWhiteSpace(q) ? "&q=" + Uri.EscapeDataString(q.Trim()) : string.Empty), null, true, null, ct);
+
+        public Task<PriceDto> GetPricesAsync(string itemId, CancellationToken ct) =>
+            SendAsync<PriceDto>("GET", "/api/v1/market/prices/" + Uri.EscapeDataString(itemId), null, true, null, ct);
+
         public Task<ListingPageDto> BrowseMarketAsync(string itemId, Guid? before, int limit, CancellationToken ct) =>
             SendAsync<ListingPageDto>("GET", "/api/v1/market/listings?limit=" + limit
                 + (itemId != null ? "&itemId=" + Uri.EscapeDataString(itemId) : string.Empty)

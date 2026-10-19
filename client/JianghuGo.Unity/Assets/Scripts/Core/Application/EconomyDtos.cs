@@ -310,4 +310,18 @@ namespace JianghuGo.Client.Application
         public int ListingHours { get; set; }
         public int MaxActiveListingsPerCharacter { get; set; }
     }
+
+    /// <summary>Price history of an item (1.9): unit prices of the last 7 days and the cheapest offer now.</summary>
+    public sealed class PriceDto
+    {
+        public string ItemId { get; set; }
+        public string ItemNamePl { get; set; }
+        public int Sales7d { get; set; }
+        public long Volume7d { get; set; }
+        public long? AverageUnitPrice7d { get; set; }
+        public long? MinUnitPrice7d { get; set; }
+        public long? MaxUnitPrice7d { get; set; }
+        public long? LowestActiveUnitPrice { get; set; }
+        public int ActiveListings { get; set; }
+    }
 }

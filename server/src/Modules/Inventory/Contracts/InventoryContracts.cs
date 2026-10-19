@@ -49,6 +49,9 @@ public interface IItemCatalog
 {
     CatalogItem? Find(string? itemId);
     int MaxStack { get; }
+
+    /// <summary>Every item (market search, 1.9).</summary>
+    IEnumerable<CatalogItem> All => [];
 }
 
 /// <summary>Stat bonuses from equipped items (Combat adds them to the battle snapshot).</summary>

@@ -833,6 +833,29 @@ paths:
       summary: Market rules (listing fee, sale tax, price range, listing lifetime, per-character listing limit).
       responses:
         "200": { description: OK }
+  /api/v1/market/search:
+    get:
+      tags: [Market]
+      summary: "Search active listings by name, type, rarity and max price; sort newest / unit_price / price."
+      parameters:
+        - { name: q, in: query, required: false, schema: { type: string, maxLength: 40 } }
+        - { name: type, in: query, required: false, schema: { type: string } }
+        - { name: rarity, in: query, required: false, schema: { type: string } }
+        - { name: maxPrice, in: query, required: false, schema: { type: integer, format: int64 } }
+        - { name: sort, in: query, required: false, schema: { type: string, enum: [newest, unit_price, price] } }
+        - { name: offset, in: query, required: false, schema: { type: integer } }
+        - { name: limit, in: query, required: false, schema: { type: integer } }
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+  /api/v1/market/prices/{itemId}:
+    get:
+      tags: [Market]
+      summary: Price history of an item (7 days of sales, cheapest offer).
+      parameters: [{ name: itemId, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
   /api/v1/market/listings:
     get:
       tags: [Market]

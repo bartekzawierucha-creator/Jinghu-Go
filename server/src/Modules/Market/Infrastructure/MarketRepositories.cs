@@ -42,6 +42,27 @@ internal sealed class InMemoryMarketRepository : IMarketRepository
         return Task.FromResult(list);
     }
 
+    public Task<IReadOnlyList<Listing>> SearchAsync(IUnitOfWork uow, IReadOnlyList<string>? itemIds, long? maxPrice, string sort, int offset, int limit, DateTimeOffset now, CancellationToken ct)
+    {
+        var q = U(uow).Table<Guid, Listing>(Listings).Values
+            .Where(l => l.IsBuyable(now) && (itemIds is null || itemIds.Contains(l.ItemId)) && (maxPrice is null || l.Price <= maxPrice));
+        q = sort switch
+        {
+            "unit_price" => q.OrderBy(l => l.Price / Math.Max(1, l.Quantity)).ThenByDescending(l => l.Id),
+            "price" => q.OrderBy(l => l.Price).ThenByDescending(l => l.Id),
+            _ => q.OrderByDescending(l => l.Id),
+        };
+        IReadOnlyList<Listing> list = [.. q.Skip(offset).Take(limit)];
+        return Task.FromResult(list);
+    }
+
+    public Task<IReadOnlyList<Listing>> SalesAsync(IUnitOfWork uow, string itemId, DateTimeOffset since, int limit, CancellationToken ct)
+    {
+        IReadOnlyList<Listing> list = [.. U(uow).Table<Guid, Listing>(Listings).Values
+            .Where(l => l.ItemId == itemId && l.Status == ListingStatuses.Sold && l.ClosedAt >= since).OrderByDescending(l => l.ClosedAt).Take(limit)];
+        return Task.FromResult(list);
+    }
+
     public Task<IReadOnlyList<Listing>> ListBySellerAsync(IUnitOfWork uow, CharacterId seller, Guid? before, int limit, CancellationToken ct)
     {
         IReadOnlyList<Listing> list = [.. U(uow).Table<Guid, Listing>(Listings).Values
@@ -87,6 +108,24 @@ internal sealed class PostgresMarketRepository : IMarketRepository
         await Pg(uow).QueryAsync(
             $"SELECT {Columns} FROM market.listings WHERE status = 'active' AND expires_at > $1 AND ($2::text IS NULL OR item_id = $2::text) " +
             "AND ($3::uuid IS NULL OR id < $3::uuid) ORDER BY id DESC LIMIT $4", Map, ct, now, itemId, before, limit);
+
+    public async Task<IReadOnlyList<Listing>> SearchAsync(IUnitOfWork uow, IReadOnlyList<string>? itemIds, long? maxPrice, string sort, int offset, int limit, DateTimeOffset now, CancellationToken ct)
+    {
+        var order = sort switch
+        {
+            "unit_price" => "price / GREATEST(quantity, 1), id DESC",
+            "price" => "price, id DESC",
+            _ => "id DESC",
+        };
+        return await Pg(uow).QueryAsync(
+            $"SELECT {Columns} FROM market.listings WHERE status = 'active' AND expires_at > $1 AND ($2::text[] IS NULL OR item_id = ANY($2::text[])) " +
+            $"AND ($3::bigint IS NULL OR price <= $3::bigint) ORDER BY {order} OFFSET $4 LIMIT $5", Map, ct, now, itemIds?.ToArray(), maxPrice, offset, limit);
+    }
+
+    public async Task<IReadOnlyList<Listing>> SalesAsync(IUnitOfWork uow, string itemId, DateTimeOffset since, int limit, CancellationToken ct) =>
+        await Pg(uow).QueryAsync(
+            $"SELECT {Columns} FROM market.listings WHERE item_id = $1 AND status = 'sold' AND closed_at >= $2 ORDER BY closed_at DESC LIMIT $3",
+            Map, ct, itemId, since, limit);
 
     public async Task<IReadOnlyList<Listing>> ListBySellerAsync(IUnitOfWork uow, CharacterId seller, Guid? before, int limit, CancellationToken ct) =>
         await Pg(uow).QueryAsync(
