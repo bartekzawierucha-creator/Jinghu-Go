@@ -1342,6 +1342,15 @@ paths:
       responses:
         "200": { description: OK }
         "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/combat/pet/evolve:
+    post:
+      tags: [Combat]
+      summary: Evolve the spirit pet at its level cap (stones + demon blood; cap +5, stronger bond).
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
   /api/v1/characters/{characterId}/combat/pet/release:
     post:
       tags: [Combat]

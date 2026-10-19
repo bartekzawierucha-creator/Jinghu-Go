@@ -400,7 +400,15 @@ namespace JianghuGo.Android
             ui.MeterIn(info, Ui.Jade, pet.XpToNextLevel > 0 ? "XP " + pet.Xp + " / " + (pet.Xp + pet.XpToNextLevel) : "Poziom maksymalny",
                 pet.XpToNextLevel > 0 ? pet.Xp : 1, pet.XpToNextLevel > 0 ? pet.Xp + pet.XpToNextLevel : 1, 18);
             ui.Text("Premie w walce: " + string.Join("  ·  ", pet.Bonuses.Select(kv => StatName(kv.Key) + " +" + kv.Value)), info, 12, Ui.Gold, bold: true, maxLines: 2);
-            ui.Text("Oswojony " + pet.TamedAt.ToLocalTime().ToString("dd.MM.yyyy"), info, 11, Ui.Muted);
+            ui.Text((pet.StagePl ?? "Młody") + " (stadium " + (pet.Stage + 1) + "/4, poziom maks. " + pet.LevelCap + ") · oswojony " + pet.TamedAt.ToLocalTime().ToString("dd.MM.yyyy"), info, 11, Ui.Muted);
+            if (pet.EvolveStones > 0)
+                ui.Btn(pet.CanEvolve ? "Ewolucja: " + pet.EvolveStones + " KD + " + pet.EvolveQuantity + "× krew demona" : "Ewolucja od poziomu " + pet.LevelCap, () => Run(async () =>
+                {
+                    var r = await _api.EvolvePetAsync(c.Id, Ct);
+                    Sfx.Play(Sfx.Breakthrough, 0.8f);
+                    await ShowPetAsync();
+                    ShowBanner("EWOLUCJA", pet.NamePl, r.Pet?.StagePl ?? string.Empty, "menu_hero");
+                }), page, secondary: !pet.CanEvolve, sp: 13, heightDp: 42);
             var confirm = false;
             Button release = null;
             release = ui.Btn("Uwolnij towarzysza", () =>

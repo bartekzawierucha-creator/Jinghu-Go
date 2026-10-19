@@ -58,7 +58,8 @@ public sealed record BattleView(
     int? BossCycle = null,
     int DamageDealt = 0);
 
-public sealed record PetView(string NpcId, string NamePl, int Level, int Xp, int XpToNextLevel, IReadOnlyDictionary<string, int> Bonuses, DateTimeOffset TamedAt);
+public sealed record PetView(string NpcId, string NamePl, int Level, int Xp, int XpToNextLevel, IReadOnlyDictionary<string, int> Bonuses, DateTimeOffset TamedAt,
+    int Stage = 0, string StagePl = "Młody", int LevelCap = 10, bool CanEvolve = false, long EvolveStones = 0, string? EvolveItem = null, int EvolveQuantity = 0);
 
 public sealed record SetLoadoutCommand(int ExpectedVersion, IReadOnlyList<string?>? Slots);
 
@@ -217,8 +218,8 @@ public sealed partial class CombatService(
             }
 
             if (await repo.FindPetAsync(uow, c.Id, ct) is { } pet && config.Npc(pet.NpcId) is { } species)
-                sources.Add(new("Towarzysz: " + species.NamePl, SpiritPetRules.Bonuses(species, pet.Level).ToDictionary(kv => kv.Key, kv => (int)((long)kv.Value * resonance / 1000)),
-                    SpiritPetRules.Companion(species, pet.Level)));
+                sources.Add(new("Towarzysz: " + species.NamePl, SpiritPetRules.Bonuses(species, pet.Level, pet.Stage).ToDictionary(kv => kv.Key, kv => (int)((long)kv.Value * resonance / 1000)),
+                    SpiritPetRules.Companion(species, pet.Level, pet.Stage)));
             foreach (var provider in perkBonuses) sources.Add(new(provider.SourcePl, new Dictionary<string, int>(), await provider.BonusAsync(uow, c.Id.Value, ct)));
             sources.Add(new("Właściwości ekwipunku", new Dictionary<string, int>(), PerkFrom(await equipment.PerksAsync(uow, c.Id, ct))));
 
@@ -256,8 +257,8 @@ public sealed partial class CombatService(
         var perks = PerkBonus.None;
         if (await repo.FindPetAsync(uow, c.Id, ct) is { } pet && config.Npc(pet.NpcId) is { } species)
         {
-            foreach (var (stat, value) in SpiritPetRules.Bonuses(species, pet.Level)) bonuses[stat] = bonuses.GetValueOrDefault(stat) + Resonate(value);
-            perks += SpiritPetRules.Companion(species, pet.Level);
+            foreach (var (stat, value) in SpiritPetRules.Bonuses(species, pet.Level, pet.Stage)) bonuses[stat] = bonuses.GetValueOrDefault(stat) + Resonate(value);
+            perks += SpiritPetRules.Companion(species, pet.Level, pet.Stage);
         }
 
         var stats = c.Stats.ToDictionary(s => s.Key, s => s.Value + bonuses.GetValueOrDefault(s.Key));
@@ -914,9 +915,38 @@ public sealed partial class CombatService(
             return (PetView?)null;
         }, ct);
 
-    private static PetView PetViewOf(SpiritPet pet, NpcDefinition species) =>
-        new(pet.NpcId, species.NamePl, pet.Level, pet.Xp, pet.Level >= SpiritPetRules.MaxLevel ? 0 : pet.Level * SpiritPetRules.XpPerLevel,
-            SpiritPetRules.Bonuses(species, pet.Level), pet.TamedAt);
+    private static PetView PetViewOf(SpiritPet pet, NpcDefinition species)
+    {
+        var cap = SpiritPetRules.Cap(pet.Stage);
+        var cost = SpiritPetRules.EvolveCost(pet.Stage);
+        var more = pet.Stage < SpiritPetRules.MaxStage;
+        return new(pet.NpcId, species.NamePl, pet.Level, pet.Xp, pet.Level >= cap ? 0 : pet.Level * SpiritPetRules.XpPerLevel,
+            SpiritPetRules.Bonuses(species, pet.Level, pet.Stage), pet.TamedAt, pet.Stage, SpiritPetRules.StageNamesPl[Math.Clamp(pet.Stage, 0, SpiritPetRules.MaxStage)], cap,
+            more && pet.Level >= cap, more ? cost.Stones : 0, more ? cost.Item : null, more ? cost.Quantity : 0);
+    }
+
+    /// <summary>Evolves the spirit pet at its level cap (2.2): pays stones and demon blood; the cap rises by 5 and the bond strengthens.</summary>
+    public Task<Result<PetView?>> EvolvePetAsync(AccountId accountId, Guid characterId, CancellationToken ct) =>
+        uowFactory.RunAsync<Result<PetView?>>(async uow =>
+        {
+            var c = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
+            if (c is null) return CharacterNotFound;
+            var pet = await repo.FindPetAsync(uow, c.Id, ct);
+            if (pet is null || config.Npc(pet.NpcId) is not { } species) return Error.NotFound("pet_not_found", "No spirit pet.");
+            if (pet.Stage >= SpiritPetRules.MaxStage) return Error.Conflict("pet_max_stage", "Your companion has reached its final form.");
+            if (pet.Level < SpiritPetRules.Cap(pet.Stage)) return Error.Conflict("pet_level_too_low", $"Reach level {SpiritPetRules.Cap(pet.Stage)} first.");
+            var cost = SpiritPetRules.EvolveCost(pet.Stage);
+            var reference = "pet-evolve-" + c.Id.Value.ToString("N") + "-" + (pet.Stage + 1);
+            var paid = await inventory.DebitAsync(uow, c.Id, cost.Stones, "pet_evolution", reference, ct);
+            if (!paid.IsSuccess) return paid.Error!;
+            var used = await inventory.RemoveItemsAsync(uow, c.Id, cost.Item, cost.Quantity, "pet_evolution", reference, ct);
+            if (!used.IsSuccess) return used.Error!;
+            var evolved = pet with { Stage = pet.Stage + 1 };
+            await repo.SavePetAsync(uow, evolved, ct);
+            await AuditAsync(uow, accountId, "combat.pet_evolved", Guid.Empty, new { characterId, pet.NpcId, stage = evolved.Stage }, clock.GetUtcNow(), ct);
+            await uow.CommitAsync(ct);
+            return (PetView?)PetViewOf(evolved, species);
+        }, ct);
 
     private async Task<TurnRecord?> LastTurnAsync(IUnitOfWork uow, Guid battleId, CancellationToken ct)
     {

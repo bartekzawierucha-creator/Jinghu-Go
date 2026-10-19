@@ -254,6 +254,15 @@ namespace JianghuGo.Client.Application
         public int XpToNextLevel { get; set; }
         public Dictionary<string, int> Bonuses { get; set; } = new Dictionary<string, int>();
         public DateTimeOffset TamedAt { get; set; }
+
+        /// <summary>Evolution (2.2).</summary>
+        public int Stage { get; set; }
+        public string StagePl { get; set; }
+        public int LevelCap { get; set; } = 10;
+        public bool CanEvolve { get; set; }
+        public long EvolveStones { get; set; }
+        public string EvolveItem { get; set; }
+        public int EvolveQuantity { get; set; }
     }
 
     public sealed class PetEnvelopeDto

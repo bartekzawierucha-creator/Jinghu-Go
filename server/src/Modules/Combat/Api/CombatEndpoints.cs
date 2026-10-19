@@ -39,6 +39,8 @@ public static class CombatEndpoints
             ApiResults.From(await svc.SetLoadoutAsync(http.User.GetAccountId(), characterId, body, ct), Results.Ok));
         character.MapGet("/pet", async (Guid characterId, HttpContext http, CombatService svc, CancellationToken ct) =>
             ApiResults.From(await svc.GetPetAsync(http.User.GetAccountId(), characterId, ct), pet => Results.Ok(new { pet })));
+        character.MapPost("/pet/evolve", async (Guid characterId, HttpContext http, CombatService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.EvolvePetAsync(http.User.GetAccountId(), characterId, ct), pet => Results.Ok(new { pet })));
         character.MapPost("/pet/release", async (Guid characterId, HttpContext http, CombatService svc, CancellationToken ct) =>
             ApiResults.From(await svc.ReleasePetAsync(http.User.GetAccountId(), characterId, ct), _ => Results.Ok(new { pet = (PetView?)null })));
         character.MapGet("/hunt", async (Guid characterId, HttpContext http, CombatService svc, CancellationToken ct) =>

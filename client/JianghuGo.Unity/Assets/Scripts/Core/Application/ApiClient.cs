@@ -230,6 +230,9 @@ namespace JianghuGo.Client.Application
         public Task<PetEnvelopeDto> GetPetAsync(Guid characterId, CancellationToken ct) =>
             SendAsync<PetEnvelopeDto>("GET", "/api/v1/characters/" + characterId + "/combat/pet", null, true, null, ct);
 
+        public Task<PetEnvelopeDto> EvolvePetAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<PetEnvelopeDto>("POST", "/api/v1/characters/" + characterId + "/combat/pet/evolve", null, true, null, ct);
+
         public Task<PetEnvelopeDto> ReleasePetAsync(Guid characterId, CancellationToken ct) =>
             SendAsync<PetEnvelopeDto>("POST", "/api/v1/characters/" + characterId + "/combat/pet/release", null, true, null, ct);
 

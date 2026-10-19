@@ -324,14 +324,14 @@ internal sealed class PostgresCombatRepository : ICombatRepository
     private static PostgresUnitOfWork Pg(IUnitOfWork uow) => PostgresUnitOfWork.From(uow);
 
     public Task<SpiritPet?> FindPetAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
-        Pg(uow).QuerySingleOrDefaultAsync("SELECT npc_id, xp, tamed_in_battle, tamed_at FROM combat.spirit_pets WHERE character_id = $1",
-            r => new SpiritPet(characterId, r.GetString(0), r.GetInt32(1), r.GetGuid(2), r.GetFieldValue<DateTimeOffset>(3)), ct, characterId.Value);
+        Pg(uow).QuerySingleOrDefaultAsync("SELECT npc_id, xp, tamed_in_battle, tamed_at, stage FROM combat.spirit_pets WHERE character_id = $1",
+            r => new SpiritPet(characterId, r.GetString(0), r.GetInt32(1), r.GetGuid(2), r.GetFieldValue<DateTimeOffset>(3), r.GetInt32(4)), ct, characterId.Value);
 
     public Task SavePetAsync(IUnitOfWork uow, SpiritPet p, CancellationToken ct) =>
         Pg(uow).ExecuteAsync(
-            "INSERT INTO combat.spirit_pets (character_id, npc_id, xp, tamed_in_battle, tamed_at) VALUES ($1, $2, $3, $4, $5) " +
-            "ON CONFLICT (character_id) DO UPDATE SET npc_id = EXCLUDED.npc_id, xp = EXCLUDED.xp, tamed_in_battle = EXCLUDED.tamed_in_battle, tamed_at = EXCLUDED.tamed_at",
-            ct, p.CharacterId.Value, p.NpcId, p.Xp, p.TamedInBattle, p.TamedAt);
+            "INSERT INTO combat.spirit_pets (character_id, npc_id, xp, tamed_in_battle, tamed_at, stage) VALUES ($1, $2, $3, $4, $5, $6) " +
+            "ON CONFLICT (character_id) DO UPDATE SET npc_id = EXCLUDED.npc_id, xp = EXCLUDED.xp, tamed_in_battle = EXCLUDED.tamed_in_battle, tamed_at = EXCLUDED.tamed_at, stage = EXCLUDED.stage",
+            ct, p.CharacterId.Value, p.NpcId, p.Xp, p.TamedInBattle, p.TamedAt, p.Stage);
 
     public Task DeletePetAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
         Pg(uow).ExecuteAsync("DELETE FROM combat.spirit_pets WHERE character_id = $1", ct, characterId.Value);
