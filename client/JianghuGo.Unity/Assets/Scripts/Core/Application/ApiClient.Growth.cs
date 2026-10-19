@@ -103,6 +103,12 @@ namespace JianghuGo.Client.Application
         public Task<ArtsDto> ChooseBranchAsync(Guid characterId, string branchId, CancellationToken ct) =>
             SendAsync<ArtsDto>("POST", Arts(characterId) + "/branch", new { branchId }, true, null, ct);
 
+        public Task<ArtsDto> ChooseCapstoneAsync(Guid characterId, string branchId, CancellationToken ct) =>
+            SendAsync<ArtsDto>("POST", Arts(characterId) + "/capstone", new { branchId }, true, null, ct);
+
+        public Task<BonusBreakdownDto> GetBonusesAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<BonusBreakdownDto>("GET", Character(characterId) + "/combat/bonuses", null, true, null, ct);
+
         // ---- estate -------------------------------------------------------------------------------------------
 
         private static string Estate(Guid characterId) => Character(characterId) + "/estate";

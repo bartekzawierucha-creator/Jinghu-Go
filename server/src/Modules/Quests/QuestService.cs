@@ -282,6 +282,8 @@ internal static class TitleBonuses
 
 internal sealed class TitleCombatBonuses(IQuestRepository repo, QuestsConfig config) : JianghuGo.Modules.Combat.Contracts.ICombatStatBonuses
 {
+    public string SourcePl => "Tytuły";
+
     public bool ResonatesWithRealm => true;
 
     public async Task<IReadOnlyDictionary<string, int>> BonusesAsync(IUnitOfWork uow, Guid characterId, CancellationToken ct) =>

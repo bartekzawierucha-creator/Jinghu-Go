@@ -295,9 +295,21 @@ namespace JianghuGo.Android
                         _cues.Add(new Cue { Hero = !mine, Anim = target["hit"], At = impact });
                         var crit = e.Crit || e.Exploit || e.Momentum >= 3;
                         var light = crit ? "crit" : tech.Contains("fist") || tech.Contains("mountain") || tech.Contains("claw") ? "hit_heavy" : ranged ? "hit_qi" : "hit";
-                        Impact(!mine, impact, mine ? TechniqueFx(tech) : _look.AttackFx, light, crit ? 1f : 0.55f);
+                        // 1.7: the screen shakes with the weight of the blow (share of the target's health); crits hit hardest
+                        var targetMax = Math.Max(1, mine ? Battle.Opponent.MaxHp : Battle.Me.MaxHp);
+                        var weight = Math.Min(1.3f, 0.35f + (e.Damage * 4f / targetMax));
+                        Impact(!mine, impact, mine ? TechniqueFx(tech) : _look.AttackFx, light, crit ? Math.Max(1f, weight) : weight);
                         if (mine) Sfx.Play(Sfx.Hit); else Sfx.Play(Sfx.Hurt);
                         _floaters.Add(new Floater { OnHero = !mine, Text = "-" + e.Damage, Color = mine ? Color.Rgb(255, 230, 140) : Color.Rgb(255, 110, 90), Size = crit ? 32 : 26, At = impact });
+                        var mech = e.Mechanic switch
+                        {
+                            "charge" => "ŁADUNEK QI!",
+                            "ember_burst" => "WYBUCH ŻARU!",
+                            "blossom" => "KWITNIENIE JADU!",
+                            "fury" => "FURIA!",
+                            _ => null,
+                        };
+                        if (mech != null) _floaters.Add(new Floater { OnHero = e.Mechanic == "fury" ? !mine : mine, Text = mech, Color = Ui.Gold, Size = 17, At = impact + 60 });
                         if (e.Crit) _floaters.Add(new Floater { OnHero = !mine, Text = "KRYTYK!", Color = Color.Rgb(255, 80, 60), Size = 16, At = impact + 120 });
                         else if (e.Exploit) _floaters.Add(new Floater { OnHero = !mine, Text = "SŁABOŚĆ!", Color = Ui.Gold, Size = 15, At = impact + 160 });
                         else if (e.Momentum >= 2) _floaters.Add(new Floater { OnHero = mine, Text = "ROZPĘD ×" + e.Momentum, Color = Ui.Gold, Size = 14, At = impact + 160 });
@@ -365,6 +377,12 @@ namespace JianghuGo.Android
                     break;
                 case "bleed":
                     _floaters.Add(new Floater { OnHero = mine, Text = "-" + e.Damage, Color = Color.Rgb(200, 60, 60), Size = 18, At = at });
+                    break;
+                case "burn":
+                    _floaters.Add(new Floater { OnHero = mine, Text = "🔥-" + e.Damage, Color = Color.Rgb(255, 140, 40), Size = 18, At = at });
+                    break;
+                case "poison":
+                    _floaters.Add(new Floater { OnHero = mine, Text = "☠-" + e.Damage, Color = Color.Rgb(120, 200, 80), Size = 18, At = at });
                     break;
             }
         }
@@ -610,7 +628,9 @@ namespace JianghuGo.Android
 
             One("stun", "stun", 0);
             One("bleed", "bleed", cellH * 0.3f);
+            One("burn", "bleed", cellH * 0.3f);
             One("weaken", "weaken", cellH * 0.3f);
+            One("poison", "weaken", cellH * 0.3f);
         }
 
         /// <summary>The opponent's telegraphed move: a small banner over its head.</summary>
@@ -707,6 +727,53 @@ namespace JianghuGo.Android
             _text.TextSize = 9 * _d;
             _text.Color = Ui.Ink;
             canvas.DrawText(f.Hp + " / " + f.MaxHp, l + pw / 2, y + 30 * _d, _text);
+
+            // 1.7: every effect on the fighter with its turns left (path resources show their value)
+            var chips = EffectChips(f);
+            if (chips.Length > 0)
+            {
+                _text.TextSize = 11 * _d;
+                _text.TextAlign = left ? Paint.Align.Left : Paint.Align.Right;
+                _text.Color = Ui.Gold;
+                canvas.DrawText(chips, left ? l + 8 * _d : l + pw - 8 * _d, y + 54 * _d, _text);
+                _text.TextAlign = Paint.Align.Center;
+                _text.TextSize = 13 * _d;
+                _text.Color = Ui.Ink;
+            }
+        }
+
+        private static string EffectChips(FighterDto f)
+        {
+            if (f?.Effects == null || f.Effects.Count == 0) return string.Empty;
+            var parts = new List<string>();
+            foreach (var g in f.Effects.GroupBy(e => e.Type))
+            {
+                var e = g.First();
+                var stacks = g.Count() > 1 ? "×" + g.Count() : string.Empty;
+                var label = g.Key switch
+                {
+                    "bleed" => "🩸" + stacks,
+                    "burn" => "🔥" + stacks,
+                    "poison" => "☠" + stacks,
+                    "stun" => "💫",
+                    "weaken" => "↓atk",
+                    "slow" => "🐢",
+                    "frail" => "✧",
+                    "shield" => "🛡" + e.Magnitude,
+                    "empower" => "↑atk",
+                    "fortify" => "◆def",
+                    "haste" => "»",
+                    "charge" => "⚡" + e.Magnitude + "%",
+                    "fury" => "🔴" + e.Magnitude,
+                    "momentum" => "➶" + e.Magnitude,
+                    _ => null,
+                };
+                if (label == null) continue;
+                var turns = g.Key is "charge" or "fury" or "momentum" or "stun" or "shield" ? string.Empty : "(" + g.Max(x => x.TurnsLeft) + ")";
+                parts.Add(label + turns);
+            }
+
+            return string.Join(" ", parts);
         }
 
         /// <summary>Title plates use the item rarity palette: common/rare/epic/legendary/mythic → mortal…divine.</summary>

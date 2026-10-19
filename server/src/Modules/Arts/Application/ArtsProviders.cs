@@ -25,12 +25,16 @@ internal sealed class ArtsReader(IArtsRepository repo, ICharacterDirectory chara
 
 internal sealed class ArtsCombatPerks(ArtsReader reader, ArtsConfig config) : ICombatPerkBonuses
 {
+    public string SourcePl => "Sztuki ścieżki";
+
     public async Task<PerkBonus> BonusAsync(IUnitOfWork uow, Guid characterId, CancellationToken ct) =>
         await reader.ReadAsync(uow, characterId, ct) is { } r ? ArtsRules.Perks(config, r.Profile, r.Path, r.Realm) : PerkBonus.None;
 }
 
 internal sealed class ArtsCombatStats(ArtsReader reader, ArtsConfig config) : ICombatStatBonuses
 {
+    public string SourcePl => "Płomienie";
+
     public async Task<IReadOnlyDictionary<string, int>> BonusesAsync(IUnitOfWork uow, Guid characterId, CancellationToken ct) =>
         await reader.ReadAsync(uow, characterId, ct) is { } r ? ArtsRules.Stats(config, r.Profile, r.Path, r.Realm, r.Now) : new Dictionary<string, int>();
 }

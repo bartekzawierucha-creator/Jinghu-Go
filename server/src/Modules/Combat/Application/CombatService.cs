@@ -11,10 +11,17 @@ using JianghuGo.Modules.Combat.Domain;
 
 namespace JianghuGo.Modules.Combat.Application;
 
-public sealed record SlotView(int Slot, string Kind, string? TechniqueId, string? NamePl, int Level, int QiCost, int Cooldown, string? Unavailable);
+public sealed record BonusSourceView(string NamePl, IReadOnlyDictionary<string, int> Stats, PerkBonus Perks);
+
+public sealed record BonusBreakdownView(int Realm, int ResonancePermille, IReadOnlyList<BonusSourceView> Sources, IReadOnlyDictionary<string, int> TotalStats,
+    PerkBonus TotalPerks, int HpBonusPermille, PerkBonus PvpPerks, PerkCaps? Caps, PerkCaps? PvpCaps);
+
+public sealed record SlotView(int Slot, string Kind, string? TechniqueId, string? NamePl, int Level, int QiCost, int Cooldown, string? Unavailable,
+    string? DescriptionPl = null, int? DamageMin = null, int? DamageMax = null);
 
 /// <summary>A technique of the path: locked ones (MinRealm above the character's realm) are listed so the player sees what is coming.</summary>
-public sealed record KnownTechniqueView(string Id, string NamePl, string Slot, int Level, int Xp, int XpToNextLevel, int MinRealm = 0, bool Locked = false, int LevelCap = 10);
+public sealed record KnownTechniqueView(string Id, string NamePl, string Slot, int Level, int Xp, int XpToNextLevel, int MinRealm = 0, bool Locked = false, int LevelCap = 10,
+    string? DescriptionPl = null, int? DamageMin = null, int? DamageMax = null);
 
 public sealed record LoadoutView(Guid CharacterId, int Version, IReadOnlyList<SlotView> Slots, IReadOnlyList<KnownTechniqueView> Known);
 
@@ -160,20 +167,65 @@ public sealed partial class CombatService(
         var realm = await RealmOfAsync(uow, c.Id, ct);
         var cap = config.Progression.LevelCap(realm);
         int Level(string id) => Math.Min(cap, mastery.TryGetValue(id, out var m) ? m.Level : 1);
+        // 1.7: descriptions from the numbers and the damage each technique would deal now (current stats and perks)
+        var me = await SnapshotAsync(uow, c, ct);
+        (string Text, int? Min, int? Max) Info(TechniqueDefinition t, int level)
+        {
+            var eq = new EquippedTechnique(t.Id, Math.Min(cap, level), dao.GetValueOrDefault(t.Id), Awakening(c, t.Id, Math.Min(cap, level)));
+            var preview = TechniqueText.Preview(config, me, eq);
+            return (TechniqueText.Describe(config, t, eq.Awakening), preview?.Min, preview?.Max);
+        }
+
         var slotViews = slots.Select((id, i) =>
         {
             var t = id is null ? null : dao.GetValueOrDefault(id) ?? config.Technique(id);
-            return new SlotView(i, SlotKinds.Layout[i], id, t?.NamePl, id is null ? 0 : Level(id), t?.QiCost ?? 0, 0, null);
+            var info = t is null ? (null, null, null) : Info(t, Level(id!));
+            return new SlotView(i, SlotKinds.Layout[i], id, t?.NamePl, id is null ? 0 : Level(id), t?.QiCost ?? 0, 0, null, info.Text, info.Min, info.Max);
         }).ToList();
         var known = config.KnownBy(c.Path).Concat(dao.Values).Select(t =>
         {
             var m = mastery.GetValueOrDefault(t.Id);
             var level = m?.Level ?? 1;
+            var info = Info(t, level);
             return new KnownTechniqueView(t.Id, t.NamePl, t.Kind, level, m?.Xp ?? 0,
-                level >= config.Progression.MaxTechniqueLevel ? 0 : level * config.Progression.XpPerLevel, t.MinRealm, t.MinRealm > realm, cap);
+                level >= config.Progression.MaxTechniqueLevel ? 0 : level * config.Progression.XpPerLevel, t.MinRealm, t.MinRealm > realm, cap, info.Text, info.Min, info.Max);
         }).OrderBy(k => k.Locked).ThenBy(k => k.MinRealm).ToList();
         return new LoadoutView(c.Id.Value, version, slotViews, known);
     }
+
+    /// <summary>Every source of combat stats and perks, the totals after the caps, and the caps themselves (1.7 bonus screen).</summary>
+    public Task<Result<BonusBreakdownView>> BonusesAsync(AccountId accountId, Guid characterId, CancellationToken ct) =>
+        uowFactory.RunAsync<Result<BonusBreakdownView>>(async uow =>
+        {
+            var c = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
+            if (c is null) return CharacterNotFound;
+            var realm = await RealmOfAsync(uow, c.Id, ct);
+            var resonance = ResonancePermille(realm);
+            var sources = new List<BonusSourceView>
+            {
+                new("Postać (cechy z narodzin)", c.Stats, PerkBonus.None),
+                new("Ścieżka", new Dictionary<string, int>(), PathAsBonus(config.Perks(c.Path))),
+                new("Ekwipunek (rezonans ×" + (resonance / 1000.0).ToString("0.#", CultureInfo.InvariantCulture) + ")",
+                    (await equipment.BonusesAsync(uow, c.Id, ct)).ToDictionary(kv => kv.Key, kv => (int)((long)kv.Value * resonance / 1000)), PerkBonus.None),
+            };
+            foreach (var provider in statBonuses)
+            {
+                var stats = (await provider.BonusesAsync(uow, c.Id.Value, ct)).ToDictionary(kv => kv.Key, kv => provider.ResonatesWithRealm ? (int)((long)kv.Value * resonance / 1000) : kv.Value);
+                sources.Add(new(provider.SourcePl, stats, PerkBonus.None));
+            }
+
+            if (await repo.FindPetAsync(uow, c.Id, ct) is { } pet && config.Npc(pet.NpcId) is { } species)
+                sources.Add(new("Towarzysz: " + species.NamePl, SpiritPetRules.Bonuses(species, pet.Level).ToDictionary(kv => kv.Key, kv => (int)((long)kv.Value * resonance / 1000)),
+                    SpiritPetRules.Companion(species, pet.Level)));
+            foreach (var provider in perkBonuses) sources.Add(new(provider.SourcePl, new Dictionary<string, int>(), await provider.BonusAsync(uow, c.Id.Value, ct)));
+
+            var snap = await SnapshotAsync(uow, c, ct);
+            var pvp = await SnapshotAsync(uow, c, ct, pvp: true);
+            return new BonusBreakdownView(realm, resonance, sources, snap.Stats, PathAsBonus(snap.Perks), snap.HpBonusPermille, PathAsBonus(pvp.Perks), config.PerkCaps, config.PvpPerkCaps);
+        }, ct);
+
+    private static PerkBonus PathAsBonus(PathPerks? p) => p is null ? PerkBonus.None : new PerkBonus(p.DamagePermille, p.GuardPermille, p.EffectChancePermille, p.BleedPermille,
+        p.HealPermille, p.QiRegen, p.QiPermille, p.RegenPermille, p.ReflectPermille, p.LifestealPermille, p.FirstStrikePermille, 0, p.SurviveOnce, p.PetPower, p.PetEvery);
 
     private async Task<Combatant> SnapshotAsync(IUnitOfWork uow, CharacterSummary c, CancellationToken ct, bool pvp = false)
     {

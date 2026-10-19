@@ -551,6 +551,30 @@ namespace JianghuGo.Android
                         await reload("Gałąź: " + o.NamePl);
                     }), card, secondary: b.Chosen != null, sp: 12, heightDp: 36);
             }
+
+            if (b.Capstones != null && b.Capstones.Count > 0)
+            {
+                var chosenCap = b.Capstones.FirstOrDefault(x => x.Id == b.Capstone);
+                ui.Btn(chosenCap != null ? "Ostateczna: " + chosenCap.NamePl : "Umiejętność ostateczna (" + (b.CapstoneRealm + 1) + ". królestwo)", () =>
+                {
+                    var body = Sheet("Umiejętność ostateczna", 0.7f, out var close, "menu_hero");
+                    ui.Text("Otwiera się w " + (b.CapstoneRealm + 1) + ". królestwie. Pierwszy wybór za darmo, zmiana kosztuje " + (b.RespecStones * 10) + " KD.", body, 11, Ui.Muted, maxLines: 2);
+                    foreach (var cap in b.Capstones)
+                    {
+                        var card = ui.Card(body, 1f, 8, cap.Id == b.Capstone ? Ui.Gold : (Color?)null);
+                        ui.Text(cap.NamePl, card, 14, cap.Id == b.Capstone ? Ui.Gold : Ui.Ink, bold: true);
+                        ui.Text(cap.DescriptionPl, card, 11, Ui.Muted, maxLines: 2);
+                        if (cap.Id != b.Capstone && arts.Realm >= b.CapstoneRealm)
+                            ui.Btn("Wybierz", () => Run(async () =>
+                            {
+                                await _api.ChooseCapstoneAsync(c.Id, cap.Id, Ct);
+                                close();
+                                Sfx.Play(Sfx.Breakthrough, 0.8f);
+                                await reload("Umiejętność ostateczna: " + cap.NamePl);
+                            }), card, secondary: true, sp: 12, heightDp: 34);
+                    }
+                }, page, secondary: true, sp: 12, heightDp: 36);
+            }
         }
 
         // ---- estate ------------------------------------------------------------------------------------------

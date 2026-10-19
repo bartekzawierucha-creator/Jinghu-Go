@@ -1603,6 +1603,23 @@ paths:
       responses:
         "200": { description: OK }
         "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/arts/capstone:
+    post:
+      tags: [Arts]
+      summary: "Choose the path's ultimate at the capstone realm (first choice free)."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/combat/bonuses:
+    get:
+      tags: [Combat]
+      summary: "Every source of combat stats and perks, the totals after caps (PvE and PvP) and the caps."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
   /api/v1/characters/{characterId}/arts:
     get:
       tags: [Arts]

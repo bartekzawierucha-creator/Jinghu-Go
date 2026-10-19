@@ -21,10 +21,22 @@ public static class MeridianRules
 
     public static int RealmBonus(CultivationState? s) => (s?.RealmIndex ?? 0) * RealmBonusPerRealm;
 
+    /// <summary>The stats each path is built around (1.7): every 4 points opened in one of them give a 5th for free.</summary>
+    public static IReadOnlyList<string> PathStats(string? path) => path switch
+    {
+        "qi" => ["spirit"],
+        "body" => ["strength", "constitution"],
+        "flame" => ["spirit", "elementalAffinity"],
+        "poison" => ["agility", "focus"],
+        _ => [],
+    };
+
     public static IReadOnlyDictionary<string, int> Bonuses(CultivationState? s, IReadOnlyDictionary<string, int> allocated)
     {
         var realm = RealmBonus(s);
-        return Stats.Select(st => (st, v: realm + allocated.GetValueOrDefault(st))).Where(x => x.v > 0).ToDictionary(x => x.st, x => x.v);
+        var pathStats = PathStats(s?.Path);
+        return Stats.Select(st => (st, v: realm + allocated.GetValueOrDefault(st) + (pathStats.Contains(st) ? allocated.GetValueOrDefault(st) / 4 : 0)))
+            .Where(x => x.v > 0).ToDictionary(x => x.st, x => x.v);
     }
 }
 
@@ -107,6 +119,8 @@ public sealed class MeridianService(
 /// <summary>Realm bonus + opened meridians, summed into the battle snapshot by Combat.</summary>
 internal sealed class CultivationCombatBonuses(ICultivationRepository repo) : ICombatStatBonuses
 {
+    public string SourcePl => "Królestwo i meridiany";
+
     public async Task<IReadOnlyDictionary<string, int>> BonusesAsync(IUnitOfWork uow, Guid characterId, CancellationToken ct)
     {
         var id = new CharacterId(characterId);

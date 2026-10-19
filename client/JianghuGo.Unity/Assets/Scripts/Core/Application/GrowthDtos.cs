@@ -189,6 +189,11 @@ namespace JianghuGo.Client.Application
         public List<int> TierRealms { get; set; } = new List<int>();
         public List<BranchOptionDto> Options { get; set; } = new List<BranchOptionDto>();
         public long RespecStones { get; set; }
+
+        /// <summary>The path's ultimate (1.7): chosen once at the capstone realm.</summary>
+        public int CapstoneRealm { get; set; } = 65;
+        public string Capstone { get; set; }
+        public List<BranchOptionDto> Capstones { get; set; } = new List<BranchOptionDto>();
     }
 
     public sealed class NoticeDto

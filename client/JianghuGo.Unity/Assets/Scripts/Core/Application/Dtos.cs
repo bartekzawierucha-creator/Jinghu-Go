@@ -286,6 +286,9 @@ namespace JianghuGo.Client.Application
 
         /// <summary>A critical strike (Focus against Willpower, rules combat-5).</summary>
         public bool Crit { get; set; }
+
+        /// <summary>A path mechanic that fired (1.7): charge, ember_burst, blossom, fury.</summary>
+        public string Mechanic { get; set; }
     }
 
     /// <summary>What the opponent will do this turn (telegraphed by the server for NPC battles).</summary>

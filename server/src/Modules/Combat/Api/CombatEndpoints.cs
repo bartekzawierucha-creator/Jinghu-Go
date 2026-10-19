@@ -31,6 +31,8 @@ public static class CombatEndpoints
         })).WithTags("Combat").RequireAuthorization();
 
         var character = app.MapGroup("/api/v1/characters/{characterId:guid}/combat").WithTags("Combat").RequireAuthorization();
+        character.MapGet("/bonuses", async (Guid characterId, HttpContext http, CombatService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.BonusesAsync(http.User.GetAccountId(), characterId, ct), Results.Ok));
         character.MapGet("/loadout", async (Guid characterId, HttpContext http, CombatService svc, CancellationToken ct) =>
             ApiResults.From(await svc.GetLoadoutAsync(http.User.GetAccountId(), characterId, ct), Results.Ok));
         character.MapPut("/loadout", async (Guid characterId, SetLoadoutCommand body, HttpContext http, CombatService svc, CancellationToken ct) =>

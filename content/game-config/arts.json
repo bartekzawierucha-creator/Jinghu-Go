@@ -1228,7 +1228,10 @@
   "tierRealms": [
    3,
    8,
-   21
+   21,
+   33,
+   44,
+   55
   ],
   "paths": {
    "qi": [
@@ -1343,6 +1346,126 @@
      "perTier": {
       "petPower": 10,
       "petEvery": 3
+     }
+    }
+   ]
+  },
+  "capstoneRealm": 65,
+  "capstones": {
+   "qi": [
+    {
+     "id": "dao_unity_sword",
+     "namePl": "Miecz Jedności Dao",
+     "descriptionPl": "Obrażenia +20%, pierwszy cios +30%.",
+     "perTier": {
+      "damagePermille": 200,
+      "firstStrikePermille": 300
+     }
+    },
+    {
+     "id": "qi_ocean",
+     "namePl": "Ocean Qi",
+     "descriptionPl": "Maks. Qi +50%, +5 Qi co turę, regeneracja 2% życia co turę.",
+     "perTier": {
+      "qiPermille": 500,
+      "qiRegen": 5,
+      "regenPermille": 20
+     }
+    },
+    {
+     "id": "heaven_mirror",
+     "namePl": "Lustro Niebios",
+     "descriptionPl": "Odbicie 15% obrażeń, gardy +10 pkt.",
+     "perTier": {
+      "reflectPermille": 150,
+      "guardPermille": 100
+     }
+    }
+   ],
+   "body": [
+    {
+     "id": "eternal_mountain",
+     "namePl": "Ciało Wiecznej Góry",
+     "descriptionPl": "Życie +40%, gardy +10 pkt.",
+     "perTier": {
+      "hpPermille": 400,
+      "guardPermille": 100
+     }
+    },
+    {
+     "id": "titan_blood",
+     "namePl": "Krew Tytana",
+     "descriptionPl": "Obrażenia +15%, kradzież życia 8%.",
+     "perTier": {
+      "damagePermille": 150,
+      "lifestealPermille": 80
+     }
+    },
+    {
+     "id": "deathless",
+     "namePl": "Nieśmiertelny",
+     "descriptionPl": "Raz w walce przeżywa śmiertelny cios, regeneracja 3% życia co turę.",
+     "perTier": {
+      "surviveOnce": 1,
+      "regenPermille": 30
+     }
+    }
+   ],
+   "flame": [
+    {
+     "id": "inner_sun",
+     "namePl": "Słońce Wewnętrzne",
+     "descriptionPl": "Obrażenia +15%, podpalenia i krwawienia +50%.",
+     "perTier": {
+      "damagePermille": 150,
+      "bleedPermille": 500
+     }
+    },
+    {
+     "id": "phoenix_reborn",
+     "namePl": "Odrodzony Feniks",
+     "descriptionPl": "Raz w walce przeżywa śmiertelny cios, leczenie +15%.",
+     "perTier": {
+      "surviveOnce": 1,
+      "healPermille": 150
+     }
+    },
+    {
+     "id": "conflagration",
+     "namePl": "Pożoga",
+     "descriptionPl": "Szansa na efekty +15%, pierwszy cios +20%.",
+     "perTier": {
+      "effectChancePermille": 150,
+      "firstStrikePermille": 200
+     }
+    }
+   ],
+   "poison": [
+    {
+     "id": "thousand_venoms",
+     "namePl": "Tysiąc Jadów",
+     "descriptionPl": "Szansa na efekty +20%, trucizny +50%.",
+     "perTier": {
+      "effectChancePermille": 200,
+      "bleedPermille": 500
+     }
+    },
+    {
+     "id": "serpent_shadow",
+     "namePl": "Cień Węża",
+     "descriptionPl": "Obrażenia +15%, pierwszy cios +30%.",
+     "perTier": {
+      "damagePermille": 150,
+      "firstStrikePermille": 300
+     }
+    },
+    {
+     "id": "venom_heart",
+     "namePl": "Serce z Jadu",
+     "descriptionPl": "Kradzież życia 8%, odbicie 10% obrażeń.",
+     "perTier": {
+      "lifestealPermille": 80,
+      "reflectPermille": 100
      }
     }
    ]

@@ -41,7 +41,8 @@ public sealed record ArtsProfile(
     int SwordXp,
     string? Branch,
     IReadOnlyList<ArtsNotice> Notices,
-    int Version)
+    int Version,
+    string? Capstone = null)
 {
     public static ArtsProfile New(CharacterId id) =>
         new(id, [], [], null, null, null, null, [], [], new Dictionary<string, int>(), 0, null, null, 0, [], 0, 0, 0, null, null, 0, null, [], 0);
@@ -303,6 +304,10 @@ public static class ArtsRules
             var tier = BranchTier(c, realm);
             if (tier > 0) sum += Scale(branch.PerTier, 1000 * tier);
         }
+
+        // the path's ultimate (1.7), chosen at the capstone realm
+        if (p.Capstone is { } capId && realm >= c.Branches.CapstoneRealm && c.Branches.CapstonesOf(path).FirstOrDefault(x => x.Id == capId) is { } cap)
+            sum += cap.PerTier;
 
         return sum;
     }

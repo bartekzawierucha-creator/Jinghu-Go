@@ -279,6 +279,8 @@ internal sealed class SectProgressHandler(IServiceScopeFactory scopes, SectsConf
 /// <summary>Buildings give every member combat perks…</summary>
 internal sealed class SectCombatPerks(ISectRepository sects, ISectDevelopmentRepository repo, SectsConfig config) : ICombatPerkBonuses
 {
+    public string SourcePl => "Budynki sekty";
+
     public async Task<PerkBonus> BonusAsync(IUnitOfWork uow, Guid characterId, CancellationToken ct)
     {
         if (config.Development is null || await sects.FindMemberAsync(uow, new CharacterId(characterId), ct) is not { } m) return PerkBonus.None;

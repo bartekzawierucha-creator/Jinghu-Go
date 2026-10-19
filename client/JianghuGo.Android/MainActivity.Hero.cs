@@ -98,6 +98,7 @@ namespace JianghuGo.Android
             ui.AddWeighted(page, doll, 1f);
             var info = ui.HRow(page, 34, 4);
             ui.Btn("Cechy, ścieżka i tytuły", () => ShowOriginsSheet(), info, secondary: true, sp: 12, heightDp: 34, icon: "menu_hero");
+            ui.Btn("Premie", () => Run(ShowBonusesSheetAsync), info, secondary: true, sp: 12, heightDp: 34);
 
             // combat stats: base + equipment + meridians/realm + pet, 3×3
             var statsCard = ui.Card(page, 0f, 8);
@@ -284,13 +285,36 @@ namespace JianghuGo.Android
                         return;
                     }
 
-                    _ui.Text("poz. " + known.Level + (known.LevelCap < 10 ? " (limit " + known.LevelCap + ")" : string.Empty) + " · " + known.Xp + "/" + known.XpToNextLevel + " XP", col, 11, Ui.Muted);
+                    _ui.Text("poz. " + known.Level + (known.LevelCap < 10 ? " (limit " + known.LevelCap + ")" : string.Empty) + " · " + known.Xp + "/" + known.XpToNextLevel + " XP"
+                             + (known.DamageMin != null ? " · obrażenia " + known.DamageMin + "–" + known.DamageMax : string.Empty), col, 11, Ui.Muted);
+                    if (!string.IsNullOrEmpty(known.DescriptionPl)) _ui.Text(known.DescriptionPl, col, 10, Ui.Jade, maxLines: 3);
                     if (known.Id != slot.TechniqueId)
                         _ui.Btn("Wybierz", () => Run(() => Set(known.Id)), row, sp: 12, heightDp: 38).LayoutParameters = new LinearLayout.LayoutParams(Px(88), Px(38)) { Gravity = GravityFlags.CenterVertical };
                 }, empty: "Nie znasz jeszcze technik tego rodzaju — stwórz je w Laboratorium Dao.");
             }
 
             if (slot.TechniqueId != null) _ui.Btn("Opróżnij slot", () => Run(() => Set(null)), body, secondary: true, sp: 13, heightDp: 42);
+        }
+
+        // ---- Premie (1.7) -------------------------------------------------------------------------------------
+
+        private async Task ShowBonusesSheetAsync()
+        {
+            var b = await _api.GetBonusesAsync(_me.Id, Ct);
+            var body = Sheet("Premie w walce", 0.8f, out _, "menu_hero");
+            _ui.Text("Suma (po limitach): " + PerksText(b.TotalPerks) + (b.HpBonusPermille != 0 ? " · życie +" + b.HpBonusPermille / 10 + "%" : string.Empty), body, 12, Ui.Gold, bold: true, maxLines: 4);
+            _ui.Text("W PvP: " + PerksText(b.PvpPerks), body, 11, Ui.Muted, maxLines: 3);
+            _ui.Text("Rezonans ekwipunku, tytułów i towarzysza: ×" + (b.ResonancePermille / 1000.0).ToString("0.#") + " (królestwo " + (b.Realm + 1) + ")", body, 11, Ui.Jade, maxLines: 2);
+            var sources = b.Sources.Where(x => x.Stats.Values.Any(v => v != 0) || x.Perks.Values.Any(v => v != 0)).ToList();
+            _ui.Pages(body, sources.Count, 1, 4, (i, cell) =>
+            {
+                var src = sources[i];
+                var card = _ui.Card(cell, 1f, 6, null, 0);
+                _ui.Text(src.NamePl, card, 13, Ui.Ink, bold: true);
+                var stats = string.Join("  ", src.Stats.Where(x => x.Value != 0).Select(x => StatName(x.Key) + " +" + x.Value));
+                var perks = PerksText(src.Perks);
+                _ui.Text(string.Join(" · ", new[] { stats, perks }.Where(t => !string.IsNullOrEmpty(t))), card, 11, Ui.Muted, maxLines: 3);
+            });
         }
 
         // ---- Towarzysz ----------------------------------------------------------------------------------------

@@ -57,7 +57,8 @@ public sealed record SwordView(int Level, int MaxLevel, int Xp, int? NextXp, lon
 
 public sealed record BranchOptionView(string Id, string NamePl, string DescriptionPl, PerkBonus PerTier);
 
-public sealed record BranchView(string? Chosen, int Tier, IReadOnlyList<int> TierRealms, IReadOnlyList<BranchOptionView> Options, long RespecStones);
+public sealed record BranchView(string? Chosen, int Tier, IReadOnlyList<int> TierRealms, IReadOnlyList<BranchOptionView> Options, long RespecStones,
+    int CapstoneRealm = 65, string? Capstone = null, IReadOnlyList<BranchOptionView>? Capstones = null);
 
 public sealed record NoticeView(string Kind, string TextPl, DateTimeOffset At);
 
@@ -435,6 +436,23 @@ public sealed class ArtsService(
             return p with { Branch = branch.Id };
         }, ct);
 
+    /// <summary>Chooses the path's ultimate at the capstone realm (1.7). The first choice is free, a change costs 10× the branch respec.</summary>
+    public Task<Result<ArtsView>> ChooseCapstoneAsync(AccountId accountId, Guid characterId, BranchCommand cmd, CancellationToken ct) =>
+        Mutate(accountId, characterId, "capstone", async (uow, x, _) =>
+        {
+            var p = x.Profile;
+            if (config.Branches.CapstonesOf(x.Character.Path).FirstOrDefault(b => b.Id == cmd.BranchId) is not { } cap) return Error.NotFound("capstone_unknown", "Unknown ultimate for your path.");
+            if (x.Status.Realm < config.Branches.CapstoneRealm) return Error.Conflict("realm_too_low", $"The ultimate opens at realm {config.Branches.CapstoneRealm}.");
+            if (p.Capstone == cap.Id) return Error.Conflict("capstone_chosen", "Already chosen.");
+            if (p.Capstone is not null)
+            {
+                var paid = await inventory.DebitAsync(uow, x.Character.Id, config.Branches.RespecStones * 10, "arts_capstone", Ref(), ct);
+                if (!paid.IsSuccess) return paid.Error!;
+            }
+
+            return p with { Capstone = cap.Id };
+        }, ct);
+
     // ---------------------------------------------------------------- plumbing
 
     private static string Ref() => Uuid7.New().ToString("N");
@@ -562,7 +580,8 @@ public sealed class ArtsService(
             await CountAsync(uow, c.Id, config.SwordIntent.EchoItem, bag, ct), config.SwordIntent.XpPerEcho * (c.Path == ArtsRules.QiPath ? 2 : 1), swords > 0 ? "⚔" + swords : null);
 
         var branch = new BranchView(p.Branch, ArtsRules.BranchTier(config, realm), config.Branches.TierRealms,
-            [.. config.BranchesOf(c.Path).Select(b => new BranchOptionView(b.Id, b.NamePl, b.DescriptionPl, b.PerTier))], config.Branches.RespecStones);
+            [.. config.BranchesOf(c.Path).Select(b => new BranchOptionView(b.Id, b.NamePl, b.DescriptionPl, b.PerTier))], config.Branches.RespecStones,
+            config.Branches.CapstoneRealm, p.Capstone, [.. config.Branches.CapstonesOf(c.Path).Select(b => new BranchOptionView(b.Id, b.NamePl, b.DescriptionPl, b.PerTier))]);
 
         var (alchemy, forge) = ArtsRules.Crafting(config, p, c.Path, realm);
         return new ArtsView(c.Id.Value, c.Path, realm, config.RulesVersion, flameView, toxin, gu, temper, sword, branch,

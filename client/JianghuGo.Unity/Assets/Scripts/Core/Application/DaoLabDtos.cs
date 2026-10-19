@@ -13,6 +13,11 @@ namespace JianghuGo.Client.Application
         public string NamePl { get; set; }
         public int Level { get; set; }
         public int QiCost { get; set; }
+
+        /// <summary>What the technique does, generated from the rules (1.7), and its damage range right now.</summary>
+        public string DescriptionPl { get; set; }
+        public int? DamageMin { get; set; }
+        public int? DamageMax { get; set; }
     }
 
     public sealed class KnownTechniqueDto
@@ -30,6 +35,30 @@ namespace JianghuGo.Client.Application
 
         /// <summary>Highest level usable at the current realm (mastery beyond it waits).</summary>
         public int LevelCap { get; set; } = 10;
+
+        public string DescriptionPl { get; set; }
+        public int? DamageMin { get; set; }
+        public int? DamageMax { get; set; }
+    }
+
+    /// <summary>One source of combat stats and perks on the bonus screen (1.7).</summary>
+    public sealed class BonusSourceDto
+    {
+        public string NamePl { get; set; }
+        public Dictionary<string, int> Stats { get; set; } = new Dictionary<string, int>();
+        public Dictionary<string, int> Perks { get; set; } = new Dictionary<string, int>();
+    }
+
+    public sealed class BonusBreakdownDto
+    {
+        public int Realm { get; set; }
+        public int ResonancePermille { get; set; }
+        public List<BonusSourceDto> Sources { get; set; } = new List<BonusSourceDto>();
+        public Dictionary<string, int> TotalStats { get; set; } = new Dictionary<string, int>();
+        public Dictionary<string, int> TotalPerks { get; set; } = new Dictionary<string, int>();
+        public int HpBonusPermille { get; set; }
+        public Dictionary<string, int> PvpPerks { get; set; } = new Dictionary<string, int>();
+        public Dictionary<string, int> Caps { get; set; } = new Dictionary<string, int>();
     }
 
     public sealed class LoadoutDto

@@ -15,6 +15,9 @@ public interface ICombatStatBonuses
     /// Realm-aware providers (meridians, flames) keep their own numbers.
     /// </summary>
     bool ResonatesWithRealm => false;
+
+    /// <summary>Name of the source on the bonus breakdown screen (1.7).</summary>
+    string SourcePl => "Inne";
 }
 
 /// <summary>
@@ -50,6 +53,9 @@ public sealed record PerkBonus(
 public interface ICombatPerkBonuses
 {
     Task<PerkBonus> BonusAsync(IUnitOfWork uow, Guid characterId, CancellationToken ct);
+
+    /// <summary>Name of the source on the bonus breakdown screen (1.7).</summary>
+    string SourcePl => "Inne";
 }
 
 /// <summary>The cultivator's current realm index (0-65), so opponents and rewards can be raised to it.</summary>

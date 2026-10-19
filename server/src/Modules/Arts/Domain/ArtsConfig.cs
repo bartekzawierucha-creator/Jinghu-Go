@@ -149,7 +149,12 @@ public sealed record SwordIntentRules(
 public sealed record BranchDefinition(string Id, string NamePl, string DescriptionPl, PerkBonus PerTier);
 
 /// <param name="TierRealms">Realm at which each branch tier opens (I, II, III).</param>
-public sealed record BranchRules(IReadOnlyList<int> TierRealms, IReadOnlyDictionary<string, IReadOnlyList<BranchDefinition>> Paths, long RespecStones = 1000);
+/// <param name="Capstones">1.7: at <see cref="CapstoneRealm"/> each path chooses one ultimate (once; changing it costs <see cref="RespecStones"/> × 10).</param>
+public sealed record BranchRules(IReadOnlyList<int> TierRealms, IReadOnlyDictionary<string, IReadOnlyList<BranchDefinition>> Paths, long RespecStones = 1000,
+    int CapstoneRealm = 65, IReadOnlyDictionary<string, IReadOnlyList<BranchDefinition>>? Capstones = null)
+{
+    public IReadOnlyList<BranchDefinition> CapstonesOf(string path) => Capstones is not null && Capstones.TryGetValue(path, out var list) ? list : [];
+}
 
 public static class ArtsConfigValidator
 {
@@ -246,7 +251,7 @@ public static class ArtsConfigValidator
 
         // branches
         var br = c.Branches;
-        if (br.TierRealms is null || br.TierRealms.Count is < 1 or > 5 || br.TierRealms.Zip(br.TierRealms.Skip(1)).Any(p => p.Second <= p.First)) e.Add("branches.tierRealms invalid.");
+        if (br.TierRealms is null || br.TierRealms.Count is < 1 or > 8 || br.TierRealms.Zip(br.TierRealms.Skip(1)).Any(p => p.Second <= p.First)) e.Add("branches.tierRealms invalid.");
         foreach (var path in Paths)
         {
             var list = br.Paths?.GetValueOrDefault(path);
