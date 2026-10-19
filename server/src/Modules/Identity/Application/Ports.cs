@@ -12,6 +12,12 @@ public interface IAccountRepository
     /// <summary>Throws <see cref="DuplicateKeyException"/> when the e-mail is taken.</summary>
     Task AddAsync(IUnitOfWork uow, Account account, CancellationToken ct);
     Task UpdateAsync(IUnitOfWork uow, Account account, CancellationToken ct);
+
+    /// <summary>Hash of the account's one-time recovery code (2.0), or null.</summary>
+    Task<string?> FindRecoveryHashAsync(IUnitOfWork uow, AccountId id, CancellationToken ct);
+
+    /// <summary>Sets (or with null removes) the recovery code hash.</summary>
+    Task SetRecoveryHashAsync(IUnitOfWork uow, AccountId id, string? hash, DateTimeOffset now, CancellationToken ct);
 }
 
 public interface ISessionRepository
@@ -20,6 +26,7 @@ public interface ISessionRepository
     Task<Session?> FindByRefreshHashAsync(IUnitOfWork uow, string refreshTokenHash, CancellationToken ct);
     Task<Session?> FindByIdAsync(IUnitOfWork uow, SessionId id, CancellationToken ct);
     Task<IReadOnlyList<Session>> ListFamilyAsync(IUnitOfWork uow, Guid familyId, CancellationToken ct);
+    Task<IReadOnlyList<Session>> ListActiveForAccountAsync(IUnitOfWork uow, AccountId accountId, CancellationToken ct);
     Task AddAsync(IUnitOfWork uow, Session session, CancellationToken ct);
     Task UpdateAsync(IUnitOfWork uow, Session session, CancellationToken ct);
 }

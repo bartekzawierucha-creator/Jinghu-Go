@@ -454,4 +454,9 @@ namespace JianghuGo.Client.Application
         public string ItemId { get; set; }
         public int Quantity { get; set; }
     }
+
+    public sealed class RecoveryCodeDto
+    {
+        public string RecoveryCode { get; set; }
+    }
 }

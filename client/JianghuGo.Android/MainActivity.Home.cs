@@ -431,6 +431,31 @@ namespace JianghuGo.Android
                 if (next && Build.VERSION.SdkInt >= BuildVersionCodes.Tiramisu && !Alarms.Allowed(this))
                     RequestPermissions(new[] { "android.permission.POST_NOTIFICATIONS" }, Alarms.PermissionRequestCode);
             });
+            var acct = _ui.HRow(body, 40, 4);
+            _ui.Btn("Kod odzyskiwania", () => Run(async () =>
+            {
+                var code = await _api.NewRecoveryCodeAsync(Ct);
+                close();
+                var sheet = Sheet("Kod odzyskiwania", 0.45f, out _, "menu_settings");
+                var t = _ui.Text(code, sheet, 22, Ui.Gold, bold: true, center: true);
+                t.SetTextIsSelectable(true);
+                _ui.Text("Zapisz go w bezpiecznym miejscu — pokazujemy go tylko raz. Z nim i e-mailem ustawisz nowe hasło. Nowy kod unieważnia poprzedni.",
+                    sheet, 12, Ui.Ink, center: true, maxLines: 4);
+            }), acct, secondary: true, sp: 12, heightDp: 40);
+            _ui.Btn("Zmień hasło", () =>
+            {
+                close();
+                var sheet = Sheet("Zmień hasło", 0.5f, out var closeSheet, "menu_settings");
+                var cur = _ui.Field("Obecne hasło", password: true, parent: sheet);
+                var next = _ui.Field("Nowe hasło (co najmniej 10 znaków)", password: true, parent: sheet);
+                _ui.Box(sheet, 1f, marginDp: 0);
+                _ui.Btn("Zmień", () => Run(async () =>
+                {
+                    await _api.ChangePasswordAsync(cur.Text, next.Text, Ct);
+                    closeSheet();
+                    SetStatus("Hasło zmienione — inne urządzenia zostały wylogowane.");
+                }), sheet, sp: 14, heightDp: 44);
+            }, acct, secondary: true, sp: 12, heightDp: 40);
             _ui.Text("Przypomnienia: koniec odosobnienia, gotowe partie w kotle i kuźni, plony, powrót uczniów i koniec polowania. Nic nie opuszcza telefonu.",
                 body, 11, Ui.Muted, maxLines: 3);
             _ui.Text("Jianghu Go " + (PackageManager?.GetPackageInfo(PackageName, 0)?.VersionName ?? string.Empty), body, 10, Ui.Muted, center: true);

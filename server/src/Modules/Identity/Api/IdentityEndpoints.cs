@@ -11,6 +11,10 @@ public sealed record RegisterResponse(Guid AccountId);
 public sealed record LoginRequest(string? Email, string? Password);
 public sealed record RefreshRequest(string? RefreshToken);
 
+public sealed record ResetPasswordRequest(string? Email, string? RecoveryCode, string? NewPassword);
+
+public sealed record ChangePasswordRequest(string? CurrentPassword, string? NewPassword);
+
 public static class IdentityEndpoints
 {
     public const string AuthRateLimitPolicy = "auth";
@@ -38,6 +42,18 @@ public static class IdentityEndpoints
                 return Results.NoContent();
             })
             .RequireAuthorization();
+
+        auth.MapPost("/recovery-code", async (HttpContext http, IdentityService svc, CancellationToken ct) =>
+                ApiResults.From(await svc.NewRecoveryCodeAsync(http.User.GetAccountId(), ct), code => Results.Ok(new { recoveryCode = code })))
+            .RequireAuthorization().RequireRateLimiting(AuthRateLimitPolicy);
+
+        auth.MapPost("/reset-password", async (ResetPasswordRequest body, IdentityService svc, CancellationToken ct) =>
+                ApiResults.From(await svc.ResetPasswordAsync(body.Email, body.RecoveryCode, body.NewPassword, ct), _ => Results.NoContent()))
+            .RequireRateLimiting(AuthRateLimitPolicy);
+
+        auth.MapPost("/change-password", async (ChangePasswordRequest body, HttpContext http, IdentityService svc, CancellationToken ct) =>
+                ApiResults.From(await svc.ChangePasswordAsync(http.User.GetAccountId(), http.User.GetSessionId(), body.CurrentPassword, body.NewPassword, ct), _ => Results.NoContent()))
+            .RequireAuthorization().RequireRateLimiting(AuthRateLimitPolicy);
 
         return app;
     }

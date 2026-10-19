@@ -64,6 +64,16 @@ namespace JianghuGo.Client.Application
             Store(pair);
         }
 
+        /// <summary>A one-time recovery code for resetting the password (2.0); shown once.</summary>
+        public async Task<string> NewRecoveryCodeAsync(CancellationToken ct) =>
+            (await SendAsync<RecoveryCodeDto>("POST", "/api/v1/auth/recovery-code", null, true, null, ct).ConfigureAwait(false))?.RecoveryCode;
+
+        public Task ResetPasswordAsync(string email, string recoveryCode, string newPassword, CancellationToken ct) =>
+            SendAsync<object>("POST", "/api/v1/auth/reset-password", new { email, recoveryCode, newPassword }, false, null, ct);
+
+        public Task ChangePasswordAsync(string currentPassword, string newPassword, CancellationToken ct) =>
+            SendAsync<object>("POST", "/api/v1/auth/change-password", new { currentPassword, newPassword }, true, null, ct);
+
         /// <summary>Restores a session from the stored refresh token. Returns false if there is none or it is dead.</summary>
         public async Task<bool> TryResumeAsync(CancellationToken ct)
         {

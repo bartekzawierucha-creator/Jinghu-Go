@@ -163,6 +163,91 @@ public sealed class IdentityService(
         }, ct);
     }
 
+    /// <summary>
+    /// A new one-time recovery code (2.0), shown once: with it and the e-mail the password can be reset without e-mail
+    /// delivery. Only its hash is stored; a new code replaces the old one.
+    /// </summary>
+    public async Task<Result<string>> NewRecoveryCodeAsync(AccountId accountId, CancellationToken ct)
+    {
+        var now = clock.GetUtcNow();
+        return await uowFactory.RunAsync<Result<string>>(async uow =>
+        {
+            var account = await accounts.FindByIdAsync(uow, accountId, ct);
+            if (account is null) return Error.NotFound("account_not_found", "Account not found.");
+            var code = RecoveryCodes.New();
+            await accounts.SetRecoveryHashAsync(uow, accountId, hasher.HashPassword(account, RecoveryCodes.Normalize(code)), now, ct);
+            await AuditAsync(uow, accountId, "account.recovery_code_created", "account", accountId.ToString(), new { }, now, ct);
+            await uow.CommitAsync(ct);
+            return code;
+        }, ct);
+    }
+
+    /// <summary>Resets the password with the e-mail and the recovery code; the code is used up and every session ends.</summary>
+    public async Task<Result<bool>> ResetPasswordAsync(string? email, string? recoveryCode, string? newPassword, CancellationToken ct)
+    {
+        var invalid = Error.Unauthorized("invalid_recovery", "Invalid e-mail or recovery code.");
+        if (ValidatePassword(newPassword) is { } passwordError) return passwordError;
+        if (string.IsNullOrWhiteSpace(email) || string.IsNullOrWhiteSpace(recoveryCode) || recoveryCode.Length > 64) return invalid;
+        var now = clock.GetUtcNow();
+        return await uowFactory.RunAsync<Result<bool>>(async uow =>
+        {
+            var account = await accounts.FindByEmailAsync(uow, NormalizeEmail(email), ct);
+            var hash = account is null ? null : await accounts.FindRecoveryHashAsync(uow, account.Id, ct);
+            if (account is null || hash is null)
+            {
+                hasher.VerifyHashedPassword(new Account(default, "", "", default, 0, null), _dummyHash.Value, recoveryCode);
+                return invalid;
+            }
+
+            if (account.IsLocked(now)) return invalid;
+            if (hasher.VerifyHashedPassword(account, hash, RecoveryCodes.Normalize(recoveryCode)) == PasswordVerificationResult.Failed)
+            {
+                var failures = account.FailedLoginCount + 1;
+                account = failures >= Opt.MaxFailedLogins
+                    ? account with { FailedLoginCount = 0, LockedUntil = now + Opt.LockoutDuration }
+                    : account with { FailedLoginCount = failures };
+                await accounts.UpdateAsync(uow, account, ct);
+                await uow.CommitAsync(ct);
+                return invalid;
+            }
+
+            account = account with { PasswordHash = hasher.HashPassword(account, newPassword!), FailedLoginCount = 0, LockedUntil = null };
+            await accounts.UpdateAsync(uow, account, ct);
+            await accounts.SetRecoveryHashAsync(uow, account.Id, null, now, ct);
+            await RevokeAllAsync(uow, account.Id, now, ct);
+            await AuditAsync(uow, account.Id, "account.password_reset", "account", account.Id.ToString(), new { }, now, ct);
+            await uow.CommitAsync(ct);
+            return true;
+        }, ct);
+    }
+
+    /// <summary>Changes the password (current one required); other sessions end, this one stays.</summary>
+    public async Task<Result<bool>> ChangePasswordAsync(AccountId accountId, SessionId current, string? currentPassword, string? newPassword, CancellationToken ct)
+    {
+        if (ValidatePassword(newPassword) is { } passwordError) return passwordError;
+        var now = clock.GetUtcNow();
+        return await uowFactory.RunAsync<Result<bool>>(async uow =>
+        {
+            var account = await accounts.FindByIdAsync(uow, accountId, ct);
+            if (account is null) return Error.NotFound("account_not_found", "Account not found.");
+            if (string.IsNullOrEmpty(currentPassword) || hasher.VerifyHashedPassword(account, account.PasswordHash, currentPassword) == PasswordVerificationResult.Failed)
+                return Error.Unauthorized("invalid_credentials", "Current password is wrong.");
+            await accounts.UpdateAsync(uow, account with { PasswordHash = hasher.HashPassword(account, newPassword!) }, ct);
+            var keep = (await sessions.FindByIdAsync(uow, current, ct))?.FamilyId;
+            foreach (var s in await sessions.ListActiveForAccountAsync(uow, accountId, ct))
+                if (s.FamilyId != keep) await sessions.UpdateAsync(uow, s with { RevokedAt = now, RevokeReason = SessionRevokeReason.Logout }, ct);
+            await AuditAsync(uow, accountId, "account.password_changed", "account", accountId.ToString(), new { }, now, ct);
+            await uow.CommitAsync(ct);
+            return true;
+        }, ct);
+    }
+
+    private async Task RevokeAllAsync(IUnitOfWork uow, AccountId accountId, DateTimeOffset now, CancellationToken ct)
+    {
+        foreach (var s in await sessions.ListActiveForAccountAsync(uow, accountId, ct))
+            await sessions.UpdateAsync(uow, s with { RevokedAt = now, RevokeReason = SessionRevokeReason.Logout }, ct);
+    }
+
     public async Task LogoutAsync(SessionId sessionId, CancellationToken ct)
     {
         var now = clock.GetUtcNow();
@@ -243,4 +328,19 @@ public sealed class IdentityService(
 
         return null;
     }
+}
+
+/// <summary>Recovery codes: 16 characters from an unambiguous alphabet in groups of four (~80 bits).</summary>
+public static class RecoveryCodes
+{
+    private const string Alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+    public static string New()
+    {
+        var bytes = System.Security.Cryptography.RandomNumberGenerator.GetBytes(16);
+        var chars = bytes.Select(b => Alphabet[b % Alphabet.Length]).ToArray();
+        return string.Join("-", Enumerable.Range(0, 4).Select(i => new string(chars, i * 4, 4)));
+    }
+
+    public static string Normalize(string code) => new string(code.Where(char.IsLetterOrDigit).Select(char.ToUpperInvariant).ToArray());
 }

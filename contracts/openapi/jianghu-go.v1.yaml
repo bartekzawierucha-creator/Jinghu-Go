@@ -103,6 +103,30 @@ paths:
       responses:
         "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/TokenPair" } } } }
         "401": { $ref: "#/components/responses/Problem" }
+  /api/v1/auth/recovery-code:
+    post:
+      tags: [Identity]
+      summary: Create a one-time recovery code (shown once; replaces the previous one).
+      responses:
+        "200": { description: OK }
+        "401": { $ref: "#/components/responses/Problem" }
+  /api/v1/auth/reset-password:
+    post:
+      tags: [Identity]
+      summary: Reset the password with e-mail and recovery code; ends every session.
+      security: []
+      responses:
+        "204": { description: Reset }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Problem" }
+  /api/v1/auth/change-password:
+    post:
+      tags: [Identity]
+      summary: Change the password (current one required); other sessions end.
+      responses:
+        "204": { description: Changed }
+        "400": { $ref: "#/components/responses/Problem" }
+        "401": { $ref: "#/components/responses/Problem" }
   /api/v1/auth/logout:
     post:
       tags: [Identity]

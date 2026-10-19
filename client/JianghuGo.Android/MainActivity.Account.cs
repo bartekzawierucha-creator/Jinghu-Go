@@ -59,6 +59,32 @@ namespace JianghuGo.Android
                 close();
                 await ShowHomeAsync();
             }), row, secondary: true, sp: 15, heightDp: 48);
+            ui.Btn("Nie pamiętam hasła", () =>
+            {
+                if (!Connect()) return;
+                close();
+                ResetPasswordSheet(email.Text?.Trim());
+            }, body, secondary: true, sp: 12, heightDp: 34);
+        }
+
+        /// <summary>Password reset with the one-time recovery code saved earlier in the settings (2.0).</summary>
+        private void ResetPasswordSheet(string email)
+        {
+            var ui = _ui;
+            var body = Sheet("Nowe hasło", 0.62f, out var close, "menu_settings");
+            ui.Text("Podaj e-mail i kod odzyskiwania (zapisany w Ustawieniach). Kod działa raz.", body, 11, Ui.Muted, maxLines: 2);
+            var mail = ui.Field("E-mail", value: email, parent: body);
+            var code = ui.Field("Kod odzyskiwania XXXX-XXXX-XXXX-XXXX", parent: body);
+            var pass = ui.Field("Nowe hasło (co najmniej 10 znaków)", password: true, parent: body);
+            ui.Box(body, 1f, marginDp: 0);
+            ui.Btn("Ustaw hasło", () => Run(async () =>
+            {
+                await _api.ResetPasswordAsync(mail.Text.Trim(), code.Text.Trim(), pass.Text, Ct);
+                await _api.LoginAsync(mail.Text.Trim(), pass.Text, Ct);
+                close();
+                await ShowHomeAsync();
+                SetStatus("Hasło zmienione. Utwórz nowy kod odzyskiwania w Ustawieniach.");
+            }), body, sp: 15, heightDp: 48);
         }
 
         // ---- creation: 1 fate, 2 path, 3 name ------------------------------------------------------------------

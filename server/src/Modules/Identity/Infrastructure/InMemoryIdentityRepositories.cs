@@ -38,6 +38,19 @@ internal sealed class InMemoryAccountRepository : IAccountRepository
         return Task.CompletedTask;
     }
 
+    private const string Recovery = "identity.recovery_codes";
+
+    public Task<string?> FindRecoveryHashAsync(IUnitOfWork uow, AccountId id, CancellationToken ct) =>
+        Task.FromResult(InMemoryUnitOfWork.From(uow).Table<AccountId, string>(Recovery).GetValueOrDefault(id));
+
+    public Task SetRecoveryHashAsync(IUnitOfWork uow, AccountId id, string? hash, DateTimeOffset now, CancellationToken ct)
+    {
+        var u = InMemoryUnitOfWork.From(uow);
+        var t = u.Table<AccountId, string>(Recovery);
+        u.SetTable(Recovery, hash is null ? t.Remove(id) : t.SetItem(id, hash));
+        return Task.CompletedTask;
+    }
+
     public Task UpdateAsync(IUnitOfWork uow, Account account, CancellationToken ct)
     {
         var u = InMemoryUnitOfWork.From(uow);
@@ -67,6 +80,12 @@ internal sealed class InMemorySessionRepository : ISessionRepository
 
     public Task<Session?> FindByIdAsync(IUnitOfWork uow, SessionId id, CancellationToken ct) =>
         Task.FromResult(InMemoryUnitOfWork.From(uow).Table<SessionId, Session>(Sessions).GetValueOrDefault(id));
+
+    public Task<IReadOnlyList<Session>> ListActiveForAccountAsync(IUnitOfWork uow, AccountId accountId, CancellationToken ct)
+    {
+        IReadOnlyList<Session> list = [.. InMemoryUnitOfWork.From(uow).Table<SessionId, Session>(Sessions).Values.Where(s => s.AccountId == accountId && s.RevokedAt is null)];
+        return Task.FromResult(list);
+    }
 
     public Task<IReadOnlyList<Session>> ListFamilyAsync(IUnitOfWork uow, Guid familyId, CancellationToken ct)
     {

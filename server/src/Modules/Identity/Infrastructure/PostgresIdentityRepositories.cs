@@ -26,6 +26,16 @@ internal sealed class PostgresAccountRepository : IAccountRepository
             $"INSERT INTO identity.accounts ({Columns}) VALUES ($1, $2, $3, $4, $5, $6)",
             ct, a.Id.Value, a.Email, a.PasswordHash, a.CreatedAt, a.FailedLoginCount, a.LockedUntil);
 
+    public async Task<string?> FindRecoveryHashAsync(IUnitOfWork uow, AccountId id, CancellationToken ct) =>
+        (await PostgresUnitOfWork.From(uow).QueryAsync("SELECT code_hash FROM identity.recovery_codes WHERE account_id = $1", r => r.GetString(0), ct, id.Value)).FirstOrDefault();
+
+    public Task SetRecoveryHashAsync(IUnitOfWork uow, AccountId id, string? hash, DateTimeOffset now, CancellationToken ct) =>
+        hash is null
+            ? PostgresUnitOfWork.From(uow).ExecuteAsync("DELETE FROM identity.recovery_codes WHERE account_id = $1", ct, id.Value)
+            : PostgresUnitOfWork.From(uow).ExecuteAsync(
+                "INSERT INTO identity.recovery_codes (account_id, code_hash, created_at) VALUES ($1, $2, $3) " +
+                "ON CONFLICT (account_id) DO UPDATE SET code_hash = EXCLUDED.code_hash, created_at = EXCLUDED.created_at", ct, id.Value, hash, now);
+
     public async Task UpdateAsync(IUnitOfWork uow, Account a, CancellationToken ct)
     {
         var rows = await PostgresUnitOfWork.From(uow).ExecuteAsync(
@@ -73,6 +83,9 @@ internal sealed class PostgresSessionRepository : ISessionRepository
 
     public Task<Session?> FindByIdAsync(IUnitOfWork uow, SessionId id, CancellationToken ct) =>
         PostgresUnitOfWork.From(uow).QuerySingleOrDefaultAsync($"SELECT {Columns} FROM identity.sessions WHERE id = $1", Map, ct, id.Value);
+
+    public async Task<IReadOnlyList<Session>> ListActiveForAccountAsync(IUnitOfWork uow, AccountId accountId, CancellationToken ct) =>
+        await PostgresUnitOfWork.From(uow).QueryAsync($"SELECT {Columns} FROM identity.sessions WHERE account_id = $1 AND revoked_at IS NULL ORDER BY id", Map, ct, accountId.Value);
 
     public async Task<IReadOnlyList<Session>> ListFamilyAsync(IUnitOfWork uow, Guid familyId, CancellationToken ct) =>
         await PostgresUnitOfWork.From(uow).QueryAsync($"SELECT {Columns} FROM identity.sessions WHERE family_id = $1 ORDER BY id", Map, ct, familyId);
