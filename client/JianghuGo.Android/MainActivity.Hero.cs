@@ -250,6 +250,33 @@ namespace JianghuGo.Android
                 ui.Text(ActionName(slot.Kind) + (slot.Level > 0 ? " · poz. " + slot.Level : string.Empty) + (slot.QiCost > 0 ? " · " + slot.QiCost + " Qi" : string.Empty), col, 10, Ui.Muted);
                 card.Click += (_, __) => PickTechnique(loadout, slot);
             });
+
+            // 1.8: saved sets (PvE / PvP / Próba) — one tap to switch; kept on this phone
+            var presets = ui.HRow(page, 40);
+            foreach (var name in new[] { "PvE", "PvP", "Próba" })
+            {
+                var key = "preset_" + c.Id + "_" + name;
+                var saved = _prefs.GetString(key, null);
+                ui.Btn(name + (saved != null ? " ▶" : " ＋"), () => Run(async () =>
+                {
+                    if (saved == null)
+                    {
+                        _prefs.Edit()!.PutString(key, string.Join(",", slots.Select(x => x.TechniqueId ?? string.Empty)))!.Apply();
+                        await ShowTechniquesAsync();
+                        SetStatus("Zapisano zestaw " + name + ". Przytrzymaj, by nadpisać.");
+                        return;
+                    }
+
+                    var ids = saved.Split(',').Select(x => string.IsNullOrEmpty(x) ? null : x).ToList();
+                    await _api.SetLoadoutAsync(c.Id, loadout.Version, ids, Ct);
+                    await ShowTechniquesAsync();
+                    SetStatus("Założono zestaw " + name + ".");
+                }), presets, secondary: true, sp: 12, heightDp: 38).LongClick += (_, __) =>
+                {
+                    _prefs.Edit()!.PutString(key, string.Join(",", slots.Select(x => x.TechniqueId ?? string.Empty)))!.Apply();
+                    SetStatus("Nadpisano zestaw " + name + ".");
+                };
+            }
         }
 
         private void PickTechnique(LoadoutDto loadout, LoadoutSlotDto slot)

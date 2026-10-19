@@ -33,8 +33,13 @@ public sealed record CultivationProfile(
     int Enlightenments,
     SettleSummary? LastSummary,
     long LifetimeQi,
-    int Version)
+    int Version,
+    DateOnly? PillDay = null,
+    IReadOnlyDictionary<string, int>? PillsToday = null)
 {
+    /// <summary>Pills of this kind already taken today (1.8 tolerance; the count resets with the world day).</summary>
+    public int PillsTaken(string itemId, DateOnly today) => PillDay == today ? PillsToday?.GetValueOrDefault(itemId) ?? 0 : 0;
+
     public const int CurrentLadder = 3;
 
     public static CultivationProfile New(CharacterId id, string path, DateTimeOffset now) =>

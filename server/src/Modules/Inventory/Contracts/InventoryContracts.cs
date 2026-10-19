@@ -23,7 +23,8 @@ public interface IInventory
     Task<bool> HasRoomAsync(IUnitOfWork uow, CharacterId characterId, string itemId, long quantity, CancellationToken ct);
 
     /// <param name="boundRef">Immutable reference stored with the item (a scroll's technique id); null for ordinary items.</param>
-    Task<Result<InstanceInfo>> CreateInstanceAsync(IUnitOfWork uow, CharacterId characterId, AccountId accountId, string itemId, string reason, string referenceId, CancellationToken ct, string? boundRef = null);
+    /// <param name="id">1.8: the instance id may be chosen (crafting picks the best of several candidates: quality follows from the id).</param>
+    Task<Result<InstanceInfo>> CreateInstanceAsync(IUnitOfWork uow, CharacterId characterId, AccountId accountId, string itemId, string reason, string referenceId, CancellationToken ct, string? boundRef = null, Guid? id = null);
 
     /// <summary>Uses up a unique item from the owner's bag (e.g. a scroll when its technique is learned).</summary>
     Task<Result<InstanceInfo>> ConsumeInstanceAsync(IUnitOfWork uow, Guid instanceId, int expectedVersion, string reason, CancellationToken ct);
@@ -54,6 +55,45 @@ public interface IItemCatalog
 public interface IEquipmentStats
 {
     Task<IReadOnlyDictionary<string, int>> BonusesAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct);
+
+    /// <summary>Combat perks from special properties of equipped items (1.8), by perk name (e.g. "lifestealPermille").</summary>
+    Task<IReadOnlyDictionary<string, int>> PerksAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyDictionary<string, int>>(new Dictionary<string, int>());
+}
+
+/// <summary>
+/// Item quality (1.8): a pure function of the instance id, like the random properties. Crafting chooses among several candidate
+/// ids (more with higher smithing), so skill raises the quality without storing anything new.
+/// </summary>
+public static class ItemQuality
+{
+    public sealed record Grade(string Id, string NamePl, int StatPermille, int ExtraAffixes);
+
+    public static readonly IReadOnlyList<Grade> Grades =
+    [
+        new("low", "Niska", 800, 0),
+        new("normal", "Zwykła", 1000, 0),
+        new("good", "Dobra", 1150, 0),
+        new("excellent", "Doskonała", 1300, 1),
+        new("masterwork", "Arcydzieło", 1500, 2),
+    ];
+
+    public static int Roll(Guid id)
+    {
+        var bytes = System.Security.Cryptography.SHA256.HashData(id.ToByteArray());
+        return (int)(BitConverter.ToUInt32(bytes, 0) % 1000);
+    }
+
+    public static Grade Of(Guid id) => Roll(id) switch
+    {
+        < 150 => Grades[0],
+        < 700 => Grades[1],
+        < 900 => Grades[2],
+        < 980 => Grades[3],
+        _ => Grades[4],
+    };
+
+    public static int Rank(Guid id) => Grades.ToList().IndexOf(Of(id));
 }
 
 public static class InventoryEvents

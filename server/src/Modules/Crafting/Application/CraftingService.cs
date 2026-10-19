@@ -148,7 +148,10 @@ public sealed partial class CraftingService(
                 {
                     if (unique)
                     {
-                        var item = await inventory.CreateInstanceAsync(uow, c.Id, accountId, recipe.Output.Item, "craft", reference, ct);
+                        // 1.8: smithing skill picks the best of several candidates (quality follows from the instance id)
+                        var candidates = 1 + (config.ProfessionRules.Level((await XpAsync(uow, c.Id, ct)).Smithing) / 2);
+                        var best = Enumerable.Range(0, candidates).Select(_ => Uuid7.New()).OrderByDescending(ItemQuality.Roll).First();
+                        var item = await inventory.CreateInstanceAsync(uow, c.Id, accountId, recipe.Output.Item, "craft", reference, ct, id: best);
                         if (!item.IsSuccess) return item.Error!;
                         created.Add(item.Value.Id);
                     }

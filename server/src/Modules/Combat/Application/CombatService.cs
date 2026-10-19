@@ -219,11 +219,18 @@ public sealed partial class CombatService(
                 sources.Add(new("Towarzysz: " + species.NamePl, SpiritPetRules.Bonuses(species, pet.Level).ToDictionary(kv => kv.Key, kv => (int)((long)kv.Value * resonance / 1000)),
                     SpiritPetRules.Companion(species, pet.Level)));
             foreach (var provider in perkBonuses) sources.Add(new(provider.SourcePl, new Dictionary<string, int>(), await provider.BonusAsync(uow, c.Id.Value, ct)));
+            sources.Add(new("Właściwości ekwipunku", new Dictionary<string, int>(), PerkFrom(await equipment.PerksAsync(uow, c.Id, ct))));
 
             var snap = await SnapshotAsync(uow, c, ct);
             var pvp = await SnapshotAsync(uow, c, ct, pvp: true);
             return new BonusBreakdownView(realm, resonance, sources, snap.Stats, PathAsBonus(snap.Perks), snap.HpBonusPermille, PathAsBonus(pvp.Perks), config.PerkCaps, config.PvpPerkCaps);
         }, ct);
+
+    /// <summary>Perks named like PerkBonus fields (equipment special properties) as a PerkBonus.</summary>
+    internal static PerkBonus PerkFrom(IReadOnlyDictionary<string, int> d) => new(
+        d.GetValueOrDefault("damagePermille"), d.GetValueOrDefault("guardPermille"), d.GetValueOrDefault("effectChancePermille"), d.GetValueOrDefault("bleedPermille"),
+        d.GetValueOrDefault("healPermille"), d.GetValueOrDefault("qiRegen"), d.GetValueOrDefault("qiPermille"), d.GetValueOrDefault("regenPermille"),
+        d.GetValueOrDefault("reflectPermille"), d.GetValueOrDefault("lifestealPermille"), d.GetValueOrDefault("firstStrikePermille"), d.GetValueOrDefault("hpPermille"));
 
     private static PerkBonus PathAsBonus(PathPerks? p) => p is null ? PerkBonus.None : new PerkBonus(p.DamagePermille, p.GuardPermille, p.EffectChancePermille, p.BleedPermille,
         p.HealPermille, p.QiRegen, p.QiPermille, p.RegenPermille, p.ReflectPermille, p.LifestealPermille, p.FirstStrikePermille, 0, p.SurviveOnce, p.PetPower, p.PetEvery);
@@ -254,6 +261,7 @@ public sealed partial class CombatService(
 
         var stats = c.Stats.ToDictionary(s => s.Key, s => s.Value + bonuses.GetValueOrDefault(s.Key));
         foreach (var provider in perkBonuses) perks += await provider.BonusAsync(uow, c.Id.Value, ct);
+        perks += PerkFrom(await equipment.PerksAsync(uow, c.Id, ct)); // special properties of equipment (1.8)
         // PvP (duels, arena) uses its own, lower caps so stacked arts cannot decide a fight between players (1.7)
         var path = (config.Perks(c.Path) ?? new PathPerks(string.Empty)).With(perks).Capped(pvp && config.PvpPerkCaps is not null ? config.PvpPerkCaps : config.PerkCaps);
         // pets (and Gu pets) grow with their owner's realm like everything else

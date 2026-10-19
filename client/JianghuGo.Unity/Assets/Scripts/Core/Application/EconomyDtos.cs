@@ -19,6 +19,10 @@ namespace JianghuGo.Client.Application
         public Guid Id { get; set; }
         public string ItemId { get; set; }
         public string NamePl { get; set; }
+        /// <summary>Quality (1.8) and the special combat property of heavenly/divine equipment.</summary>
+        public string Quality { get; set; }
+        public string QualityPl { get; set; }
+        public SpecialAffixDto Special { get; set; }
         public string Rarity { get; set; }
         public string Slot { get; set; }
         public int UpgradeLevel { get; set; }
@@ -60,6 +64,14 @@ namespace JianghuGo.Client.Application
         public int Pieces { get; set; }
         public Dictionary<string, int> Active { get; set; } = new Dictionary<string, int>();
         public List<SetBonusDto> Bonuses { get; set; } = new List<SetBonusDto>();
+    }
+
+    public sealed class SpecialAffixDto
+    {
+        public string Id { get; set; }
+        public string NamePl { get; set; }
+        public string Perk { get; set; }
+        public int Value { get; set; }
     }
 
     /// <summary>The travelling merchant (1.6).</summary>

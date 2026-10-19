@@ -107,7 +107,9 @@ namespace JianghuGo.Android
             var rarity = Ui.RarityOf(e.Stack?.Rarity ?? e.Item.Rarity);
             ui.Text(rarity.Name + (e.Stack != null ? "  ·  w sakwie: " + e.Stack.Quantity : e.Item.IsEquipped ? "  ·  założony" : e.Item.State == "listed" ? "  ·  na targu" : string.Empty), body, 12, rarity.Color, bold: true);
             if (e.Item != null && e.Item.Stats.Count > 0)
-                ui.Text(string.Join("  ·  ", e.Item.Stats.Select(x => StatName(x.Key) + " +" + x.Value)), body, 13, Ui.Ink, maxLines: 2);
+                ui.Text((e.Item.QualityPl != null ? "Jakość: " + e.Item.QualityPl + "  ·  " : string.Empty) + string.Join("  ·  ", e.Item.Stats.Select(x => StatName(x.Key) + " +" + x.Value)), body, 13, Ui.Ink, maxLines: 2);
+            if (e.Item?.Special != null)
+                ui.Text("Właściwość szczególna „" + e.Item.Special.NamePl + "”: " + PerksText(new Dictionary<string, int> { [e.Item.Special.Perk] = e.Item.Special.Value }), body, 12, Ui.Gold, maxLines: 2);
             if (e.Item != null && e.Item.Affixes != null && e.Item.Affixes.Count > 0)
                 ui.Text("Właściwości: " + string.Join("  ·  ", e.Item.Affixes.Select(a => a.NamePl + " (" + StatName(a.Stat) + " +" + a.Value + ")")), body, 12, Ui.Violet, maxLines: 2);
             if (e.Item?.SetNamePl != null)
@@ -145,7 +147,7 @@ namespace JianghuGo.Android
                     {
                         var r = await economy.UseAsync(e.Stack.ItemId, 1, Ct);
                         Sfx.Play(Sfx.Chime);
-                        await Done("+" + r.QiGranted + " Qi");
+                        await Done("Pigułka zażyta — Qi wpływa do naczynia (każda kolejna dziś działa o 25% słabiej).");
                     }), r1, sp: 14, heightDp: 46);
                 ui.Btn("Wyrzuć 1", () => Run(async () =>
                 {

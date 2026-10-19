@@ -10,7 +10,8 @@ public sealed record ItemsConfig(
     IReadOnlyList<AffixDefinition>? Affixes = null,
     IReadOnlyList<ItemSet>? Sets = null,
     IReadOnlyDictionary<string, IReadOnlyList<LootDrop>>? Dismantle = null,
-    MerchantRules? Merchant = null)
+    MerchantRules? Merchant = null,
+    IReadOnlyList<SpecialAffixDefinition>? SpecialAffixes = null)
 {
     public IReadOnlyList<AffixDefinition> AffixList => Affixes ?? [];
 
@@ -165,3 +166,6 @@ public sealed record MerchantRules(int SellPermille, IReadOnlyDictionary<string,
 }
 
 public sealed record MerchantOffer(string Item, long Price);
+
+/// <summary>A combat perk a heavenly or divine item may carry (1.8): Perk is a PerkBonus field name, values in ‰ (base, before grade).</summary>
+public sealed record SpecialAffixDefinition(string Id, string NamePl, string Perk, int Min, int Max);

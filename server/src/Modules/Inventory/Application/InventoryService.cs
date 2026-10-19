@@ -12,7 +12,11 @@ public sealed record StackView(string ItemId, string NamePl, string Type, string
 public sealed record AffixView(string Id, string NamePl, string Stat, int Value);
 
 public sealed record InstanceView(Guid Id, string ItemId, string NamePl, string Rarity, string? Slot, int UpgradeLevel, string State, int Version,
-    IReadOnlyDictionary<string, int> Stats, string? BoundRef, IReadOnlyList<AffixView>? Affixes = null, string? SetId = null, string? SetNamePl = null);
+    IReadOnlyDictionary<string, int> Stats, string? BoundRef, IReadOnlyList<AffixView>? Affixes = null, string? SetId = null, string? SetNamePl = null,
+    string? Quality = null, string? QualityPl = null, SpecialAffixView? Special = null);
+
+/// <summary>A combat perk carried by a heavenly or divine item (1.8).</summary>
+public sealed record SpecialAffixView(string Id, string NamePl, string Perk, int Value);
 
 public sealed record SetView(string Id, string NamePl, int Worn, int Pieces, IReadOnlyDictionary<string, int> Active, IReadOnlyList<SetBonus> Bonuses);
 
@@ -353,10 +357,14 @@ public sealed class InventoryService(
             [.. instances.Select(i =>
             {
                 var d = config.Item(i.ItemId);
-                var stats = d.Equipment?.Stats.ToDictionary(s => s.Key, s => InventoryRules.ScaledStat(config, s.Value, i.UpgradeLevel)) ?? [];
+                var grade = ItemQuality.Of(i.Id);
+                var stats = d.Equipment?.Stats.ToDictionary(s => s.Key, s => InventoryRules.ScaledStat(config, s.Value, i.UpgradeLevel) * grade.StatPermille / 1000) ?? [];
                 var set = config.SetOf(i.ItemId);
+                var special = InventoryRules.SpecialAffix(config, i);
                 return new InstanceView(i.Id, i.ItemId, d.NamePl, d.Rarity, d.Equipment?.Slot, i.UpgradeLevel, i.State, i.Version, stats, i.BoundRef,
-                    [.. InventoryRules.Affixes(config, i).Select(a => new AffixView(a.Id, a.NamePl, a.Stat, a.Value))], set?.Id, set?.NamePl);
+                    [.. InventoryRules.Affixes(config, i).Select(a => new AffixView(a.Id, a.NamePl, a.Stat, a.Value))], set?.Id, set?.NamePl,
+                    d.Equipment is null ? null : grade.Id, d.Equipment is null ? null : grade.NamePl,
+                    special is null ? null : new SpecialAffixView(special.Id, special.NamePl, special.Perk, special.Value));
             })],
             equipped.ToDictionary(i => InventoryRules.SlotOf(config, i.ItemId)!, i => i.Id),
             InventoryRules.Bonuses(config, equipped),

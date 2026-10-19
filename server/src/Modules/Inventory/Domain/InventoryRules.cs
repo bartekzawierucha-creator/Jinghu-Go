@@ -18,9 +18,10 @@ public static class InventoryRules
         foreach (var i in list)
         {
             if (c.Find(i.ItemId)?.Equipment is not { } eq) continue;
+            var quality = Contracts.ItemQuality.Of(i.Id).StatPermille;
             foreach (var (stat, v) in eq.Stats)
             {
-                sum[stat] = sum.GetValueOrDefault(stat) + ScaledStat(c, v, i.UpgradeLevel);
+                sum[stat] = sum.GetValueOrDefault(stat) + (ScaledStat(c, v, i.UpgradeLevel) * quality / 1000);
             }
 
             foreach (var a in Affixes(c, i)) sum[a.Stat] = sum.GetValueOrDefault(a.Stat) + a.Value;
@@ -37,11 +38,30 @@ public static class InventoryRules
 
     public sealed record RolledAffix(string Id, string NamePl, string Stat, int Value);
 
+    public sealed record RolledSpecial(string Id, string NamePl, string Perk, int Value);
+
+    /// <summary>
+    /// A special property (1.8): heavenly and divine equipment may carry a combat perk (critical, life steal, resistance…), a pure
+    /// function of the item id like the ordinary properties. Chance and value grow with grade and quality.
+    /// </summary>
+    public static RolledSpecial? SpecialAffix(ItemsConfig c, ItemInstance i)
+    {
+        if (c.SpecialAffixes is not { Count: > 0 } pool || c.Find(i.ItemId) is not { Equipment: not null } d) return null;
+        var tier = RarityTier(d.Rarity);
+        if (tier < 4) return null;
+        var rng = new DeterministicRandom(SeedFrom(i.Id, new Guid("6a69616e-6768-752d-7370-656369616c21")));
+        var chance = (tier == 5 ? 450 : 250) + (Contracts.ItemQuality.Rank(i.Id) * 100);
+        if (rng.NextInt(0, 1000) >= chance) return null;
+        var a = pool[rng.NextInt(0, pool.Count)];
+        var value = rng.NextInt(a.Min, a.Max + 1) * (tier == 5 ? 3 : 2) / 2 * Contracts.ItemQuality.Of(i.Id).StatPermille / 1000;
+        return new RolledSpecial(a.Id, a.NamePl, a.Perk, Math.Max(1, value));
+    }
+
     /// <summary>The item's random properties: a pure function of its (server-generated) id and rarity — never stored, never rerolled.</summary>
     public static IReadOnlyList<RolledAffix> Affixes(ItemsConfig c, ItemInstance i)
     {
         if (c.AffixList.Count == 0 || c.Find(i.ItemId) is not { Equipment: not null } d) return [];
-        var n = Math.Min(AffixCount.GetValueOrDefault(d.Rarity), c.AffixList.Count);
+        var n = Math.Min(AffixCount.GetValueOrDefault(d.Rarity) + Contracts.ItemQuality.Of(i.Id).ExtraAffixes, c.AffixList.Count);
         if (n == 0) return [];
         var rng = new DeterministicRandom(SeedFrom(i.Id, new Guid("6a69616e-6768-752d-6166-666978657321")));
         var pool = c.AffixList.ToList();

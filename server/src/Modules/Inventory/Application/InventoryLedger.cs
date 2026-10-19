@@ -91,12 +91,12 @@ public sealed class InventoryLedger(IInventoryRepository repo, ItemsConfig confi
         return (InventoryRules.SlotsUsed(stacks.Count, instances), InventoryRules.Capacity(config, instances.Where(i => i.State == InstanceStates.Equipped)));
     }
 
-    public async Task<Result<InstanceInfo>> CreateInstanceAsync(IUnitOfWork uow, CharacterId characterId, AccountId accountId, string itemId, string reason, string referenceId, CancellationToken ct, string? boundRef = null)
+    public async Task<Result<InstanceInfo>> CreateInstanceAsync(IUnitOfWork uow, CharacterId characterId, AccountId accountId, string itemId, string reason, string referenceId, CancellationToken ct, string? boundRef = null, Guid? id = null)
     {
         if (config.Find(itemId) is not { Stackable: false } def) return UnknownItem(itemId);
         if ((def.Type == ItemTypes.Scroll) != (boundRef is not null)) return Error.Validation("bound_ref_invalid", "Scrolls (and only scrolls) carry a reference.");
         if (!await HasRoomAsync(uow, characterId, itemId, 1, ct)) return BagFull;
-        return Info(await CreateUncheckedAsync(uow, characterId, accountId, itemId, reason, referenceId, ct, boundRef));
+        return Info(await CreateUncheckedAsync(uow, characterId, accountId, itemId, reason, referenceId, ct, boundRef, id));
     }
 
     public async Task<Result<InstanceInfo>> ConsumeInstanceAsync(IUnitOfWork uow, Guid instanceId, int expectedVersion, string reason, CancellationToken ct)
@@ -111,10 +111,10 @@ public sealed class InventoryLedger(IInventoryRepository repo, ItemsConfig confi
     }
 
     /// <summary>Creates a unique item regardless of bag space (reward grants only).</summary>
-    public async Task<ItemInstance> CreateUncheckedAsync(IUnitOfWork uow, CharacterId characterId, AccountId accountId, string itemId, string reason, string referenceId, CancellationToken ct, string? boundRef = null)
+    public async Task<ItemInstance> CreateUncheckedAsync(IUnitOfWork uow, CharacterId characterId, AccountId accountId, string itemId, string reason, string referenceId, CancellationToken ct, string? boundRef = null, Guid? id = null)
     {
         var now = clock.GetUtcNow();
-        var instance = new ItemInstance(Uuid7.New(), characterId, accountId, itemId, 0, InstanceStates.Bag, 1, now, boundRef);
+        var instance = new ItemInstance(id ?? Uuid7.New(), characterId, accountId, itemId, 0, InstanceStates.Bag, 1, now, boundRef);
         await repo.AddInstanceAsync(uow, instance, ct);
         await EventAsync(uow, instance, "created", new { reason, referenceId }, ct);
         return instance;
@@ -200,6 +200,14 @@ public sealed class InventoryLedger(IInventoryRepository repo, ItemsConfig confi
 
     public async Task<IReadOnlyDictionary<string, int>> BonusesAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
         InventoryRules.Bonuses(config, (await repo.ListInstancesAsync(uow, characterId, ct)).Where(i => i.State == InstanceStates.Equipped));
+
+    public async Task<IReadOnlyDictionary<string, int>> PerksAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct)
+    {
+        var sum = new Dictionary<string, int>();
+        foreach (var i in (await repo.ListInstancesAsync(uow, characterId, ct)).Where(i => i.State == InstanceStates.Equipped))
+            if (InventoryRules.SpecialAffix(config, i) is { } sp) sum[sp.Perk] = sum.GetValueOrDefault(sp.Perk) + sp.Value;
+        return sum;
+    }
 
     public InstanceInfo Info(ItemInstance i) =>
         new(i.Id, i.CharacterId.Value, i.AccountId.Value, i.ItemId, i.UpgradeLevel, i.State, i.Version, config.Find(i.ItemId)?.Tradable ?? false, i.BoundRef);
