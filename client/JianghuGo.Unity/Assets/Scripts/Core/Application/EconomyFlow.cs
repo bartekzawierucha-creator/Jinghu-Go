@@ -33,6 +33,21 @@ namespace JianghuGo.Client.Application
             await ReloadAsync(ct).ConfigureAwait(false);
         }
 
+        /// <summary>What the merchant pays and sells (null when the server has no merchant).</summary>
+        public MerchantDto Merchant { get; private set; }
+
+        public async Task LoadMerchantAsync(CancellationToken ct)
+        {
+            try
+            {
+                Merchant = await _api.GetMerchantAsync(_characterId, ct).ConfigureAwait(false);
+            }
+            catch (ApiException)
+            {
+                Merchant = null;
+            }
+        }
+
         public async Task ReloadAsync(CancellationToken ct)
         {
             Set(await _api.GetInventoryAsync(_characterId, ct).ConfigureAwait(false));
@@ -126,7 +141,9 @@ namespace JianghuGo.Client.Application
         public UpgradeLevelDto NextUpgrade(ItemInstanceDto item)
         {
             if (Recipes?.Upgrade == null || item.UpgradeLevel >= Recipes.Upgrade.MaxLevel) return null;
-            return Recipes.Upgrade.Levels[item.UpgradeLevel];
+            var level = Recipes.Upgrade.Levels[item.UpgradeLevel];
+            if (item.Rarity == null || Recipes.Upgrade.RarityPermille == null || !Recipes.Upgrade.RarityPermille.TryGetValue(item.Rarity, out var p)) return level;
+            return new UpgradeLevelDto { Level = level.Level, SuccessPermille = level.SuccessPermille, Stones = level.Stones * p / 1000 };
         }
 
         // ---- market ---------------------------------------------------------------------------

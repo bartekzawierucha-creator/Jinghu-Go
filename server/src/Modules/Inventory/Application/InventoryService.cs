@@ -26,6 +26,18 @@ public sealed record DismantleResult(IReadOnlyList<StackView> Materials, Invento
 
 public sealed record EquipCommand(Guid InstanceId, int ExpectedVersion);
 
+public sealed record MerchantOfferView(string ItemId, string NamePl, string Type, string Rarity, long Price);
+
+/// <summary>The merchant's stock and what it pays: SellPrices per item id the character holds (tradable only).</summary>
+public sealed record MerchantView(int SellPermille, IReadOnlyList<MerchantOfferView> Stock, IReadOnlyDictionary<string, long> SellPrices, long Balance, int MaxPerTrade);
+
+/// <summary>Sell either a stack (itemId + quantity) or one unique item (instanceId + expectedVersion).</summary>
+public sealed record MerchantSellCommand(string? ItemId, int Quantity, Guid? InstanceId, int ExpectedVersion);
+
+public sealed record MerchantBuyCommand(string ItemId, int Quantity);
+
+public sealed record MerchantTradeResult(long Stones, long Balance, InventoryView Inventory);
+
 public sealed record UseCommand(string ItemId, int Quantity);
 
 public sealed record UseResult(string ItemId, int Quantity, long QiGranted, long Remaining);
@@ -186,6 +198,97 @@ public sealed class InventoryService(
                 await AuditAsync(uow, accountId, "inventory.dismantled", c.Id, new { instanceId = item.Id, item.ItemId, materials }, ct);
                 var views = materials.Select(m => { var d = config.Item(m.ItemId); return new StackView(m.ItemId, d.NamePl, d.Type, d.Rarity, m.Quantity); }).ToList();
                 return new DismantleResult(views, await ViewAsync(uow, c.Id, ct));
+            }, ct);
+            if (result.IsSuccess) await uow.CommitAsync(ct);
+            return result;
+        }, ct);
+
+    // ---------------------------------------------------------------- merchant (1.6)
+
+    private static readonly Error NoMerchant = Error.NotFound("merchant_unavailable", "There is no merchant.");
+
+    public Task<Result<MerchantView>> MerchantAsync(AccountId accountId, Guid characterId, CancellationToken ct) =>
+        uowFactory.RunAsync<Result<MerchantView>>(async uow =>
+        {
+            if (config.Merchant is not { } m) return NoMerchant;
+            var c = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
+            if (c is null) return CharacterNotFound;
+            var held = (await repo.ListStacksAsync(uow, c.Id, ct)).Select(x => x.ItemId)
+                .Concat((await repo.ListInstancesAsync(uow, c.Id, ct)).Where(i => i.State == InstanceStates.Bag).Select(i => i.ItemId)).Distinct();
+            var prices = held.Select(config.Find).Where(d => d is { Tradable: true }).ToDictionary(d => d!.Id, d => m.SellPrice(d!));
+            var stock = m.Stock.Select(o => { var d = config.Item(o.Item); return new MerchantOfferView(o.Item, d.NamePl, d.Type, d.Rarity, o.Price); }).ToList();
+            return new MerchantView(m.SellPermille, stock, prices, await ledger.BalanceAsync(uow, c.Id, ct), m.MaxPerTrade);
+        }, ct);
+
+    /// <summary>Sells tradable items to the merchant for stones (unique items: from the bag only, upgrades raise the price).</summary>
+    public Task<Result<MerchantTradeResult>> SellToMerchantAsync(AccountId accountId, Guid characterId, string? key, MerchantSellCommand cmd, CancellationToken ct) =>
+        uowFactory.RunAsync<Result<MerchantTradeResult>>(async uow =>
+        {
+            var result = await Idempotency.ExecuteAsync(idempotency, uow, clock, accountId, "inventory.merchant_sell", key, new { characterId, cmd }, async Task<Result<MerchantTradeResult>> () =>
+            {
+                if (config.Merchant is not { } m) return NoMerchant;
+                var c = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
+                if (c is null) return CharacterNotFound;
+                if ((cmd.ItemId is null) == (cmd.InstanceId is null)) return Error.Validation("sell_target_invalid", "Give either itemId with quantity, or instanceId.");
+                var reference = Uuid7.New().ToString();
+                long stones;
+                if (cmd.InstanceId is { } id)
+                {
+                    var item = await repo.FindInstanceAsync(uow, id, ct);
+                    if (item is null || item.CharacterId != c.Id || item.State == InstanceStates.Destroyed) return ItemNotFound;
+                    if (item.Version != cmd.ExpectedVersion) return Concurrent;
+                    if (item.State != InstanceStates.Bag) return Error.Conflict("item_not_in_bag", "Unequip the item (or cancel its listing) first.");
+                    var d = config.Item(item.ItemId);
+                    if (!d.Tradable) return Error.Validation("item_not_tradable", "The merchant does not buy this item.");
+                    if (!await MoveAsync(uow, item, InstanceStates.Destroyed, "sold_to_merchant", ct)) return Concurrent;
+                    stones = m.SellPrice(d, item.UpgradeLevel);
+                }
+                else
+                {
+                    if (cmd.Quantity < 1 || cmd.Quantity > m.MaxPerTrade) return Error.Validation("quantity_invalid", $"Sell 1-{m.MaxPerTrade} at a time.");
+                    var d = config.Find(cmd.ItemId);
+                    if (d is null) return ItemNotFound;
+                    if (!d.Tradable) return Error.Validation("item_not_tradable", "The merchant does not buy this item.");
+                    var removed = await ledger.RemoveItemsAsync(uow, c.Id, d.Id, cmd.Quantity, "merchant_sell", reference, ct);
+                    if (!removed.IsSuccess) return removed.Error!;
+                    stones = m.SellPrice(d) * cmd.Quantity;
+                }
+
+                var balance = await ledger.BalanceAsync(uow, c.Id, ct);
+                if (stones > 0)
+                {
+                    var credited = await ledger.CreditAsync(uow, c.Id, stones, "merchant_sell", reference, ct);
+                    if (!credited.IsSuccess) return credited.Error!;
+                    balance = credited.Value;
+                }
+
+                await AuditAsync(uow, accountId, "inventory.sold_to_merchant", c.Id, new { cmd.ItemId, cmd.Quantity, cmd.InstanceId, stones }, ct);
+                return new MerchantTradeResult(stones, balance, await ViewAsync(uow, c.Id, ct));
+            }, ct);
+            if (result.IsSuccess) await uow.CommitAsync(ct);
+            return result;
+        }, ct);
+
+    /// <summary>Buys goods from the merchant's stock (stackable goods only; the bag must have room).</summary>
+    public Task<Result<MerchantTradeResult>> BuyFromMerchantAsync(AccountId accountId, Guid characterId, string? key, MerchantBuyCommand cmd, CancellationToken ct) =>
+        uowFactory.RunAsync<Result<MerchantTradeResult>>(async uow =>
+        {
+            var result = await Idempotency.ExecuteAsync(idempotency, uow, clock, accountId, "inventory.merchant_buy", key, new { characterId, cmd }, async Task<Result<MerchantTradeResult>> () =>
+            {
+                if (config.Merchant is not { } m) return NoMerchant;
+                var c = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
+                if (c is null) return CharacterNotFound;
+                if (m.Offer(cmd.ItemId) is not { } offer) return Error.NotFound("not_in_stock", "The merchant does not sell this.");
+                if (cmd.Quantity < 1 || cmd.Quantity > m.MaxPerTrade) return Error.Validation("quantity_invalid", $"Buy 1-{m.MaxPerTrade} at a time.");
+                if (!await ledger.HasRoomAsync(uow, c.Id, offer.Item, cmd.Quantity, ct)) return Error.Conflict("bag_full", "There is no room in the bag.");
+                var reference = Uuid7.New().ToString();
+                var cost = checked(offer.Price * cmd.Quantity);
+                var debited = await ledger.DebitAsync(uow, c.Id, cost, "merchant_buy", reference, ct);
+                if (!debited.IsSuccess) return debited.Error!;
+                var added = await ledger.AddItemsAsync(uow, c.Id, offer.Item, cmd.Quantity, "merchant_buy", reference, ct);
+                if (!added.IsSuccess) return added.Error!;
+                await AuditAsync(uow, accountId, "inventory.bought_from_merchant", c.Id, new { cmd.ItemId, cmd.Quantity, cost }, ct);
+                return new MerchantTradeResult(-cost, debited.Value, await ViewAsync(uow, c.Id, ct));
             }, ct);
             if (result.IsSuccess) await uow.CommitAsync(ct);
             return result;

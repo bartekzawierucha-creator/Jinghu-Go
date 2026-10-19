@@ -81,7 +81,7 @@ public class CombatTests : IAsyncLifetime
         Assert.Equal("sword_qi_wave", loadout["slots"]![1].Str("techniqueId"));
         Assert.Equal(8, loadout["slots"]!.AsArray().Count);
 
-        string?[] swapped = ["palm_strike", "sword_thrust", "qi_blast", "flying_daggers", "flowing_water", "iron_shirt", "cloud_step", "mirror_palm"];
+        string?[] swapped = ["palm_strike", "sword_thrust", "qi_blast", "flying_daggers", "flowing_water", "iron_shirt", "heavenly_seal", "mirror_palm"];
         var saved = await Ok(await p.SendAsync(HttpMethod.Put, url, new { expectedVersion = 0, slots = swapped }));
         Assert.Equal(1, saved.Int("version"));
         var stale = await p.SendAsync(HttpMethod.Put, url, new { expectedVersion = 0, slots = swapped });
@@ -90,6 +90,14 @@ public class CombatTests : IAsyncLifetime
         string?[] foreign = ["palm_strike", "iron_fist", null, null, "flowing_water", null, null, null];
         var bad = await p.SendAsync(HttpMethod.Put, url, new { expectedVersion = 1, slots = foreign });
         Assert.Equal("loadout_invalid", (await ApiHost.Json(bad)).Str("code"));
+
+        // 1.6: techniques open realm by realm; locked ones are listed so the player sees what is coming
+        string?[] early = ["palm_strike", "sword_thrust", "qi_blast", "flying_daggers", "flowing_water", "iron_shirt", "swallow_glide", "mirror_palm"];
+        var locked = await p.SendAsync(HttpMethod.Put, url, new { expectedVersion = 1, slots = early });
+        Assert.Equal("technique_locked", (await ApiHost.Json(locked)).Str("code"));
+        var known = (await Ok(await p.GetAsync(url)))["known"]!.AsArray();
+        Assert.True(known.Single(k => k!.Str("id") == "swallow_glide")!["locked"]!.GetValue<bool>());
+        Assert.False(known.Single(k => k!.Str("id") == "palm_strike")!["locked"]!.GetValue<bool>());
 
         var thief = await _host.RegisterAndLoginAsync();
         Assert.Equal(HttpStatusCode.NotFound, (await thief.GetAsync(url)).StatusCode);

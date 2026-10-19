@@ -116,6 +116,15 @@ public sealed class SectService(
             return await MyViewAsync(uow, s, m, ct);
         }, ct);
 
+    /// <summary>The character's own pending applications (so they can be withdrawn).</summary>
+    public Task<Result<IReadOnlyList<ApplicationView>>> MyApplicationsAsync(AccountId accountId, Guid characterId, CancellationToken ct) =>
+        uowFactory.RunAsync<Result<IReadOnlyList<ApplicationView>>>(async uow =>
+        {
+            var c = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
+            if (c is null) return CharacterNotFound;
+            return Result<IReadOnlyList<ApplicationView>>.Success([.. (await repo.ListPendingForCharacterAsync(uow, c.Id, ct)).Select(View)]);
+        }, ct);
+
     public Task<Result<IReadOnlyList<SectEventView>>> HistoryAsync(AccountId accountId, Guid sectId, Guid characterId, Guid? before, int? limit, CancellationToken ct) =>
         uowFactory.RunAsync<Result<IReadOnlyList<SectEventView>>>(async uow =>
         {

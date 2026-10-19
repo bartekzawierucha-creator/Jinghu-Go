@@ -104,13 +104,15 @@ namespace JianghuGo.Android
             statsCard.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, Px(96)) { TopMargin = Px(6) };
             LinearLayout row = null;
             var k = 0;
+            // gear, pet and titles resonate with the realm: ×(10 + realm) / 10 (rules combat-5; realm bonus is 2 per realm)
+            var resonance = 10 + (meridians == null ? 0 : meridians.RealmBonus / 2);
             foreach (var st in c.Stats)
             {
                 if (k++ % 3 == 0) row = ui.HRow(statsCard, 24, 2);
-                var eq = inv.Bonuses.TryGetValue(st.Id, out var e) ? e : 0;
+                var eq = (inv.Bonuses.TryGetValue(st.Id, out var e) ? e : 0) * resonance / 10;
                 var mer = meridians == null ? 0 : (meridians.Allocated.TryGetValue(st.Id, out var a) ? a : 0) + meridians.RealmBonus;
-                var pb = pet != null && pet.Bonuses.TryGetValue(st.Id, out var b) ? b : 0;
-                var tb = _board?.TitleBonuses != null && _board.TitleBonuses.TryGetValue(st.Id, out var tv) ? tv : 0;
+                var pb = (pet != null && pet.Bonuses.TryGetValue(st.Id, out var b) ? b : 0) * resonance / 10;
+                var tb = (_board?.TitleBonuses != null && _board.TitleBonuses.TryGetValue(st.Id, out var tv) ? tv : 0) * resonance / 10;
                 var total = st.Value + eq + mer + pb + tb;
                 var cell = ui.Box(row, 1f, horizontal: true, marginDp: 4);
                 var statId = st.Id;

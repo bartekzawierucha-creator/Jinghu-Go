@@ -78,6 +78,13 @@ namespace JianghuGo.Android
                     ui.Text((b.Opponent?.Name ?? "?") + (b.Kind == "pvp" ? "  ·  pojedynek" : "  ·  trening"), col, 14, Ui.Ink, bold: true);
                     var waiting = b.Status == "pending_acceptance";
                     ui.Text(waiting ? (b.MySide == "b" ? "Wyzwanie do przyjęcia" : "Czeka na przeciwnika") : "Tura " + b.Turn + " · trwa", col, 11, Ui.Muted);
+                    if (waiting && b.MySide == "b")
+                        ui.Btn("Odrzuć", () => Run(async () =>
+                        {
+                            await _api.DeclineChallengeAsync(b.Id, Ct);
+                            await ShowCombatTabAsync(4);
+                            SetStatus("Wyzwanie odrzucone.");
+                        }), row, secondary: true, sp: 12, heightDp: 38).LayoutParameters = new LinearLayout.LayoutParams(Px(84), Px(38)) { Gravity = GravityFlags.CenterVertical, RightMargin = Px(4) };
                     ui.Btn(waiting && b.MySide == "b" ? "Przyjmij" : "Otwórz", () => Run(async () =>
                     {
                         if (waiting && b.MySide == "b") await _api.AcceptChallengeAsync(b.Id, Ct);

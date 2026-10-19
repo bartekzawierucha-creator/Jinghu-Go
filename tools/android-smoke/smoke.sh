@@ -226,6 +226,12 @@ $UI tap "Sakwa"
 $UI wait "Kamieni Duchowych" 60
 $UI noscroll
 $UI shot shots/08-bag.png
+$UI tap "Wędrowny kupiec"
+$UI wait "podstawowe towary" 30
+$UI noscroll
+$UI shot shots/08a-merchant.png
+$UI tap "Zamknij"
+$UI wait "Kamieni Duchowych" 60
 $UI tap "Kuźnia"
 $UI wait "Kowalstwo" 60
 $UI shot shots/08b-forge.png

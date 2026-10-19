@@ -62,6 +62,32 @@ namespace JianghuGo.Client.Application
         public List<SetBonusDto> Bonuses { get; set; } = new List<SetBonusDto>();
     }
 
+    /// <summary>The travelling merchant (1.6).</summary>
+    public sealed class MerchantDto
+    {
+        public int SellPermille { get; set; }
+        public List<MerchantOfferDto> Stock { get; set; } = new List<MerchantOfferDto>();
+        public Dictionary<string, long> SellPrices { get; set; } = new Dictionary<string, long>();
+        public long Balance { get; set; }
+        public int MaxPerTrade { get; set; }
+    }
+
+    public sealed class MerchantOfferDto
+    {
+        public string ItemId { get; set; }
+        public string NamePl { get; set; }
+        public string Type { get; set; }
+        public string Rarity { get; set; }
+        public long Price { get; set; }
+    }
+
+    public sealed class MerchantTradeDto
+    {
+        public long Stones { get; set; }
+        public long Balance { get; set; }
+        public InventoryDto Inventory { get; set; }
+    }
+
     public sealed class DismantleResultDto
     {
         public List<StackDto> Materials { get; set; } = new List<StackDto>();
@@ -167,6 +193,9 @@ namespace JianghuGo.Client.Application
         public int MaxLevel { get; set; }
         public string Material { get; set; }
         public List<UpgradeLevelDto> Levels { get; set; } = new List<UpgradeLevelDto>();
+
+        /// <summary>Stone price factor (‰) by item grade (1.6); missing grade = ×1.</summary>
+        public Dictionary<string, int> RarityPermille { get; set; }
     }
 
     public sealed class RecipeBookDto

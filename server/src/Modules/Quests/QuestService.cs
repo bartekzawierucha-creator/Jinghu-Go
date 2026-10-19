@@ -38,8 +38,12 @@ public sealed class QuestService(
     ICorrelationContext correlation,
     QuestsConfig config,
     TimeProvider clock,
-    QuestTitles titles)
+    QuestTitles titles,
+    JianghuGo.Modules.Cultivation.Contracts.ICultivationStatus cultivation)
 {
+    /// <summary>Daily quests and check-ins pay more as the cultivator climbs: +15 % per realm (1.6).</summary>
+    public static long RealmStones(long stones, int realm) => stones * (1000 + (150L * Math.Clamp(realm, 0, 65))) / 1000;
+
     private static readonly Error CharacterNotFound = Error.NotFound("character_not_found", "Character not found.");
 
     public Task<Result<QuestBoard>> GetAsync(AccountId accountId, Guid characterId, CancellationToken ct) =>
@@ -141,7 +145,7 @@ public sealed class QuestService(
             if (current?.LastDay == today) return Error.Conflict("already_checked_in", "Already checked in today.");
             var (streak, best) = QuestRules.NextStreak(current, today);
             await repo.SaveCheckinAsync(uow, new CheckinState(c.Id, today, streak, best, now), ct);
-            var stones = QuestRules.CheckinStones(config, streak);
+            var stones = RealmStones(QuestRules.CheckinStones(config, streak), (await cultivation.StatusAsync(uow, c.Id.Value, ct)).Realm);
             var credited = await inventory.CreditAsync(uow, c.Id, stones, "checkin", QuestRules.Period(today), ct);
             if (!credited.IsSuccess) return credited.Error!;
             await repo.AddProgressAsync(uow, c.Id, QuestRules.Period(today), "m_" + Metrics.Checkins, 1, ct);
@@ -188,7 +192,8 @@ public sealed class QuestService(
                 : new QuestView(q.Id, q.NamePl, q.DescriptionPl, q.Metric, q.Target, Math.Min(progress, q.Target), q.Stones, done, claimed, q.TitlePl, q.Bonus, q.Secret, q.RiddlePl, q.TitleRarity);
         }
 
-        var daily = QuestRules.DailyFor(config, id.Value, today).Select(q => View(q, todayRows)).ToList();
+        var realm = (await cultivation.StatusAsync(uow, id.Value, ct)).Realm;
+        var daily = QuestRules.DailyFor(config, id.Value, today).Select(q => View(q, todayRows)).Select(v => v with { Stones = RealmStones(v.Stones, realm) }).ToList();
         var achievements = config.Achievements.Select(q => View(q, lifeRows)).ToList();
         var seasonRows = (await repo.ListAsync(uow, id, QuestRules.SeasonPeriod(today), ct)).ToDictionary(r => r.Key);
         var seasonal = config.SeasonalList.Where(q => QuestRules.SeasonActive(q, today) || lifeRows.ContainsKey("q_" + q.Id)).Select(q =>
@@ -216,7 +221,7 @@ public sealed class QuestService(
         var all = await titles.ListAsync(uow, id, ct);
         return new QuestBoard(day, daily, achievements,
             new CheckinView(checkedToday ? checkin!.Streak : checkin is not null && checkin.LastDay == today.AddDays(-1) ? checkin.Streak : 0, checkin?.BestStreak ?? 0, checkedToday,
-                QuestRules.CheckinStones(config, nextStreak)), titleNames, titleBonuses, seasonal, story, all, all.FirstOrDefault(t => t.Selected)?.Id,
+                RealmStones(QuestRules.CheckinStones(config, nextStreak), realm)), titleNames, titleBonuses, seasonal, story, all, all.FirstOrDefault(t => t.Selected)?.Id,
             config.Achievements.Count(q => q.Secret && (lifeRows.GetValueOrDefault("m_" + q.Metric)?.Progress ?? 0) >= q.Target), config.Achievements.Count(q => q.Secret));
     }
 
@@ -277,6 +282,8 @@ internal static class TitleBonuses
 
 internal sealed class TitleCombatBonuses(IQuestRepository repo, QuestsConfig config) : JianghuGo.Modules.Combat.Contracts.ICombatStatBonuses
 {
+    public bool ResonatesWithRealm => true;
+
     public async Task<IReadOnlyDictionary<string, int>> BonusesAsync(IUnitOfWork uow, Guid characterId, CancellationToken ct) =>
         TitleBonuses.Sum(config, (await repo.ListAsync(uow, new CharacterId(characterId), QuestRules.Life, ct)).Select(r => r.Key));
 }

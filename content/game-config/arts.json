@@ -3,7 +3,7 @@
  "flames": [
   {
    "id": "soul_candle",
-   "rank": 18,
+   "rank": 26,
    "namePl": "Płomień Świecy Dusz",
    "sourcePl": "Miejsca kultu nocą; ślady żaru",
    "spirit": "flame_spirit_lesser",
@@ -26,7 +26,7 @@
   },
   {
    "id": "bamboo_smoke",
-   "rank": 17,
+   "rank": 25,
    "namePl": "Ogień Bambusowego Dymu",
    "sourcePl": "Lasy i bambusowe gaje; ślady żaru",
    "spirit": "flame_spirit_lesser",
@@ -54,7 +54,7 @@
   },
   {
    "id": "iron_red",
-   "rank": 16,
+   "rank": 24,
    "namePl": "Czerwony Płomień Żelaza",
    "sourcePl": "Górscy bandyci, żyły rudy",
    "spirit": "flame_spirit_lesser",
@@ -82,7 +82,7 @@
   },
   {
    "id": "fox_fire",
-   "rank": 15,
+   "rank": 23,
    "namePl": "Płomień Lisiego Ognia",
    "sourcePl": "Ognisty Lis",
    "spirit": "flame_spirit_lesser",
@@ -107,7 +107,7 @@
   },
   {
    "id": "salt_sea",
-   "rank": 14,
+   "rank": 22,
    "namePl": "Słony Płomień Morza",
    "sourcePl": "Ślady żaru nad wodą",
    "spirit": "flame_spirit_lesser",
@@ -130,7 +130,7 @@
   },
   {
    "id": "thunder_feather",
-   "rank": 13,
+   "rank": 21,
    "namePl": "Płomień Gromowego Pióra",
    "sourcePl": "Gromowy Orzeł",
    "spirit": "flame_spirit_greater",
@@ -154,7 +154,7 @@
   },
   {
    "id": "bone_ash",
-   "rank": 12,
+   "rank": 20,
    "namePl": "Popielny Płomień Kości",
    "sourcePl": "Trupia Marionetka",
    "spirit": "flame_spirit_greater",
@@ -178,7 +178,7 @@
   },
   {
    "id": "blood_moon",
-   "rank": 11,
+   "rank": 19,
    "namePl": "Płomień Krwawego Księżyca",
    "sourcePl": "Tylko przy pełni (ślady żaru)",
    "spirit": "flame_spirit_greater",
@@ -201,7 +201,7 @@
   },
   {
    "id": "void_ice",
-   "rank": 10,
+   "rank": 18,
    "namePl": "Lodowy Płomień Pustki",
    "sourcePl": "Wieża Prób, piętro 25",
    "spirit": "flame_spirit_greater",
@@ -225,7 +225,7 @@
   },
   {
    "id": "dragon_breath",
-   "rank": 9,
+   "rank": 17,
    "namePl": "Płomień Smoczego Oddechu",
    "sourcePl": "Smok Jiao",
    "spirit": "flame_spirit_greater",
@@ -249,7 +249,7 @@
   },
   {
    "id": "golden_sun",
-   "rank": 8,
+   "rank": 16,
    "namePl": "Złoty Płomień Słońca",
    "sourcePl": "W południe (ślady żaru 11-13)",
    "spirit": "flame_spirit_greater",
@@ -271,7 +271,7 @@
   },
   {
    "id": "black_lotus",
-   "rank": 7,
+   "rank": 15,
    "namePl": "Płomień Czarnego Lotosu",
    "sourcePl": "Demoniczny Kultywator",
    "spirit": "flame_spirit_greater",
@@ -296,7 +296,7 @@
   },
   {
    "id": "storm_qilin",
-   "rank": 6,
+   "rank": 14,
    "namePl": "Płomień Burzowego Qilina",
    "sourcePl": "Nagroda za Bossa Świata",
    "spirit": "flame_spirit_primal",
@@ -320,7 +320,7 @@
   },
   {
    "id": "violet_heaven",
-   "rank": 5,
+   "rank": 13,
    "namePl": "Płomień Fioletowego Nieba",
    "sourcePl": "Wędrujący: rzadkie ślady żaru",
    "spirit": "flame_spirit_primal",
@@ -344,7 +344,7 @@
   },
   {
    "id": "phoenix",
-   "rank": 4,
+   "rank": 12,
    "namePl": "Płomień Feniksa",
    "sourcePl": "Wieża Prób, piętro 50",
    "spirit": "flame_spirit_primal",
@@ -369,7 +369,7 @@
   },
   {
    "id": "colorless",
-   "rank": 3,
+   "rank": 11,
    "namePl": "Płomień Bez Koloru",
    "sourcePl": "Władca Krwawych Demonów",
    "spirit": "flame_spirit_primal",
@@ -391,6 +391,216 @@
    },
    "alchemyPermille": 180,
    "forgePermille": 100
+  },
+  {
+   "id": "frost_lotus",
+   "rank": 10,
+   "namePl": "Płomień Mroźnego Lotosu",
+   "sourcePl": "Wieża Prób, piętro 75",
+   "spirit": "flame_spirit_primal",
+   "discover": [
+    {
+     "kind": "tower",
+     "ref": "75"
+    }
+   ],
+   "absorbHours": 22,
+   "minRealm": 9,
+   "stats": {
+    "spirit": 9,
+    "willpower": 6
+   },
+   "perks": {
+    "guardPermille": 40,
+    "regenPermille": 10
+   },
+   "alchemyPermille": 190,
+   "forgePermille": 60
+  },
+  {
+   "id": "nine_nether",
+   "rank": 9,
+   "namePl": "Płomień Dziewięciu Otchłani",
+   "sourcePl": "Władca Krwawych Demonów, nocne ślady żaru",
+   "spirit": "flame_spirit_primal",
+   "discover": [
+    {
+     "kind": "npc",
+     "ref": "blood_demon_lord",
+     "chancePermille": 60
+    },
+    {
+     "kind": "trace",
+     "ref": "night"
+    }
+   ],
+   "absorbHours": 24,
+   "minRealm": 12,
+   "stats": {
+    "spirit": 10,
+    "focus": 6
+   },
+   "perks": {
+    "damagePermille": 80,
+    "lifestealPermille": 30
+   },
+   "alchemyPermille": 200,
+   "forgePermille": 80
+  },
+  {
+   "id": "thunder_god",
+   "rank": 8,
+   "namePl": "Płomień Boga Gromu",
+   "sourcePl": "Boss świata (Burzowy Qilin)",
+   "spirit": "flame_spirit_primal",
+   "discover": [
+    {
+     "kind": "boss"
+    }
+   ],
+   "absorbHours": 26,
+   "minRealm": 16,
+   "stats": {
+    "agility": 10,
+    "spirit": 8
+   },
+   "perks": {
+    "firstStrikePermille": 200,
+    "effectChancePermille": 60
+   },
+   "alchemyPermille": 200,
+   "forgePermille": 120
+  },
+  {
+   "id": "dragon_emperor",
+   "rank": 7,
+   "namePl": "Płomień Smoczego Cesarza",
+   "sourcePl": "Przełom do 20. królestwa",
+   "spirit": "flame_spirit_primal",
+   "discover": [
+    {
+     "kind": "realm",
+     "ref": "20"
+    }
+   ],
+   "absorbHours": 28,
+   "minRealm": 20,
+   "stats": {
+    "strength": 12,
+    "constitution": 8
+   },
+   "perks": {
+    "hpPermille": 150,
+    "damagePermille": 60
+   },
+   "alchemyPermille": 210,
+   "forgePermille": 160
+  },
+  {
+   "id": "star_fall",
+   "rank": 6,
+   "namePl": "Płomień Spadającej Gwiazdy",
+   "sourcePl": "Wieża Prób, piętro 125",
+   "spirit": "flame_spirit_primal",
+   "discover": [
+    {
+     "kind": "tower",
+     "ref": "125"
+    }
+   ],
+   "absorbHours": 30,
+   "minRealm": 25,
+   "stats": {
+    "spirit": 12,
+    "insight": 8
+   },
+   "perks": {
+    "damagePermille": 120,
+    "qiPermille": 100
+   },
+   "alchemyPermille": 230,
+   "forgePermille": 120
+  },
+  {
+   "id": "netherworld_lotus",
+   "rank": 5,
+   "namePl": "Płomień Lotosu Zaświatów",
+   "sourcePl": "Rzadkie ślady żaru, pełnia księżyca",
+   "spirit": "flame_spirit_primal",
+   "discover": [
+    {
+     "kind": "trace",
+     "ref": "rare"
+    },
+    {
+     "kind": "moon"
+    }
+   ],
+   "absorbHours": 32,
+   "minRealm": 30,
+   "stats": {
+    "spirit": 12,
+    "willpower": 10
+   },
+   "perks": {
+    "healPermille": 60,
+    "regenPermille": 15,
+    "reflectPermille": 60
+   },
+   "alchemyPermille": 250,
+   "forgePermille": 100
+  },
+  {
+   "id": "void_devouring",
+   "rank": 4,
+   "namePl": "Płomień Pożerający Pustkę",
+   "sourcePl": "Przełom do 35. królestwa",
+   "spirit": "flame_spirit_primal",
+   "discover": [
+    {
+     "kind": "realm",
+     "ref": "35"
+    }
+   ],
+   "absorbHours": 34,
+   "minRealm": 35,
+   "stats": {
+    "spirit": 14,
+    "focus": 10
+   },
+   "perks": {
+    "lifestealPermille": 50,
+    "damagePermille": 120
+   },
+   "alchemyPermille": 260,
+   "forgePermille": 150
+  },
+  {
+   "id": "heaven_burning",
+   "rank": 3,
+   "namePl": "Płomień Spalający Niebiosa",
+   "sourcePl": "Wieża Prób, piętro 200",
+   "spirit": "flame_spirit_primal",
+   "discover": [
+    {
+     "kind": "tower",
+     "ref": "200"
+    }
+   ],
+   "absorbHours": 36,
+   "minRealm": 40,
+   "stats": {
+    "spirit": 14,
+    "strength": 10,
+    "elementalAffinity": 10
+   },
+   "perks": {
+    "damagePermille": 150,
+    "bleedPermille": 300,
+    "effectChancePermille": 80
+   },
+   "alchemyPermille": 280,
+   "forgePermille": 180
   },
   {
    "id": "chaos",
@@ -482,6 +692,10 @@
    {
     "count": 18,
     "titlePl": "Ten, W Którym Płonie Niebo"
+   },
+   {
+    "count": 26,
+    "titlePl": "Pan Wszystkich Płomieni"
    }
   ]
  },

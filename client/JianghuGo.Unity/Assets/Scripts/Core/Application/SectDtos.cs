@@ -43,6 +43,11 @@ namespace JianghuGo.Client.Application
         public Guid? Next { get; set; }
     }
 
+    public sealed class SectApplicationPageDto
+    {
+        public List<SectApplicationDto> Items { get; set; } = new List<SectApplicationDto>();
+    }
+
     public sealed class SectApplicationDto
     {
         public Guid Id { get; set; }

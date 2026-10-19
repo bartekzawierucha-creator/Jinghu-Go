@@ -37,8 +37,13 @@ public class GrowthRulesTests
     {
         Assert.Equal(0, ArtsConfigValidator.Validate(Arts).Count);
         Assert.Equal(0, EstateConfigValidator.Validate(Estate).Count);
-        Assert.Equal(18, Arts.Flames.Count);
-        Assert.Equal(18, Arts.Flames.Select(f => f.Rank).Distinct().Count());
+        Assert.Equal(26, Arts.Flames.Count);
+        Assert.Equal(26, Arts.Flames.Select(f => f.Rank).Distinct().Count());
+        // 1.6: no gap in the flame ladder (a new flame at least every ~6 realms up to realm 44, then the last two)
+        var realms = Arts.Flames.Select(f => f.MinRealm).Distinct().Order().ToList();
+        for (var i = 1; i < realms.Count; i++) Assert.True(realms[i] - realms[i - 1] <= 20, $"gap {realms[i - 1]}..{realms[i]}");
+        Assert.Equal(2000, ArtsRules.FlameResonancePermille(Arts.Flame("soul_candle")!, 10));
+        Assert.Equal(1000, ArtsRules.FlameResonancePermille(Arts.Flame("first_dawn")!, 10));
         foreach (var v in Arts.Venoms) Assert.True(Items.Find(v.Item) is not null, "venom item " + v.Item);
         foreach (var f in Arts.Flames)
         {

@@ -57,18 +57,27 @@ namespace JianghuGo.Android
                     await Reload(0, "Sekta założona.");
                 }), page, sp: 14, heightDp: 44);
                 var sects = (await flow.BrowseAsync(Ct)).Items;
+                var pending = (await _api.MyApplicationsAsync(c.Id, Ct)).Items;
                 ui.Pages(page, sects.Count, 1, 4, (i, cell) =>
                 {
                     var s = sects[i];
-                    var card = ui.Card(cell, 1f, 6, null, 0);
+                    var mineApp = pending.FirstOrDefault(a => a.SectId == s.Id);
+                    var card = ui.Card(cell, 1f, 6, mineApp != null ? Ui.Gold : (Color?)null, 0);
                     var row = ui.HRow(card, 42, 0);
                     ui.Icon(row, "menu_sect", 34);
                     ui.Text(s.Name + "  ·  " + s.MemberCount + " członków", row, 13, Ui.Ink, bold: true).LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f) { LeftMargin = Px(8), Gravity = GravityFlags.CenterVertical };
-                    ui.Btn("Poproś", () => Run(async () =>
+                    ui.Btn(mineApp != null ? "Wycofaj" : "Poproś", () => Run(async () =>
                     {
+                        if (mineApp != null)
+                        {
+                            await _api.WithdrawApplicationAsync(c.Id, mineApp.Id, Ct);
+                            await Reload(0, "Wycofano prośbę do " + s.Name + ".");
+                            return;
+                        }
+
                         await flow.ApplyAsync(s.Id, "Proszę o przyjęcie.", Ct);
-                        SetStatus("Wysłano prośbę do " + s.Name + ".");
-                    }), row, secondary: true, sp: 12, heightDp: 36).LayoutParameters = new LinearLayout.LayoutParams(Px(80), Px(36)) { Gravity = GravityFlags.CenterVertical };
+                        await Reload(0, "Wysłano prośbę do " + s.Name + ".");
+                    }), row, secondary: true, sp: 12, heightDp: 36).LayoutParameters = new LinearLayout.LayoutParams(Px(84), Px(36)) { Gravity = GravityFlags.CenterVertical };
                 }, empty: "Nie ma jeszcze żadnej sekty — bądź pierwszy.");
                 return;
             }

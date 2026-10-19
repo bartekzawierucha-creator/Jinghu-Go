@@ -95,7 +95,7 @@ public static class ArtsRules
         "flame_spirit_lesser" => 900,
         "flame_spirit_greater" => 780,
         _ => 680,
-    }) + ((9 - Math.Clamp(f.Rank, 1, 18)) * 4);
+    }) + ((13 - Math.Clamp(f.Rank, 1, 26)) * 3);
 
     public static bool IsFullMoon(DateTimeOffset at)
     {
@@ -308,13 +308,18 @@ public static class ArtsRules
     }
 
     /// <summary>Flat stats from slotted flames (scaled like their perks); poison costs a few points while it lasts.</summary>
+    /// <summary>(10 + realm) / (10 + the flame's realm), never below 1: a soul candle is still worth slotting at realm 60.</summary>
+    public static int FlameResonancePermille(FlameDefinition f, int realm) => Math.Max(1000, (10 + Math.Max(0, realm)) * 1000 / (10 + f.MinRealm));
+
     public static IReadOnlyDictionary<string, int> Stats(ArtsConfig c, ArtsProfile p, string path, int realm, DateTimeOffset now)
     {
         var stats = new Dictionary<string, int>();
         foreach (var (def, owned) in SlottedFlames(c, p, realm))
         {
             var power = FlamePower(c, owned, path);
-            foreach (var (stat, v) in def.Stats) stats[stat] = stats.GetValueOrDefault(stat) + (v * power / 1000);
+            // 1.6: a flame resonates with its owner's cultivation: its stats grow as the realm rises past the flame's own
+            var resonance = FlameResonancePermille(def, realm);
+            foreach (var (stat, v) in def.Stats) stats[stat] = stats.GetValueOrDefault(stat) + (int)((long)v * power / 1000 * resonance / 1000);
         }
 
         if (p.PoisonedUntil is { } until && until > now)

@@ -161,6 +161,20 @@ namespace JianghuGo.Client.Application
         public Task<DismantleResultDto> DismantleAsync(Guid characterId, ItemInstanceDto item, CancellationToken ct) =>
             SendAsync<DismantleResultDto>("POST", Character(characterId) + "/inventory/dismantle", new { instanceId = item.Id, expectedVersion = item.Version }, true, NewIdempotencyKey(), ct);
 
+        // ---- merchant (1.6) -----------------------------------------------------------------------------------
+
+        public Task<MerchantDto> GetMerchantAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<MerchantDto>("GET", Character(characterId) + "/inventory/merchant", null, true, null, ct);
+
+        public Task<MerchantTradeDto> SellToMerchantAsync(Guid characterId, string itemId, int quantity, CancellationToken ct) =>
+            SendAsync<MerchantTradeDto>("POST", Character(characterId) + "/inventory/merchant/sell", new { itemId, quantity }, true, NewIdempotencyKey(), ct);
+
+        public Task<MerchantTradeDto> SellToMerchantAsync(Guid characterId, ItemInstanceDto item, CancellationToken ct) =>
+            SendAsync<MerchantTradeDto>("POST", Character(characterId) + "/inventory/merchant/sell", new { instanceId = item.Id, expectedVersion = item.Version }, true, NewIdempotencyKey(), ct);
+
+        public Task<MerchantTradeDto> BuyFromMerchantAsync(Guid characterId, string itemId, int quantity, CancellationToken ct) =>
+            SendAsync<MerchantTradeDto>("POST", Character(characterId) + "/inventory/merchant/buy", new { itemId, quantity }, true, NewIdempotencyKey(), ct);
+
         // ---- sect development ---------------------------------------------------------------------------------
 
         public Task<SectDevelopmentDto> GetSectDevelopmentAsync(Guid sectId, Guid characterId, CancellationToken ct) =>

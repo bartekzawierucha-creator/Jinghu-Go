@@ -54,6 +54,13 @@ public static class InventoryEndpoints
         g.MapPost("/dismantle", async (Guid characterId, DismantleCommand body, [FromHeader(Name = "Idempotency-Key")] string? key, HttpContext http, InventoryService svc, CancellationToken ct) =>
             await Guard(async () => ApiResults.From(await svc.DismantleAsync(http.User.GetAccountId(), characterId, key, body, ct), Results.Ok)));
 
+        g.MapGet("/merchant", async (Guid characterId, HttpContext http, InventoryService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.MerchantAsync(http.User.GetAccountId(), characterId, ct), Results.Ok));
+        g.MapPost("/merchant/sell", async (Guid characterId, MerchantSellCommand body, [FromHeader(Name = "Idempotency-Key")] string? key, HttpContext http, InventoryService svc, CancellationToken ct) =>
+            await Guard(async () => ApiResults.From(await svc.SellToMerchantAsync(http.User.GetAccountId(), characterId, key, body, ct), Results.Ok)));
+        g.MapPost("/merchant/buy", async (Guid characterId, MerchantBuyCommand body, [FromHeader(Name = "Idempotency-Key")] string? key, HttpContext http, InventoryService svc, CancellationToken ct) =>
+            await Guard(async () => ApiResults.From(await svc.BuyFromMerchantAsync(http.User.GetAccountId(), characterId, key, body, ct), Results.Ok)));
+
         g.MapGet("/wallet", async (Guid characterId, Guid? before, int? limit, HttpContext http, InventoryService svc, CancellationToken ct) =>
             ApiResults.From(await svc.WalletAsync(http.User.GetAccountId(), characterId, before, limit, ct), list => Results.Ok(new
             {

@@ -8,6 +8,13 @@ public static class CultivationRules
     /// <summary>Each realm's tribulation is a little fiercer than the last (on top of being raised to the realm by Combat's scaling).</summary>
     public const int TribulationPowerPerRealmPermille = 3;
 
+    /// <summary>A flat Qi amount (tuned for realm 0) at a realm: × realmGrowth^realm, like the Qi a stage needs.</summary>
+    public static long RealmScaledQi(CultivationConfig c, long qi, int realm)
+    {
+        var v = qi * Math.Pow((double)c.Flow.RealmGrowth, Math.Max(0, realm));
+        return v >= long.MaxValue / 4 ? long.MaxValue / 4 : Math.Max(qi, (long)v);
+    }
+
     public const int ChanceScale = 1_000_000; // chances are stored and rolled in parts-per-million
     public const int StagesPerRealm = 12;
 

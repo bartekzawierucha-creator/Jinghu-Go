@@ -132,7 +132,15 @@
       {"floor": 35, "stones": 800, "items": [{"item": "star_iron", "quantity": 3}]},
       {"floor": 40, "stones": 1000, "items": [{"item": "soul_jade", "quantity": 2}, {"item": "core_pill", "quantity": 1}]},
       {"floor": 45, "stones": 1200, "items": [{"item": "refining_stone", "quantity": 10}, {"item": "tortoise_shell", "quantity": 2}]},
-      {"floor": 50, "stones": 2000, "items": [{"item": "nascent_pill", "quantity": 1}, {"item": "dragon_scale", "quantity": 3}]}
+      {"floor": 50, "stones": 2000, "items": [{"item": "nascent_pill", "quantity": 1}, {"item": "dragon_scale", "quantity": 3}]},
+      {"floor": 75, "stones": 2500, "items": [{"item": "refining_stone", "quantity": 6}, {"item": "spirit_marrow_pill", "quantity": 1}]},
+      {"floor": 100, "stones": 4000, "items": [{"item": "manual_starfall_canon", "quantity": 1}, {"item": "manual_primordial_breath", "quantity": 1}]},
+      {"floor": 140, "stones": 6000, "items": [{"item": "manual_saint_heart", "quantity": 1}, {"item": "void_mold", "quantity": 1}]},
+      {"floor": 150, "stones": 6000, "items": [{"item": "phoenix_ash_venom", "quantity": 2}, {"item": "void_mold", "quantity": 2}]},
+      {"floor": 190, "stones": 9000, "items": [{"item": "manual_true_god_body", "quantity": 1}, {"item": "saint_blood_pill", "quantity": 1}]},
+      {"floor": 250, "stones": 12000, "items": [{"item": "manual_eternal_flame", "quantity": 1}, {"item": "heaven_marrow_pill", "quantity": 1}]},
+      {"floor": 300, "stones": 16000, "items": [{"item": "manual_dao_origin", "quantity": 1}, {"item": "primordial_essence_pill", "quantity": 1}]},
+      {"floor": 330, "stones": 25000, "items": [{"item": "dao_sword", "quantity": 1}]}
     ]
   },
   "worldBoss": {

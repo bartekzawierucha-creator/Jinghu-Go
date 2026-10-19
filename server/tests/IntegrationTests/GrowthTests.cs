@@ -90,7 +90,7 @@ public class GrowthTests : IAsyncLifetime
     {
         var (p, c) = await NewAsync("flame");
         var arts = await Ok(await p.GetAsync(Url(c, "arts")));
-        Assert.Equal(18, arts["flames"]!["all"]!.AsArray().Count);
+        Assert.Equal(26, arts["flames"]!["all"]!.AsArray().Count);
         Assert.True(arts["flames"]!["all"]!.AsArray().All(f => f!.Str("state") == "unknown"));
         await Problem(await p.PostAsync(Url(c, "arts/flames/subdue"), new { flameId = "soul_candle" }), HttpStatusCode.Conflict, "flame_not_found_yet");
         await Problem(await p.PostAsync(Url(c, "arts/flames/traces")), HttpStatusCode.Conflict, "not_enough_traces");
@@ -314,6 +314,46 @@ public class GrowthTests : IAsyncLifetime
         var r = await Ok(await p.PostAsync(Url(c, "inventory/dismantle"), new { instanceId = sword.Id, expectedVersion = sword.Version }, Player.NewKey()));
         Assert.True(r["materials"]!.AsArray().Count >= 0);
         Assert.False(r["inventory"]!["items"]!.AsArray().Any(i => i!.Str("id") == sword.Id.ToString()));
+    }
+
+    // ---- merchant (1.6) -------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Merchant_buys_for_less_than_it_sells_and_takes_unique_items_from_the_bag()
+    {
+        var (p, c) = await NewAsync("body");
+        await GiveAsync(c, "iron_ore", 10);
+        var shop = await Ok(await p.GetAsync(Url(c, "inventory/merchant")));
+        Assert.Equal(300, shop.Int("sellPermille"));
+        var orePrice = shop["sellPrices"]!["iron_ore"]!.GetValue<long>();
+        Assert.Equal(1, orePrice);                                                   // mortal 5 × 30 %
+        var offer = shop["stock"]!.AsArray().Single(o => o!.Str("itemId") == "iron_ore")!;
+        Assert.True(offer["price"]!.GetValue<long>() > orePrice, "no buy-sell loop");
+
+        var before = shop["balance"]!.GetValue<long>();
+        var sold = await Ok(await p.PostAsync(Url(c, "inventory/merchant/sell"), new { itemId = "iron_ore", quantity = 10 }, Player.NewKey()));
+        Assert.Equal(10 * orePrice, sold["stones"]!.GetValue<long>());
+        Assert.Equal(before + (10 * orePrice), sold["balance"]!.GetValue<long>());
+        Assert.Equal(0, await CountAsync(c, "iron_ore"));
+        await Problem(await p.PostAsync(Url(c, "inventory/merchant/sell"), new { itemId = "iron_ore", quantity = 1 }, Player.NewKey()), HttpStatusCode.UnprocessableEntity, "insufficient_items");
+
+        var bought = await Ok(await p.PostAsync(Url(c, "inventory/merchant/buy"), new { itemId = "spirit_herb", quantity = 2 }, Player.NewKey()));
+        Assert.Equal(-16, bought["stones"]!.GetValue<long>());
+        Assert.Equal(2, await CountAsync(c, "spirit_herb"));
+        await Problem(await p.PostAsync(Url(c, "inventory/merchant/buy"), new { itemId = "dragon_scale", quantity = 1 }, Player.NewKey()), HttpStatusCode.NotFound, "not_in_stock");
+        await Problem(await p.PostAsync(Url(c, "inventory/merchant/buy"), new { itemId = "refining_stone", quantity = 99 }, Player.NewKey()), HttpStatusCode.UnprocessableEntity, "insufficient_funds");
+
+        var sword = await InUowAsync(async uow =>
+        {
+            var owner = (await _host.Service<JianghuGo.Modules.Characters.Contracts.ICharacterDirectory>().FindAsync(uow, Id(c).Value, default))!;
+            return (await _host.Service<IInventory>().CreateInstanceAsync(uow, Id(c), owner.AccountId, "frost_sword", "test", Guid.NewGuid().ToString(), default)).Value;
+        });
+        var key = Player.NewKey();
+        var one = await Ok(await p.PostAsync(Url(c, "inventory/merchant/sell"), new { instanceId = sword.Id, expectedVersion = sword.Version }, key));
+        Assert.Equal(18, one["stones"]!.GetValue<long>());                          // earth 60 × 30 %
+        var again = await Ok(await p.PostAsync(Url(c, "inventory/merchant/sell"), new { instanceId = sword.Id, expectedVersion = sword.Version }, key));
+        Assert.Equal(one["balance"]!.GetValue<long>(), again["balance"]!.GetValue<long>()); // idempotent retry pays once
+        Assert.False(one["inventory"]!["items"]!.AsArray().Any(i => i!.Str("id") == sword.Id.ToString()));
     }
 
     // ---- sect development -----------------------------------------------------------------------------------

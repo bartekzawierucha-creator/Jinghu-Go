@@ -490,6 +490,8 @@ namespace JianghuGo.Android
             "already_harvested" => "Już to zebrałeś.",
             "attunement_cooldown" => "Płomień jeszcze się nie odnowił.",
             "insufficient_funds" => "Za mało Kamieni Duchowych.",
+            "not_in_stock" => "Kupiec tego nie sprzedaje.",
+            "item_not_tradable" => "Tego przedmiotu nie da się sprzedać.",
             "insufficient_items" => "Brakuje przedmiotów.",
             "bag_full" => "Sakwa jest pełna.",
             "stack_full" => "Stos osiągnął limit.",

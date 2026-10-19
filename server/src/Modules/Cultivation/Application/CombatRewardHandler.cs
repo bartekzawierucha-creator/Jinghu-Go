@@ -12,16 +12,18 @@ internal static class QiCredit
 {
     public static async Task CreditAsync(
         ICultivationRepository repo, ICharacterDirectory characters, IAuditLog audit, CultivationConfig config,
-        IUnitOfWork uow, OutboxMessage message, Guid accountId, Guid characterId, long qi, object auditData, CancellationToken ct)
+        IUnitOfWork uow, OutboxMessage message, Guid accountId, Guid characterId, long qi, object auditData, CancellationToken ct, bool realmScaled = false, int homeRealm = 0)
     {
         if (qi <= 0) return;
         var account = new AccountId(accountId);
         var character = await characters.FindOwnedAsync(uow, account, characterId, ct);
         if (character is null) return; // character gone: nothing to credit
+        var stored = await repo.FindAsync(uow, character.Id, ct);
+        // 1.6: flat rewards (world nodes, pills) follow the cultivation curve like the method's Qi per win does
+        if (realmScaled && stored is not null) qi = CultivationRules.RealmScaledQi(config, qi, stored.RealmIndex - homeRealm);
         if (!await repo.TryRecordRewardAsync(uow, message.Id, character.Id, qi, message.OccurredAt, ct)) return;
 
         var today = CultivationRules.WorldDate(config, message.OccurredAt);
-        var stored = await repo.FindAsync(uow, character.Id, ct);
         var state = (stored ?? CultivationState.Initial(character.Id, account, character.Path, today, message.OccurredAt)).ForDay(today);
         var version = stored?.Version ?? 0;
         var updated = state with { Qi = checked(state.Qi + qi), Version = version + 1, UpdatedAt = message.OccurredAt };
@@ -57,19 +59,25 @@ internal sealed class WorldRewardHandler(ICultivationRepository repo, ICharacter
     public Task HandleAsync(IUnitOfWork uow, OutboxMessage message, CancellationToken ct)
     {
         var e = message.Payload<JianghuGo.Modules.World.Contracts.WorldEvents.QiRewardV1>();
-        return QiCredit.CreditAsync(repo, characters, audit, config, uow, message, e.AccountId, e.CharacterId, e.Qi, new { source = e.Source, qi = e.Qi }, ct);
+        return QiCredit.CreditAsync(repo, characters, audit, config, uow, message, e.AccountId, e.CharacterId, e.Qi, new { source = e.Source, qi = e.Qi }, ct, realmScaled: true);
     }
 }
 
-/// <summary>Qi from consumed pills (inventory.consumable_used).</summary>
-internal sealed class ConsumableQiHandler(ICultivationRepository repo, ICharacterDirectory characters, IAuditLog audit, CultivationConfig config) : IOutboxHandler
+/// <summary>
+/// Qi from consumed pills (inventory.consumable_used). 1.6: a pill is tuned for the realm its grade belongs to (mortal 0, spirit 1,
+/// earth 2, heavenly 4, divine 6) and grows with the cultivation curve above it, so a pill keeps its worth relative to a stage.
+/// </summary>
+internal sealed class ConsumableQiHandler(ICultivationRepository repo, ICharacterDirectory characters, IAuditLog audit, CultivationConfig config,
+    JianghuGo.Modules.Inventory.Contracts.IItemCatalog items) : IOutboxHandler
 {
+    public static int HomeRealm(string? rarity) => rarity switch { "spirit" => 1, "earth" => 2, "heavenly" => 4, "divine" => 6, _ => 0 };
+
     public string EventType => JianghuGo.Modules.Inventory.Contracts.InventoryEvents.ConsumableUsed;
 
     public Task HandleAsync(IUnitOfWork uow, OutboxMessage message, CancellationToken ct)
     {
         var e = message.Payload<JianghuGo.Modules.Inventory.Contracts.InventoryEvents.ConsumableUsedV1>();
         return QiCredit.CreditAsync(repo, characters, audit, config, uow, message, e.AccountId, e.CharacterId, e.Qi,
-            new { source = "consumable", item = e.ItemId, e.Quantity, qi = e.Qi }, ct);
+            new { source = "consumable", item = e.ItemId, e.Quantity, qi = e.Qi }, ct, realmScaled: true, homeRealm: HomeRealm(items.Find(e.ItemId)?.Rarity));
     }
 }

@@ -28,6 +28,7 @@ public static class CraftingEndpoints
                 c.Upgrade.MaxLevel,
                 c.Upgrade.Material,
                 levels = c.Upgrade.SuccessPermilleByTargetLevel.Select((p, i) => new { level = i + 1, successPermille = p, stones = CraftingRules.UpgradeStones(c, i + 1) }),
+                rarityPermille = c.Upgrade.RarityPermille,
             },
         })).WithTags("Crafting").RequireAuthorization();
 

@@ -74,6 +74,8 @@ public static class SectEndpoints
 
         app.MapGet("/api/v1/characters/{characterId:guid}/sect", async (Guid characterId, HttpContext http, SectService svc, CancellationToken ct) =>
             ApiResults.From(await svc.MineAsync(http.User.GetAccountId(), characterId, ct), Results.Ok)).WithTags("Sects").RequireAuthorization();
+        app.MapGet("/api/v1/characters/{characterId:guid}/sect/applications", async (Guid characterId, HttpContext http, SectService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.MyApplicationsAsync(http.User.GetAccountId(), characterId, ct), list => Results.Ok(new { items = list }))).WithTags("Sects").RequireAuthorization();
         return app;
     }
 

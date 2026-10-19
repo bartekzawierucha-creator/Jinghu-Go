@@ -87,6 +87,9 @@ public sealed partial class CombatService(
     IItemCatalog items,
     IEnumerable<ICombatRealm> realms) : ICombatEncounters
 {
+    /// <summary>Resonance of flat bonuses (gear, pets, titles) with the realm: (10 + realm) / 10, in ‰.</summary>
+    public static int ResonancePermille(int realm) => (10 + Math.Clamp(realm, 0, 65)) * 100;
+
     /// <summary>Luck from Fate: +3‰ drop chance per point, at most +50 %.</summary>
     public static int LuckPermille(int fate) => Math.Clamp(fate * 3, 0, 500);
 
@@ -175,16 +178,20 @@ public sealed partial class CombatService(
         var mastery = (await repo.ListMasteryAsync(uow, c.Id, ct)).ToDictionary(m => m.TechniqueId, m => Math.Min(levelCap, m.Level));
         var dao = await DaoTechniquesAsync(uow, c, ct);
         // Equipment bonuses are frozen into the snapshot: changing gear mid-battle has no effect.
-        var bonuses = new Dictionary<string, int>(await equipment.BonusesAsync(uow, c.Id, ct));
+        // 1.6: gear, pets and titles resonate with the cultivator's realm (×(10 + realm) / 10), so they stay worth having.
+        var resonance = ResonancePermille(await RealmOfAsync(uow, c.Id, ct));
+        int Resonate(int v) => (int)((long)v * resonance / 1000);
+        var bonuses = (await equipment.BonusesAsync(uow, c.Id, ct)).ToDictionary(kv => kv.Key, kv => Resonate(kv.Value));
         foreach (var provider in statBonuses)
         {
-            foreach (var (stat, value) in await provider.BonusesAsync(uow, c.Id.Value, ct)) bonuses[stat] = bonuses.GetValueOrDefault(stat) + value;
+            foreach (var (stat, value) in await provider.BonusesAsync(uow, c.Id.Value, ct))
+                bonuses[stat] = bonuses.GetValueOrDefault(stat) + (provider.ResonatesWithRealm ? Resonate(value) : value);
         }
 
         var perks = PerkBonus.None;
         if (await repo.FindPetAsync(uow, c.Id, ct) is { } pet && config.Npc(pet.NpcId) is { } species)
         {
-            foreach (var (stat, value) in SpiritPetRules.Bonuses(species, pet.Level)) bonuses[stat] = bonuses.GetValueOrDefault(stat) + value;
+            foreach (var (stat, value) in SpiritPetRules.Bonuses(species, pet.Level)) bonuses[stat] = bonuses.GetValueOrDefault(stat) + Resonate(value);
             perks += SpiritPetRules.Companion(species, pet.Level);
         }
 

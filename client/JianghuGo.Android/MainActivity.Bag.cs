@@ -26,6 +26,7 @@ namespace JianghuGo.Android
             var c = _me;
             var economy = new EconomyFlow(_api, c.Id);
             await economy.LoadAsync(Ct);
+            if (tab == 0) await economy.LoadMerchantAsync(Ct);
             var page1 = tab == 2 ? await economy.BrowseAsync(null, null, Ct) : null;
             var mine = tab == 2 ? await economy.MyListingsAsync(Ct) : null;
             ShowBag(economy, tab, page1, mine, 0);
@@ -45,6 +46,8 @@ namespace JianghuGo.Android
             ui.Text(inv.Balance.ToString("N0") + " Kamieni Duchowych", head, 13, Ui.Gold, bold: true).LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f) { LeftMargin = Px(6), Gravity = GravityFlags.CenterVertical };
             ui.Text("Miejsca " + inv.SlotsUsed + "/" + inv.Capacity, head, 12, Ui.Muted).Gravity = GravityFlags.End;
 
+            if (tab == 0 && economy.Merchant != null)
+                ui.Btn("🏮 Wędrowny kupiec", () => MerchantSheet(economy), page, secondary: true, sp: 13, heightDp: 40);
             if (tab == 0) BagGrid(economy, ui, page, startPage);
             else if (tab == 1) Forge(economy, ui, page, startPage);
             else Market(economy, ui, page, offers, mine, marketMine);
@@ -175,6 +178,32 @@ namespace JianghuGo.Android
                     }), r1, secondary: true, sp: 13, heightDp: 46);
             }
 
+            // sell to the travelling merchant (fixed price, instant)
+            long merchantPrice = 0;
+            if (economy.Merchant != null && (e.Stack != null || e.Item.InBag) && economy.Merchant.SellPrices.TryGetValue(e.ItemId, out merchantPrice))
+            {
+                var price = e.Item != null ? merchantPrice * (10 + e.Item.UpgradeLevel) / 10 : merchantPrice;
+                var rm = ui.HRow(body, 46);
+                ui.Btn("Kupcowi: 1 za " + price + " KD", () => Run(async () =>
+                {
+                    var r = e.Stack != null ? await _api.SellToMerchantAsync(_me.Id, e.Stack.ItemId, 1, Ct) : await _api.SellToMerchantAsync(_me.Id, e.Item, Ct);
+                    await economy.ReloadAsync(Ct);
+                    Sfx.Play(Sfx.Coin, 0.7f);
+                    await Done("Sprzedano kupcowi: +" + r.Stones + " KD");
+                }), rm, secondary: true, sp: 12, heightDp: 46);
+                if (e.Stack != null && e.Stack.Quantity > 1)
+                {
+                    var all = (int)Math.Min(e.Stack.Quantity, economy.Merchant.MaxPerTrade);
+                    ui.Btn("Wszystko (" + all + ") za " + (price * all) + " KD", () => Run(async () =>
+                    {
+                        var r = await _api.SellToMerchantAsync(_me.Id, e.Stack.ItemId, all, Ct);
+                        await economy.ReloadAsync(Ct);
+                        Sfx.Play(Sfx.Coin, 0.7f);
+                        await Done("Sprzedano kupcowi: +" + r.Stones + " KD");
+                    }), rm, secondary: true, sp: 12, heightDp: 46);
+                }
+            }
+
             // sell on the market (tradable stacks and items in the bag)
             if (e.Stack != null || e.Item.InBag)
             {
@@ -191,6 +220,40 @@ namespace JianghuGo.Android
                     await Done("Wystawiono na targu.");
                 }), r2, secondary: true, sp: 12, heightDp: 46);
             }
+        }
+
+        // ---- Wędrowny kupiec (1.6) ----------------------------------------------------------------------------
+
+        private void MerchantSheet(EconomyFlow economy)
+        {
+            var ui = _ui;
+            var m = economy.Merchant;
+            var body = Sheet("Wędrowny kupiec", 0.7f, out var close, "icon_stones");
+            ui.Text("Skupuje przedmioty za " + m.SellPermille / 10 + "% ich wartości (stuknij przedmiot w sakwie). Sprzedaje podstawowe towary:", body, 12, Ui.Muted, maxLines: 3);
+            ui.Pages(body, m.Stock.Count, 1, 4, (i, cell) =>
+            {
+                var o = m.Stock[i];
+                var row = ui.HRow(cell, 44, 0);
+                ui.Icon(row, ui.ArtId("item_" + o.ItemId) != 0 ? "item_" + o.ItemId : "item_slot_empty", 36);
+                var col = ui.Box(row, 1f, marginDp: 6);
+                ui.Text(o.NamePl, col, 13, Ui.RarityOf(o.Rarity).Color, bold: true);
+                ui.Text(o.Price + " KD / szt.", col, 11, Ui.Gold);
+                foreach (var n in new[] { 1, 10 })
+                {
+                    var qty = n;
+                    ui.Btn("×" + qty, () => Run(async () =>
+                    {
+                        var r = await _api.BuyFromMerchantAsync(_me.Id, o.ItemId, qty, Ct);
+                        _balance = r.Balance;
+                        await economy.ReloadAsync(Ct);
+                        await economy.LoadMerchantAsync(Ct);
+                        Sfx.Play(Sfx.Coin, 0.6f);
+                        RefreshHud();
+                        SetStatus("Kupiono " + qty + "× " + o.NamePl + " (" + (-r.Stones) + " KD)");
+                    }), row, secondary: true, sp: 12, heightDp: 38).LayoutParameters = new LinearLayout.LayoutParams(Px(60), Px(38)) { Gravity = GravityFlags.CenterVertical, LeftMargin = Px(4) };
+                }
+            });
+            ui.Btn("Zamknij", () => { close(); ShowBag(economy, 0, null, null, 0); }, body, secondary: true, sp: 13, heightDp: 42);
         }
 
         // ---- Kuźnia i alchemia --------------------------------------------------------------------------------

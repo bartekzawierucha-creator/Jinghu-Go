@@ -9,7 +9,8 @@ public sealed record ItemsConfig(
     IReadOnlyDictionary<string, LootTable> LootTables,
     IReadOnlyList<AffixDefinition>? Affixes = null,
     IReadOnlyList<ItemSet>? Sets = null,
-    IReadOnlyDictionary<string, IReadOnlyList<LootDrop>>? Dismantle = null)
+    IReadOnlyDictionary<string, IReadOnlyList<LootDrop>>? Dismantle = null,
+    MerchantRules? Merchant = null)
 {
     public IReadOnlyList<AffixDefinition> AffixList => Affixes ?? [];
 
@@ -114,6 +115,21 @@ public static class ItemsConfigValidator
         }
 
         foreach (var dup in c.SetList.SelectMany(s => s.Items).GroupBy(i => i).Where(g => g.Count() > 1)) e.Add($"item {dup.Key} belongs to two sets.");
+        if (c.Merchant is { } m)
+        {
+            if (m.SellPermille is < 1 or > 900 || m.MaxPerTrade is < 1 or > 999 || m.BasePrices is null || m.Stock is null) e.Add("merchant: sellPermille 1-900, maxPerTrade 1-999, prices and stock required.");
+            else
+            {
+                foreach (var i in c.Items.Where(i => i.Tradable)) if (m.BasePrice(i) <= 0) e.Add($"merchant: no base price for grade '{i.Rarity}'.");
+                foreach (var o in m.Stock)
+                {
+                    var d = c.Items.FirstOrDefault(i => i.Id == o.Item);
+                    if (d is null) e.Add($"merchant stock: unknown item '{o.Item}'.");
+                    else if (o.Price <= m.SellPrice(d)) e.Add($"merchant stock: '{o.Item}' must cost more than the merchant pays for it.");
+                }
+            }
+        }
+
         foreach (var (rarity, drops) in c.Dismantle ?? new Dictionary<string, IReadOnlyList<LootDrop>>())
         {
             if (!Rarities.All.Contains(rarity)) e.Add($"dismantle: unknown rarity '{rarity}'.");
@@ -134,3 +150,18 @@ public static class ItemsConfigValidator
         return e;
     }
 }
+
+/// <summary>
+/// The travelling merchant (1.6): buys tradable items for <see cref="SellPermille"/> of their base price (by grade, +10 % per upgrade
+/// level) and sells a small stock of basic goods at fixed prices. Buying back is always dearer than selling, so there is no loop.
+/// </summary>
+public sealed record MerchantRules(int SellPermille, IReadOnlyDictionary<string, long> BasePrices, IReadOnlyList<MerchantOffer> Stock, int MaxPerTrade = 99)
+{
+    public long BasePrice(ItemDefinition d) => BasePrices.GetValueOrDefault(d.Rarity);
+
+    public long SellPrice(ItemDefinition d, int upgradeLevel = 0) => BasePrice(d) * SellPermille / 1000 * (10 + Math.Max(0, upgradeLevel)) / 10;
+
+    public MerchantOffer? Offer(string? itemId) => Stock.FirstOrDefault(o => o.Item == itemId);
+}
+
+public sealed record MerchantOffer(string Item, long Price);

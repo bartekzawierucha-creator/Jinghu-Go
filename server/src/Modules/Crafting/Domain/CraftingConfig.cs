@@ -51,7 +51,9 @@ public static class Professions
 
 public sealed record ItemAmount(string Item, int Quantity);
 
-public sealed record UpgradeRules(int MaxLevel, long StonesPerLevel, string Material, IReadOnlyList<int> SuccessPermilleByTargetLevel);
+/// <remarks>1.6: the stone price per level grows with the item's grade (<see cref="RarityPermille"/>, ‰; missing = ×1).</remarks>
+public sealed record UpgradeRules(int MaxLevel, long StonesPerLevel, string Material, IReadOnlyList<int> SuccessPermilleByTargetLevel,
+    IReadOnlyDictionary<string, int>? RarityPermille = null);
 
 public static class RecipeKinds
 {
@@ -82,7 +84,8 @@ public static class CraftingRules
 
     public static int UpgradeChancePermille(CraftingConfig c, int targetLevel) => c.Upgrade.SuccessPermilleByTargetLevel[targetLevel - 1];
 
-    public static long UpgradeStones(CraftingConfig c, int targetLevel) => c.Upgrade.StonesPerLevel * targetLevel;
+    public static long UpgradeStones(CraftingConfig c, int targetLevel, string? rarity = null) =>
+        c.Upgrade.StonesPerLevel * targetLevel * (rarity is not null && c.Upgrade.RarityPermille?.TryGetValue(rarity, out var p) == true ? p : 1000) / 1000;
 }
 
 public static class CraftingConfigValidator

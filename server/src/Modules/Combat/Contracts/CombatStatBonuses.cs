@@ -9,6 +9,12 @@ namespace JianghuGo.Modules.Combat.Contracts;
 public interface ICombatStatBonuses
 {
     Task<IReadOnlyDictionary<string, int>> BonusesAsync(IUnitOfWork uow, Guid characterId, CancellationToken ct);
+
+    /// <summary>
+    /// Flat bonuses tuned for a fresh cultivator (titles) resonate with the realm like equipment and pets do: ×(10 + realm) / 10.
+    /// Realm-aware providers (meridians, flames) keep their own numbers.
+    /// </summary>
+    bool ResonatesWithRealm => false;
 }
 
 /// <summary>

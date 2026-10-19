@@ -143,6 +143,10 @@ namespace JianghuGo.Client.Application
         public Task<BattleDto> AcceptChallengeAsync(Guid battleId, CancellationToken ct) =>
             SendAsync<BattleDto>("POST", "/api/v1/combat/battles/" + battleId + "/accept", null, true, null, ct);
 
+        /// <summary>Turns a challenge down (the challenger is told).</summary>
+        public Task<BattleDto> DeclineChallengeAsync(Guid battleId, CancellationToken ct) =>
+            SendAsync<BattleDto>("POST", "/api/v1/combat/battles/" + battleId + "/decline", null, true, null, ct);
+
         public Task<BattleDto> GetBattleAsync(Guid battleId, CancellationToken ct) =>
             SendAsync<BattleDto>("GET", "/api/v1/combat/battles/" + battleId, null, true, null, ct);
 
@@ -382,6 +386,12 @@ namespace JianghuGo.Client.Application
 
         public Task<SectApplicationDto> DecideApplicationAsync(Guid characterId, Guid applicationId, bool accept, CancellationToken ct) =>
             SendAsync<SectApplicationDto>("POST", "/api/v1/sects/applications/" + applicationId + "/decision", new { characterId, accept }, true, null, ct);
+
+        public Task<SectApplicationDto> WithdrawApplicationAsync(Guid characterId, Guid applicationId, CancellationToken ct) =>
+            SendAsync<SectApplicationDto>("POST", "/api/v1/sects/applications/" + applicationId + "/withdraw", new { characterId }, true, null, ct);
+
+        public Task<SectApplicationPageDto> MyApplicationsAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<SectApplicationPageDto>("GET", "/api/v1/characters/" + characterId + "/sect/applications", null, true, null, ct);
 
         public Task<SectDto> LeaveSectAsync(Guid characterId, Guid sectId, CancellationToken ct) =>
             SendAsync<SectDto>("POST", "/api/v1/sects/" + sectId + "/leave", new { characterId }, true, null, ct);
