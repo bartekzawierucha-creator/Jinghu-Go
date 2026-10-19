@@ -268,3 +268,14 @@ public static class ArtsConfigValidator
         if (codex.Any(x => x.Count < 1 || string.IsNullOrWhiteSpace(x.TitlePl)) || codex.Zip(codex.Skip(1)).Any(p => p.Second.Count <= p.First.Count)) e.Add($"{where} must have increasing counts and titles.");
     }
 }
+
+/// <summary>Flames, branch tiers and the ultimate on the Road of 66 Realms (1.9).</summary>
+public sealed class ArtsRoad(ArtsConfig c) : JianghuGo.Modules.Characters.Contracts.IRoadContributor
+{
+    public IEnumerable<(int Realm, string TextPl)> Unlocks(string path)
+    {
+        foreach (var f in c.Flames) yield return (f.MinRealm, "Płomień: " + f.NamePl);
+        for (var i = 0; i < c.Branches.TierRealms.Count; i++) yield return (c.Branches.TierRealms[i], $"Gałąź ścieżki: stopień {i + 1}");
+        if (c.Branches.CapstonesOf(path).Count > 0) yield return (c.Branches.CapstoneRealm, "Umiejętność ostateczna ścieżki");
+    }
+}

@@ -42,7 +42,8 @@ public sealed record ArtsProfile(
     string? Branch,
     IReadOnlyList<ArtsNotice> Notices,
     int Version,
-    string? Capstone = null)
+    string? Capstone = null,
+    string? SecondPath = null)
 {
     public static ArtsProfile New(CharacterId id) =>
         new(id, [], [], null, null, null, null, [], [], new Dictionary<string, int>(), 0, null, null, 0, [], 0, 0, 0, null, null, 0, null, [], 0);
@@ -238,8 +239,16 @@ public static class ArtsRules
         p.LifestealPermille * permille / 1000, p.FirstStrikePermille * permille / 1000, p.HpPermille * permille / 1000, permille >= 1000 ? p.SurviveOnce : 0,
         p.PetPower * permille / 1000, p.PetEvery);
 
-    public static int FlamePower(ArtsConfig c, OwnedFlame f, string path) =>
-        (1000 + (f.Level * c.FlameRules.LevelPermille)) * (path == FlamePath ? 1000 : c.FlameRules.OtherPathPowerPermille) / 1000;
+    /// <summary>Realm from which a cultivator may take up a second path (1.9): its arts then work at <see cref="MixedPathPermille"/>.</summary>
+    public const int SecondPathRealm = 33;
+    public const int MixedPathPermille = 600;
+
+    /// <summary>Strength (‰) of a path's art for this cultivator: full on the own path, 60 % on the chosen second path, 30 % otherwise.</summary>
+    public static int ArtPower(string path, string? second, string artPath, int other = 300) =>
+        path == artPath ? 1000 : second == artPath ? Math.Max(other, MixedPathPermille) : other;
+
+    public static int FlamePower(ArtsConfig c, OwnedFlame f, string path, string? second = null) =>
+        (1000 + (f.Level * c.FlameRules.LevelPermille)) * ArtPower(path, second, FlamePath, c.FlameRules.OtherPathPowerPermille) / 1000;
 
     public static IEnumerable<(FlameDefinition Def, OwnedFlame Owned)> SlottedFlames(ArtsConfig c, ArtsProfile p, int realm) =>
         p.Slots.Take(FlameSlots(c, realm)).Select(id => (c.Flame(id), p.Owned(id))).Where(x => x.Item1 is not null && x.Item2 is not null).Select(x => (x.Item1!, x.Item2!));
@@ -258,13 +267,13 @@ public static class ArtsRules
         var slottedIds = slotted.Select(s => s.Def.Id).ToList();
         foreach (var (def, owned) in slotted)
         {
-            var power = FlamePower(c, owned, path);
+            var power = FlamePower(c, owned, path, p.SecondPath);
             if (p.Fusions.Any(f => f.Split('+').Contains(def.Id) && FusionActive(p, f, slottedIds))) power = power * (1000 + c.FlameRules.FusionBonusPermille) / 1000;
             sum += Scale(def.Perks, power);
         }
 
         var toxin = ToxinLevel(c, p.ToxinXp);
-        var toxinPower = path == PoisonPath ? 1000 : 300;
+        var toxinPower = ArtPower(path, p.SecondPath, PoisonPath);
         foreach (var perk in c.Toxin.Perks.Where(x => x.Level <= toxin)) sum += Scale(perk.Perks, toxinPower);
         if (c.Coating(p.Coating) is { } coating && p.CoatingCharges > 0) sum += coating.Perks;
 
@@ -278,7 +287,7 @@ public static class ArtsRules
 
         if (p.Temper > 0)
         {
-            var bodyPower = path == BodyPath ? 1000 : 300;
+            var bodyPower = ArtPower(path, p.SecondPath, BodyPath);
             var hp = 0;
             foreach (var stage in c.Tempering.Stages)
             {
@@ -294,7 +303,7 @@ public static class ArtsRules
         var swords = SwordLevel(c, p.SwordXp);
         if (swords > 0)
         {
-            var swordPower = path == QiPath ? 1000 : 300;
+            var swordPower = ArtPower(path, p.SecondPath, QiPath);
             sum += Scale(new PerkBonus(DamagePermille: swords * c.SwordIntent.DamagePermillePerLevel, FirstStrikePermille: swords * c.SwordIntent.FirstStrikePermillePerLevel), swordPower);
             if (swords >= c.SwordIntent.Levels.Count) sum += Scale(c.SwordIntent.FullArrayPerks, swordPower);
         }
@@ -321,7 +330,7 @@ public static class ArtsRules
         var stats = new Dictionary<string, int>();
         foreach (var (def, owned) in SlottedFlames(c, p, realm))
         {
-            var power = FlamePower(c, owned, path);
+            var power = FlamePower(c, owned, path, p.SecondPath);
             // 1.6: a flame resonates with its owner's cultivation: its stats grow as the realm rises past the flame's own
             var resonance = FlameResonancePermille(def, realm);
             foreach (var (stat, v) in def.Stats) stats[stat] = stats.GetValueOrDefault(stat) + (int)((long)v * power / 1000 * resonance / 1000);
@@ -337,7 +346,7 @@ public static class ArtsRules
         int alchemy = 0, forge = 0;
         foreach (var (def, owned) in SlottedFlames(c, p, realm))
         {
-            var power = FlamePower(c, owned, path);
+            var power = FlamePower(c, owned, path, p.SecondPath);
             alchemy += def.AlchemyPermille * power / 1000;
             forge += def.ForgePermille * power / 1000;
         }

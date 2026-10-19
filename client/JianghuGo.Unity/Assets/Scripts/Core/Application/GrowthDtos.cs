@@ -194,6 +194,10 @@ namespace JianghuGo.Client.Application
         public int CapstoneRealm { get; set; } = 65;
         public string Capstone { get; set; }
         public List<BranchOptionDto> Capstones { get; set; } = new List<BranchOptionDto>();
+
+        /// <summary>Second path taken from realm 33 (1.9): its arts work at 60 %.</summary>
+        public string SecondPath { get; set; }
+        public int SecondPathRealm { get; set; } = 33;
     }
 
     public sealed class NoticeDto

@@ -57,7 +57,8 @@ public sealed class WorldService(
     WorldSecret secret,
     IRandomSeedSource seeds,
     TimeProvider clock,
-    INpcNames npcNames)
+    INpcNames npcNames,
+    IEnumerable<ICombatRealm> realms)
 {
     private static readonly Error CharacterNotFound = Error.NotFound("character_not_found", "Character not found.");
 
@@ -136,7 +137,13 @@ public sealed class WorldService(
                     reward = WorldGenerator.NodeReward(config, node.Kind, WorldGenerator.EventAt(config, secret.Seed, node.Point, now),
                         config.Regions is null ? null : WorldGenerator.RegionAt(config, secret.Seed, node.Point, now).Weather);
                     await PayAsync(uow, accountId, c.Id, reward, "node:" + node.Kind, now, ct);
-                    gathered = [.. WorldGenerator.RollYields(kind, seeds.NextSeed()).Select(y => new WorldEvents.GatheredItem(y.Item, y.Quantity))];
+                    var realm = 0;
+                    foreach (var r in realms) { realm = await r.RealmAsync(uow, c.Id.Value, ct); break; }
+                    var era = Math.Clamp(realm / 11, 0, 5);
+                    var rolled = WorldGenerator.RollYields(kind, seeds.NextSeed()).ToList();
+                    gathered = [.. rolled.Select(y => new WorldEvents.GatheredItem(y.Item, y.Quantity))];
+                    foreach (var y in rolled)
+                        if (config.FinerYield(y.Item, era) is { } finer) gathered.Add(new WorldEvents.GatheredItem(finer, Math.Max(1, y.Quantity / 2)));
                     if (gathered.Count > 0)
                     {
                         await outbox.EnqueueAsync(uow, OutboxMessage.Create(WorldEvents.ItemsGathered,

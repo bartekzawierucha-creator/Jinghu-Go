@@ -575,6 +575,29 @@ namespace JianghuGo.Android
                     }
                 }, page, secondary: true, sp: 12, heightDp: 36);
             }
+
+            if (arts.Realm >= b.SecondPathRealm)
+            {
+                var names = new Dictionary<string, string> { ["qi"] = "Miecz Qi", ["body"] = "Hartowanie ciała", ["flame"] = "Płomień", ["poison"] = "Trucizna" };
+                ui.Btn(b.SecondPath != null && names.TryGetValue(b.SecondPath, out var sn) ? "Druga ścieżka: " + sn : "Wybierz drugą ścieżkę", () =>
+                {
+                    var body = Sheet("Druga ścieżka", 0.6f, out var close, "menu_hero");
+                    ui.Text("Sztuki drugiej ścieżki działają w 60% zamiast 30%. Pierwszy wybór za darmo, zmiana kosztuje " + (b.RespecStones * 10) + " KD.", body, 11, Ui.Muted, maxLines: 3);
+                    foreach (var kv in names)
+                    {
+                        if (kv.Key == c.Path) continue;
+                        var card = ui.Card(body, 1f, 8, kv.Key == b.SecondPath ? Ui.Gold : (Color?)null);
+                        ui.Text(kv.Value, card, 14, kv.Key == b.SecondPath ? Ui.Gold : Ui.Ink, bold: true);
+                        if (kv.Key != b.SecondPath)
+                            ui.Btn("Wybierz", () => Run(async () =>
+                            {
+                                await _api.ChooseSecondPathAsync(c.Id, kv.Key, Ct);
+                                close();
+                                await reload("Druga ścieżka: " + kv.Value);
+                            }), card, secondary: true, sp: 12, heightDp: 34);
+                    }
+                }, page, secondary: true, sp: 12, heightDp: 36);
+            }
         }
 
         // ---- estate ------------------------------------------------------------------------------------------

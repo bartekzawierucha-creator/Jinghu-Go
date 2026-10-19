@@ -25,6 +25,7 @@ public static class EstateModule
         var path = configuration["GameConfig:EstatePath"] ?? "game-config/estate.json";
         if (!Path.IsPathRooted(path)) path = Path.Combine(AppContext.BaseDirectory, path);
         services.AddSingleton(LoadConfig(path));
+        services.AddSingleton<JianghuGo.Modules.Characters.Contracts.IRoadContributor>(sp => new EstateRoad(sp.GetRequiredService<EstateConfig>()));
         if (StorageProvider.From(configuration) == StorageKind.Postgres)
             services.AddSingleton<IEstateRepository, PostgresEstateRepository>();
         else

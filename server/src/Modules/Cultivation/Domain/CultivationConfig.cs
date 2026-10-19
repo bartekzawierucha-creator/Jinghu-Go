@@ -254,3 +254,14 @@ public static class CultivationConfigValidator
         return r;
     }
 }
+
+/// <summary>The realm ladder and the methods on the Road of 66 Realms (1.9).</summary>
+public sealed class CultivationRoad(CultivationConfig c) : JianghuGo.Modules.Characters.Contracts.IRoadRealms, JianghuGo.Modules.Characters.Contracts.IRoadContributor
+{
+    public IReadOnlyList<JianghuGo.Modules.Characters.Contracts.RoadRealm> Realms { get; } =
+        [.. c.Realms.Select((r, i) => new JianghuGo.Modules.Characters.Contracts.RoadRealm(i, r.NamePl, r.Hanzi, r.Era, c.Eras.FirstOrDefault(e => e.Era == r.Era)?.NamePl ?? string.Empty,
+            r.TribulationPl, r.UnlockPl))];
+
+    public IEnumerable<(int Realm, string TextPl)> Unlocks(string path) =>
+        c.Methods.Where(m => m.MinRealm > 0 && (m.Path is null || m.Path == path)).Select(m => (m.MinRealm, "Metoda: " + m.NamePl));
+}

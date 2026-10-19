@@ -110,3 +110,14 @@ public static class TechniqueText
         return ((int)Math.Max(1, dmg * (1000 - v) / 1000), (int)Math.Max(1, dmg * (1000 + v) / 1000));
     }
 }
+
+/// <summary>Techniques and technique level caps on the Road of 66 Realms (1.9).</summary>
+public sealed class CombatRoad(CombatConfig c) : JianghuGo.Modules.Characters.Contracts.IRoadContributor
+{
+    public IEnumerable<(int Realm, string TextPl)> Unlocks(string path)
+    {
+        foreach (var t in c.KnownBy(path).Where(t => t.MinRealm > 0)) yield return (t.MinRealm, "Technika: " + t.NamePl);
+        for (var r = 1; r <= 65; r++)
+            if (c.Progression.LevelCap(r) > c.Progression.LevelCap(r - 1)) yield return (r, $"Techniki do poziomu {c.Progression.LevelCap(r)}");
+    }
+}

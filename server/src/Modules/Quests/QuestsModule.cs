@@ -31,6 +31,7 @@ public static class QuestsModule
         else
             services.AddSingleton<IQuestRepository, InMemoryQuestRepository>();
         services.AddScoped<QuestService>();
+        services.AddScoped<RoadService>();
         services.AddSingleton<QuestTitles>();
         services.AddSingleton<ICharacterDecorationProvider, QuestTitleDecoration>();
         services.AddSingleton<IOutboxHandler, RealmCounter>();
@@ -62,6 +63,8 @@ public static class QuestsModule
 
     public static IEndpointRouteBuilder MapQuestEndpoints(this IEndpointRouteBuilder app)
     {
+        app.MapGet("/api/v1/characters/{characterId:guid}/road", async (Guid characterId, HttpContext http, RoadService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.GetAsync(http.User.GetAccountId(), characterId, ct), Results.Ok)).WithTags("Quests").RequireAuthorization();
         var g = app.MapGroup("/api/v1/characters/{characterId:guid}/quests").WithTags("Quests").RequireAuthorization();
         g.MapGet("/", async (Guid characterId, HttpContext http, QuestService svc, CancellationToken ct) =>
             ApiResults.From(await svc.GetAsync(http.User.GetAccountId(), characterId, ct), Results.Ok));

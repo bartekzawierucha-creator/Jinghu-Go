@@ -106,6 +106,9 @@ namespace JianghuGo.Client.Application
         public Task<ArtsDto> ChooseCapstoneAsync(Guid characterId, string branchId, CancellationToken ct) =>
             SendAsync<ArtsDto>("POST", Arts(characterId) + "/capstone", new { branchId }, true, null, ct);
 
+        public Task<ArtsDto> ChooseSecondPathAsync(Guid characterId, string pathId, CancellationToken ct) =>
+            SendAsync<ArtsDto>("POST", Arts(characterId) + "/second-path", new { branchId = pathId }, true, null, ct);
+
         public Task<ForgedScrollDto> GetScrollInfoAsync(string techniqueId, CancellationToken ct) =>
             SendAsync<ForgedScrollDto>("GET", "/api/v1/dao-lab/scrolls/" + techniqueId, null, true, null, ct);
 

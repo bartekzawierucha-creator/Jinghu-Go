@@ -24,6 +24,9 @@ public static class CultivationModule
         }
 
         services.AddSingleton(LoadConfig(path));
+        services.AddSingleton(sp => new CultivationRoad(sp.GetRequiredService<CultivationConfig>()));
+        services.AddSingleton<JianghuGo.Modules.Characters.Contracts.IRoadRealms>(sp => sp.GetRequiredService<CultivationRoad>());
+        services.AddSingleton<JianghuGo.Modules.Characters.Contracts.IRoadContributor>(sp => sp.GetRequiredService<CultivationRoad>());
         if (StorageProvider.From(configuration) == StorageKind.Postgres)
         {
             services.AddSingleton<ICultivationRepository, PostgresCultivationRepository>();

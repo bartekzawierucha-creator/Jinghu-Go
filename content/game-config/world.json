@@ -6,6 +6,7 @@
   "nearbyRadiusM": 600,
   "interactionRadiusM": 40,
   "interactionsPerHour": 60,
+  "eraYields": {"spirit_herb": ["lotus_seed", "heaven_dew", "soul_jade", "blood_crystal"], "iron_ore": ["refining_stone", "star_iron", "star_iron", "dragon_scale", "void_mold"], "jade": ["soul_jade", "soul_jade", "blood_crystal", "dragon_scale", "phoenix_ash_venom"], "bamboo_essence": ["spirit_silk", "frost_silk", "frost_silk", "heaven_dew", "heaven_dew"], "ember_trace": ["fire_crystal", "fire_crystal", "fire_crystal", "dao_essence", "dao_essence"]},
   "nodeKinds": [
     {"id": "qi_spring", "namePl": "Źródło Qi", "nameEn": "Qi Spring", "weight": 50, "rewardQi": 15, "npcId": null, "yields": [{"item": "iron_ore", "chancePermille": 400, "min": 1, "max": 2}]},
     {"id": "spirit_herb", "namePl": "Duchowe Zioło", "nameEn": "Spirit Herb", "weight": 35, "rewardQi": 10, "npcId": null, "yields": [{"item": "spirit_herb", "chancePermille": 1000, "min": 1, "max": 3}]},

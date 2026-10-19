@@ -53,6 +53,8 @@ public static class ArtsEndpoints
             ApiResults.From(await svc.OfferEchoesAsync(http.User.GetAccountId(), characterId, cmd, ct), Results.Ok));
         g.MapPost("/branch", async (Guid characterId, BranchCommand cmd, HttpContext http, ArtsService svc, CancellationToken ct) =>
             ApiResults.From(await svc.ChooseBranchAsync(http.User.GetAccountId(), characterId, cmd, ct), Results.Ok));
+        g.MapPost("/second-path", async (Guid characterId, BranchCommand cmd, HttpContext http, ArtsService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.ChooseSecondPathAsync(http.User.GetAccountId(), characterId, cmd, ct), Results.Ok));
         g.MapPost("/capstone", async (Guid characterId, BranchCommand cmd, HttpContext http, ArtsService svc, CancellationToken ct) =>
             ApiResults.From(await svc.ChooseCapstoneAsync(http.User.GetAccountId(), characterId, cmd, ct), Results.Ok));
         return app;

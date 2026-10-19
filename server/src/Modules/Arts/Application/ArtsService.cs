@@ -58,7 +58,7 @@ public sealed record SwordView(int Level, int MaxLevel, int Xp, int? NextXp, lon
 public sealed record BranchOptionView(string Id, string NamePl, string DescriptionPl, PerkBonus PerTier);
 
 public sealed record BranchView(string? Chosen, int Tier, IReadOnlyList<int> TierRealms, IReadOnlyList<BranchOptionView> Options, long RespecStones,
-    int CapstoneRealm = 65, string? Capstone = null, IReadOnlyList<BranchOptionView>? Capstones = null);
+    int CapstoneRealm = 65, string? Capstone = null, IReadOnlyList<BranchOptionView>? Capstones = null, string? SecondPath = null, int SecondPathRealm = 33);
 
 public sealed record NoticeView(string Kind, string TextPl, DateTimeOffset At);
 
@@ -436,6 +436,23 @@ public sealed class ArtsService(
             return p with { Branch = branch.Id };
         }, ct);
 
+    /// <summary>From realm 33 a cultivator may take up a second path (1.9): its arts work at 60 % instead of 30 %. Changing it costs 10× the branch respec.</summary>
+    public Task<Result<ArtsView>> ChooseSecondPathAsync(AccountId accountId, Guid characterId, BranchCommand cmd, CancellationToken ct) =>
+        Mutate(accountId, characterId, "second_path", async (uow, x, _) =>
+        {
+            var p = x.Profile;
+            if (cmd.BranchId is not ("qi" or "body" or "flame" or "poison") || cmd.BranchId == x.Character.Path) return Error.Validation("path_invalid", "Choose another path than your own.");
+            if (x.Status.Realm < ArtsRules.SecondPathRealm) return Error.Conflict("realm_too_low", $"A second path opens at realm {ArtsRules.SecondPathRealm}.");
+            if (p.SecondPath == cmd.BranchId) return Error.Conflict("second_path_chosen", "Already your second path.");
+            if (p.SecondPath is not null)
+            {
+                var paid = await inventory.DebitAsync(uow, x.Character.Id, config.Branches.RespecStones * 10, "arts_second_path", Ref(), ct);
+                if (!paid.IsSuccess) return paid.Error!;
+            }
+
+            return p with { SecondPath = cmd.BranchId };
+        }, ct);
+
     /// <summary>Chooses the path's ultimate at the capstone realm (1.7). The first choice is free, a change costs 10× the branch respec.</summary>
     public Task<Result<ArtsView>> ChooseCapstoneAsync(AccountId accountId, Guid characterId, BranchCommand cmd, CancellationToken ct) =>
         Mutate(accountId, characterId, "capstone", async (uow, x, _) =>
@@ -581,7 +598,8 @@ public sealed class ArtsService(
 
         var branch = new BranchView(p.Branch, ArtsRules.BranchTier(config, realm), config.Branches.TierRealms,
             [.. config.BranchesOf(c.Path).Select(b => new BranchOptionView(b.Id, b.NamePl, b.DescriptionPl, b.PerTier))], config.Branches.RespecStones,
-            config.Branches.CapstoneRealm, p.Capstone, [.. config.Branches.CapstonesOf(c.Path).Select(b => new BranchOptionView(b.Id, b.NamePl, b.DescriptionPl, b.PerTier))]);
+            config.Branches.CapstoneRealm, p.Capstone, [.. config.Branches.CapstonesOf(c.Path).Select(b => new BranchOptionView(b.Id, b.NamePl, b.DescriptionPl, b.PerTier))],
+            p.SecondPath, ArtsRules.SecondPathRealm);
 
         var (alchemy, forge) = ArtsRules.Crafting(config, p, c.Path, realm);
         return new ArtsView(c.Id.Value, c.Path, realm, config.RulesVersion, flameView, toxin, gu, temper, sword, branch,

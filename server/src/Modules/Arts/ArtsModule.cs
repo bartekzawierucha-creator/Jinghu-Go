@@ -24,6 +24,7 @@ public static class ArtsModule
         var path = configuration["GameConfig:ArtsPath"] ?? "game-config/arts.json";
         if (!Path.IsPathRooted(path)) path = Path.Combine(AppContext.BaseDirectory, path);
         services.AddSingleton(LoadConfig(path));
+        services.AddSingleton<JianghuGo.Modules.Characters.Contracts.IRoadContributor>(sp => new ArtsRoad(sp.GetRequiredService<ArtsConfig>()));
         if (StorageProvider.From(configuration) == StorageKind.Postgres)
         {
             services.AddSingleton<IArtsRepository, PostgresArtsRepository>();

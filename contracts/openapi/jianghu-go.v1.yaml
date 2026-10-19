@@ -1620,6 +1620,23 @@ paths:
       responses:
         "200": { description: OK }
         "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/road:
+    get:
+      tags: [Quests]
+      summary: "The Road of 66 Realms: every realm with its era, tribulation and what it opens for the character's path."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/arts/second-path:
+    post:
+      tags: [Arts]
+      summary: "From realm 33: take up a second path (its arts work at 60 %)."
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
   /api/v1/characters/{characterId}/arts:
     get:
       tags: [Arts]

@@ -14,7 +14,16 @@ public sealed record WorldConfig(
     IReadOnlyList<NodeKind> NodeKinds,
     FlameRules Flame,
     EventRules Events,
-    RegionRules? Regions = null);
+    RegionRules? Regions = null,
+    IReadOnlyDictionary<string, IReadOnlyList<string>>? EraYields = null)
+{
+    /// <summary>
+    /// 1.9: a cultivator of a later era also finds the material's finer counterpart (spirit herb → lotus seed → heaven dew…),
+    /// half as many; each entry lists the finer material per era 1, 2… (the last one stays for later eras).
+    /// </summary>
+    public string? FinerYield(string item, int era) =>
+        era > 0 && EraYields is not null && EraYields.TryGetValue(item, out var tiers) && tiers.Count > 0 ? tiers[Math.Clamp(era - 1, 0, tiers.Count - 1)] : null;
+}
 
 public sealed record CountRange(int Min, int Max);
 

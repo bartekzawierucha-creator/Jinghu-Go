@@ -29,6 +29,7 @@ public static class CombatModule
             .Where(i => catalog.Find(i.Item) is null).Select(i => i.Item).Distinct().ToList();
         if (unknown.Count > 0) throw new InvalidOperationException($"Invalid combat config '{path}': unknown reward items {string.Join(", ", unknown)}.");
         services.AddSingleton(combat);
+        services.AddSingleton<JianghuGo.Modules.Characters.Contracts.IRoadContributor>(new CombatRoad(combat));
         var daoPath = configuration["GameConfig:DaoLabPath"] ?? "game-config/dao-lab.json";
         if (!Path.IsPathRooted(daoPath))
         {

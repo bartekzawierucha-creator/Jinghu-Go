@@ -112,3 +112,13 @@ public static class EstateConfigValidator
         else if (drops.Any(x => !Id.IsMatch(x.Item ?? "") || x.ChancePermille is < 1 or > 1000 || x.Min < 1 || x.Max < x.Min || x.Max > 100)) e.Add($"{where}: a drop is invalid.");
     }
 }
+
+/// <summary>Expeditions and crops on the Road of 66 Realms (1.9).</summary>
+public sealed class EstateRoad(EstateConfig c) : JianghuGo.Modules.Characters.Contracts.IRoadContributor
+{
+    public IEnumerable<(int Realm, string TextPl)> Unlocks(string path)
+    {
+        foreach (var x in c.Expeditions.Where(x => x.MinRealm > 0)) yield return (x.MinRealm, "Wyprawa: " + x.NamePl);
+        foreach (var crop in c.Garden.Crops.Where(x => x.MinRealm > 0)) yield return (crop.MinRealm, "Uprawa: " + crop.NamePl);
+    }
+}
