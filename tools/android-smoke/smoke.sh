@@ -158,7 +158,7 @@ $UI tap "Zabierz" 15 || $UI tap "Dalej" 15
 $UI tap "Wyjdź"
 $UI wait "Trening" 30
 $UI tap "Wieża"
-$UI wait "Piętro 1 z 50" 30
+$UI wait "Piętro 1 z 330" 30
 $UI tap "Bossy"
 $UI wait "legowisk" 30
 $UI noscroll
