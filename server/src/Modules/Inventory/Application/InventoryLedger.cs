@@ -198,16 +198,28 @@ public sealed class InventoryLedger(IInventoryRepository repo, ItemsConfig confi
         }
     }
 
-    public async Task<IReadOnlyDictionary<string, int>> BonusesAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
-        InventoryRules.Bonuses(config, (await repo.ListInstancesAsync(uow, characterId, ct)).Where(i => i.State == InstanceStates.Equipped));
+    public async Task<IReadOnlyDictionary<string, int>> BonusesAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct)
+    {
+        var sum = InventoryRules.Bonuses(config, (await repo.ListInstancesAsync(uow, characterId, ct)).Where(i => i.State == InstanceStates.Equipped))
+            .ToDictionary(kv => kv.Key, kv => kv.Value);
+        if (await TalismanAsync(uow, characterId, ct) is { Stats: { } stats })
+            foreach (var (k, v) in stats) sum[k] = sum.GetValueOrDefault(k) + v;
+        return sum;
+    }
 
     public async Task<IReadOnlyDictionary<string, int>> PerksAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct)
     {
         var sum = new Dictionary<string, int>();
         foreach (var i in (await repo.ListInstancesAsync(uow, characterId, ct)).Where(i => i.State == InstanceStates.Equipped))
             if (InventoryRules.SpecialAffix(config, i) is { } sp) sum[sp.Perk] = sum.GetValueOrDefault(sp.Perk) + sp.Value;
+        if (await TalismanAsync(uow, characterId, ct) is { Perks: { } perks })
+            foreach (var (k, v) in perks) sum[k] = sum.GetValueOrDefault(k) + v;
         return sum;
     }
+
+    /// <summary>The talisman burning now (2.2), if any.</summary>
+    public async Task<TalismanSpec?> TalismanAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
+        await repo.FindTalismanAsync(uow, characterId, ct) is { } t && t.Until > clock.GetUtcNow() ? config.Find(t.ItemId)?.Consumable?.Talisman : null;
 
     public InstanceInfo Info(ItemInstance i) =>
         new(i.Id, i.CharacterId.Value, i.AccountId.Value, i.ItemId, i.UpgradeLevel, i.State, i.Version, config.Find(i.ItemId)?.Tradable ?? false, i.BoundRef);

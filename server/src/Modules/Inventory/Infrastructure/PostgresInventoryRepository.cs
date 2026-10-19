@@ -103,4 +103,13 @@ internal sealed class PostgresInventoryRepository : IInventoryRepository
         (await Pg(uow).QueryAsync(
             "SELECT (SELECT count(*) FROM inventory.wallet_mismatches), (SELECT count(*) FROM inventory.stack_mismatches)",
             r => ((int)r.GetInt64(0), (int)r.GetInt64(1)), ct)).Single();
+
+    public Task<ActiveTalisman?> FindTalismanAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
+        PostgresUnitOfWork.From(uow).QuerySingleOrDefaultAsync("SELECT item_id, until FROM inventory.talismans WHERE character_id = $1",
+            r => new ActiveTalisman(characterId, r.GetString(0), r.GetFieldValue<DateTimeOffset>(1)), ct, characterId.Value);
+
+    public Task SetTalismanAsync(IUnitOfWork uow, ActiveTalisman t, CancellationToken ct) =>
+        PostgresUnitOfWork.From(uow).ExecuteAsync(
+            "INSERT INTO inventory.talismans (character_id, item_id, until) VALUES ($1, $2, $3) ON CONFLICT (character_id) DO UPDATE SET item_id = EXCLUDED.item_id, until = EXCLUDED.until",
+            ct, t.CharacterId.Value, t.ItemId, t.Until);
 }

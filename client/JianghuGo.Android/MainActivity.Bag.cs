@@ -45,6 +45,8 @@ namespace JianghuGo.Android
             ui.Icon(head, "icon_stones", 22);
             ui.Text(inv.Balance.ToString("N0") + " Kamieni Duchowych", head, 13, Ui.Gold, bold: true).LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f) { LeftMargin = Px(6), Gravity = GravityFlags.CenterVertical };
             ui.Text("Miejsca " + inv.SlotsUsed + "/" + inv.Capacity, head, 12, Ui.Muted).Gravity = GravityFlags.End;
+            if (tab == 0 && inv.Talisman != null)
+                ui.Text("🔥 " + inv.Talisman.NamePl + " płonie do " + inv.Talisman.Until.ToLocalTime().ToString("HH:mm"), page, 11, Ui.Jade, center: true);
 
             if (tab == 0 && economy.Merchant != null)
                 ui.Btn("🏮 Wędrowny kupiec", () => MerchantSheet(economy), page, secondary: true, sp: 13, heightDp: 40);
@@ -147,7 +149,9 @@ namespace JianghuGo.Android
                     {
                         var r = await economy.UseAsync(e.Stack.ItemId, 1, Ct);
                         Sfx.Play(Sfx.Chime);
-                        await Done("Pigułka zażyta — Qi wpływa do naczynia (każda kolejna dziś działa o 25% słabiej).");
+                        await Done(e.Stack.ItemId.StartsWith("talisman_") || e.Stack.ItemId.StartsWith("formation_")
+                            ? e.Stack.NamePl + " płonie — premia w walkach przez kilka godzin (nowy talizman zastępuje poprzedni)."
+                            : "Pigułka zażyta — Qi wpływa do naczynia (każda kolejna dziś działa o 25% słabiej).");
                     }), r1, sp: 14, heightDp: 46);
                 ui.Btn("Wyrzuć 1", () => Run(async () =>
                 {

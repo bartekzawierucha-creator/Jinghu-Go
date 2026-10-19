@@ -22,7 +22,10 @@ public sealed record SetView(string Id, string NamePl, int Worn, int Pieces, IRe
 
 public sealed record InventoryView(Guid CharacterId, string RulesVersion, long Balance, int SlotsUsed, int Capacity,
     IReadOnlyList<StackView> Stacks, IReadOnlyList<InstanceView> Items, IReadOnlyDictionary<string, Guid> Equipped, IReadOnlyDictionary<string, int> Bonuses,
-    IReadOnlyList<SetView>? Sets = null);
+    IReadOnlyList<SetView>? Sets = null, TalismanView? Talisman = null);
+
+/// <summary>The talisman burning now (2.2).</summary>
+public sealed record TalismanView(string ItemId, string NamePl, DateTimeOffset Until, IReadOnlyDictionary<string, int> Stats, IReadOnlyDictionary<string, int> Perks);
 
 public sealed record DismantleCommand(Guid InstanceId, int ExpectedVersion);
 
@@ -137,6 +140,18 @@ public sealed class InventoryService(
                 if (c is null) return CharacterNotFound;
                 if (config.Find(cmd.ItemId)?.Consumable is not { } effect) return Error.Validation("item_not_consumable", "This item cannot be used.");
                 var reference = Uuid7.New().ToString();
+                if (effect.Talisman is { } talisman)
+                {
+                    // A talisman burns for some hours; a new one replaces the one burning (2.2).
+                    if (cmd.Quantity != 1) return Error.Validation("quantity_invalid", "Light one talisman at a time.");
+                    var used = await ledger.RemoveItemsAsync(uow, c.Id, cmd.ItemId, 1, "use", reference, ct);
+                    if (!used.IsSuccess) return used.Error!;
+                    var at = clock.GetUtcNow();
+                    await repo.SetTalismanAsync(uow, new ActiveTalisman(c.Id, cmd.ItemId, at.AddHours(talisman.Hours)), ct);
+                    await AuditAsync(uow, accountId, "inventory.talisman_lit", c.Id, new { cmd.ItemId, hours = talisman.Hours }, ct);
+                    return new UseResult(cmd.ItemId, 1, 0, used.Value);
+                }
+
                 var removed = await ledger.RemoveItemsAsync(uow, c.Id, cmd.ItemId, cmd.Quantity, "use", reference, ct);
                 if (!removed.IsSuccess) return removed.Error!;
                 var qi = checked(effect.Qi * cmd.Quantity);
@@ -373,7 +388,10 @@ public sealed class InventoryService(
                 var worn = s.Items.Count(id => equipped.Any(e => e.ItemId == id));
                 var active = InventoryRules.ActiveSets(config, equipped).FirstOrDefault(a => a.Set.Id == s.Id).Stats ?? new Dictionary<string, int>();
                 return new SetView(s.Id, s.NamePl, worn, s.Items.Count, active, s.Bonuses);
-            })]);
+            })],
+            await repo.FindTalismanAsync(uow, characterId, ct) is { } t && t.Until > clock.GetUtcNow() && config.Find(t.ItemId)?.Consumable?.Talisman is { } spec
+                ? new TalismanView(t.ItemId, config.Item(t.ItemId).NamePl, t.Until, spec.Stats ?? new Dictionary<string, int>(), spec.Perks ?? new Dictionary<string, int>())
+                : null);
     }
 
     private Task AuditAsync(IUnitOfWork uow, AccountId accountId, string action, CharacterId characterId, object data, CancellationToken ct) =>

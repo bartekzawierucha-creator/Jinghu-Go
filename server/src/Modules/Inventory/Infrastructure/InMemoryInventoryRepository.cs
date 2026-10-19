@@ -129,4 +129,16 @@ internal sealed class InMemoryInventoryRepository : IInventoryRepository
         var s = u.Table<(CharacterId, string), long>(Stacks).Count(kv => stackSums.GetValueOrDefault(kv.Key) != kv.Value);
         return Task.FromResult((w, s));
     }
+
+    private const string Talismans = "inventory.talismans";
+
+    public Task<ActiveTalisman?> FindTalismanAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct) =>
+        Task.FromResult(InMemoryUnitOfWork.From(uow).Table<CharacterId, ActiveTalisman>(Talismans).GetValueOrDefault(characterId));
+
+    public Task SetTalismanAsync(IUnitOfWork uow, ActiveTalisman talisman, CancellationToken ct)
+    {
+        var u = InMemoryUnitOfWork.From(uow);
+        u.SetTable(Talismans, u.Table<CharacterId, ActiveTalisman>(Talismans).SetItem(talisman.CharacterId, talisman));
+        return Task.CompletedTask;
+    }
 }

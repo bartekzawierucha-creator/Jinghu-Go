@@ -119,6 +119,9 @@ namespace JianghuGo.Client.Application
         public Dictionary<string, int> Bonuses { get; set; } = new Dictionary<string, int>();
         public List<SetDto> Sets { get; set; } = new List<SetDto>();
 
+        /// <summary>The talisman burning now (2.2), or null.</summary>
+        public TalismanDto Talisman { get; set; }
+
         public long Count(string itemId)
         {
             foreach (var s in Stacks) if (s.ItemId == itemId) return s.Quantity;
@@ -323,5 +326,14 @@ namespace JianghuGo.Client.Application
         public long? MaxUnitPrice7d { get; set; }
         public long? LowestActiveUnitPrice { get; set; }
         public int ActiveListings { get; set; }
+    }
+
+    public sealed class TalismanDto
+    {
+        public string ItemId { get; set; }
+        public string NamePl { get; set; }
+        public DateTimeOffset Until { get; set; }
+        public Dictionary<string, int> Stats { get; set; } = new Dictionary<string, int>();
+        public Dictionary<string, int> Perks { get; set; } = new Dictionary<string, int>();
     }
 }

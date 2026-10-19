@@ -33,4 +33,7 @@ public interface IInventoryRepository
 
     /// <summary>Economy reconciliation: (wallets whose balance ≠ Σ ledger, stacks whose quantity ≠ Σ ledger). Both must be 0.</summary>
     Task<(int Wallets, int Stacks)> CountMismatchesAsync(IUnitOfWork uow, CancellationToken ct);
+
+    Task<ActiveTalisman?> FindTalismanAsync(IUnitOfWork uow, CharacterId characterId, CancellationToken ct);
+    Task SetTalismanAsync(IUnitOfWork uow, ActiveTalisman talisman, CancellationToken ct);
 }

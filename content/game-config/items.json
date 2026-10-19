@@ -123,7 +123,12 @@
     {"id": "manual_dao_origin", "namePl": "Pismo Źródła Dao", "nameEn": "Dao Origin Script", "type": "material", "rarity": "divine", "tradable": true},
     {"id": "star_vine_seed", "namePl": "Nasiono Gwiezdnego Pnącza", "nameEn": "Star Vine Seed", "type": "material", "rarity": "heavenly", "tradable": true},
     {"id": "blood_lily_bulb", "namePl": "Cebulka Krwawej Lilii", "nameEn": "Blood Lily Bulb", "type": "material", "rarity": "divine", "tradable": true},
-    {"id": "dao_essence", "namePl": "Esencja Dao", "nameEn": "Dao Essence", "type": "material", "rarity": "heavenly", "tradable": true}
+    {"id": "dao_essence", "namePl": "Esencja Dao", "nameEn": "Dao Essence", "type": "material", "rarity": "heavenly", "tradable": true},
+    {"id": "talisman_iron_skin", "namePl": "Talizman Żelaznej Skóry", "nameEn": "Iron Skin Talisman", "type": "consumable", "rarity": "spirit", "tradable": true, "consumable": {"qi": 0, "talisman": {"hours": 6, "perks": {"guardPermille": 60, "hpPermille": 50}}}},
+    {"id": "talisman_blazing_edge", "namePl": "Talizman Płonącego Ostrza", "nameEn": "Blazing Edge Talisman", "type": "consumable", "rarity": "spirit", "tradable": true, "consumable": {"qi": 0, "talisman": {"hours": 6, "perks": {"damagePermille": 60}}}},
+    {"id": "talisman_clear_mind", "namePl": "Talizman Jasnego Umysłu", "nameEn": "Clear Mind Talisman", "type": "consumable", "rarity": "earth", "tradable": true, "consumable": {"qi": 0, "talisman": {"hours": 8, "stats": {"insight": 5, "focus": 5}, "perks": {"qiRegen": 1}}}},
+    {"id": "talisman_fortune", "namePl": "Talizman Pomyślności", "nameEn": "Fortune Talisman", "type": "consumable", "rarity": "earth", "tradable": true, "consumable": {"qi": 0, "talisman": {"hours": 8, "stats": {"fate": 8}}}},
+    {"id": "formation_five_elements", "namePl": "Formacja Pięciu Żywiołów", "nameEn": "Five Elements Formation", "type": "consumable", "rarity": "heavenly", "tradable": true, "consumable": {"qi": 0, "talisman": {"hours": 12, "stats": {"elementalAffinity": 10}, "perks": {"damagePermille": 50, "guardPermille": 50, "effectChancePermille": 50}}}}
   ],
   "lootTables": {
     "training_dummy": {"stones": 2, "drops": []},

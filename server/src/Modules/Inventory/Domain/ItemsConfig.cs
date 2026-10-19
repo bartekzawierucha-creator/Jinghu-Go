@@ -40,7 +40,13 @@ public sealed record ItemDefinition(
     public bool Stackable => Type is not (ItemTypes.Equipment or ItemTypes.Scroll);
 }
 
-public sealed record ConsumableSpec(long Qi);
+/// <param name="Talisman">A talisman (2.2): instead of Qi it grants stats and/or combat perks for some hours (one active at a time).</param>
+public sealed record ConsumableSpec(long Qi, TalismanSpec? Talisman = null);
+
+public sealed record TalismanSpec(int Hours, IReadOnlyDictionary<string, int>? Stats = null, IReadOnlyDictionary<string, int>? Perks = null);
+
+/// <summary>The talisman burning for a character.</summary>
+public sealed record ActiveTalisman(JianghuGo.Domain.CharacterId CharacterId, string ItemId, DateTimeOffset Until);
 
 public sealed record EquipmentSpec(string Slot, IReadOnlyDictionary<string, int> Stats, int BagBonus = 0);
 
@@ -96,7 +102,10 @@ public static class ItemsConfigValidator
             if (!Rarities.All.Contains(i.Rarity)) e.Add($"item {i.Id}: unknown rarity '{i.Rarity}'.");
             if ((i.Type == ItemTypes.Equipment) != (i.Equipment is not null)) e.Add($"item {i.Id}: equipment spec iff type equipment.");
             if ((i.Type == ItemTypes.Consumable) != (i.Consumable is not null)) e.Add($"item {i.Id}: consumable spec iff type consumable.");
-            if (i.Consumable is { Qi: < 1 }) e.Add($"item {i.Id}: consumable must grant Qi.");
+            if (i.Consumable is { Qi: < 1, Talisman: null }) e.Add($"item {i.Id}: consumable must grant Qi.");
+            if (i.Consumable?.Talisman is { } tal && (tal.Hours is < 1 or > 72 || ((tal.Stats?.Count ?? 0) + (tal.Perks?.Count ?? 0)) == 0
+                    || tal.Stats?.Any(kv => kv.Value is < 1 or > 50) == true || tal.Perks?.Any(kv => kv.Value is < 1 or > 300) == true))
+                e.Add($"item {i.Id}: talisman needs 1-72 hours and positive stats/perks.");
             if (i.Equipment is { } eq)
             {
                 if (!EquipmentSlots.All.Contains(eq.Slot)) e.Add($"item {i.Id}: unknown slot '{eq.Slot}'.");
