@@ -26,6 +26,18 @@ namespace JianghuGo.Client.Application
         public Task<CodexPageDto> GetCodexAsync(Guid characterId, CancellationToken ct) =>
             SendAsync<CodexPageDto>("GET", "/api/v1/characters/" + characterId + "/quests/codex", null, true, null, ct);
 
+        public Task<CraftOrderPageDto> GetCraftOrdersAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<CraftOrderPageDto>("GET", "/api/v1/market/orders?characterId=" + characterId, null, true, null, ct);
+
+        public Task<CraftOrderDto> PlaceCraftOrderAsync(Guid characterId, string itemId, long quantity, long reward, CancellationToken ct) =>
+            SendAsync<CraftOrderDto>("POST", "/api/v1/market/orders", new { characterId, itemId, quantity, reward }, true, NewIdempotencyKey(), ct);
+
+        public Task<object> FulfilCraftOrderAsync(Guid characterId, Guid orderId, CancellationToken ct) =>
+            SendAsync<object>("POST", "/api/v1/market/orders/" + orderId + "/fulfil", new { characterId }, true, null, ct);
+
+        public Task<object> CancelCraftOrderAsync(Guid characterId, Guid orderId, CancellationToken ct) =>
+            SendAsync<object>("POST", "/api/v1/market/orders/" + orderId + "/cancel", new { characterId }, true, null, ct);
+
         public Task<FriendsDto> GetFriendsAsync(Guid characterId, CancellationToken ct) =>
             SendAsync<FriendsDto>("GET", Social(characterId) + "/friends", null, true, null, ct);
 

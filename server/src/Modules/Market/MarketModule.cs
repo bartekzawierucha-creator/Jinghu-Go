@@ -27,13 +27,16 @@ public static class MarketModule
         if (StorageProvider.From(configuration) == StorageKind.Postgres)
         {
             services.AddSingleton<IMarketRepository, PostgresMarketRepository>();
+            services.AddSingleton<ICraftOrderRepository, PostgresCraftOrderRepository>();
         }
         else
         {
             services.AddSingleton<IMarketRepository, InMemoryMarketRepository>();
+            services.AddSingleton<ICraftOrderRepository, InMemoryCraftOrderRepository>();
         }
 
         services.AddScoped<MarketService>();
+        services.AddScoped<CraftOrderService>();
         return services;
     }
 

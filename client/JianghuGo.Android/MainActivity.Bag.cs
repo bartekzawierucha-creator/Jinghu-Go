@@ -357,6 +357,50 @@ namespace JianghuGo.Android
 
         private string _marketQuery;
 
+        /// <summary>Craft orders (2.3): ask for items with an escrowed reward, or deliver someone else's order.</summary>
+        private async Task CraftOrdersSheetAsync(EconomyFlow economy)
+        {
+            var c = _me;
+            var orders = (await _api.GetCraftOrdersAsync(c.Id, Ct)).Items;
+            var body = Sheet("Zamówienia rzemieślnicze", 0.85f, out var close, "menu_market");
+            var row = _ui.HRow(body, 42, 4);
+            var item = _ui.Field("Przedmiot (nazwa)", parent: row);
+            item.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 1.6f);
+            var qty = _ui.Field("Ile", number: true, parent: row);
+            qty.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 0.7f) { LeftMargin = Px(4) };
+            var reward = _ui.Field("KD", number: true, parent: row);
+            reward.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 0.9f) { LeftMargin = Px(4) };
+            _ui.Btn("Złóż zamówienie", () => Run(async () =>
+            {
+                var term = item.Text?.Trim() ?? string.Empty;
+                var found = await _api.SearchMarketAsync(term, "newest", 1, Ct);
+                var id = found.Items.FirstOrDefault()?.ItemId ?? economy.Inventory.Stacks.FirstOrDefault(s => s.NamePl.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0)?.ItemId
+                    ?? term.ToLowerInvariant().Replace(' ', '_');
+                long.TryParse(qty.Text, out var q);
+                long.TryParse(reward.Text, out var r);
+                await _api.PlaceCraftOrderAsync(c.Id, id, Math.Max(1, q), r, Ct);
+                close();
+                RefreshHud();
+                SetStatus("Zamówienie złożone — nagroda czeka w depozycie.");
+            }), body, sp: 13, heightDp: 38);
+            _ui.Pages(body, orders.Count, 1, 4, (i, cell) =>
+            {
+                var o = orders[i];
+                var card = _ui.Card(cell, 1f, 6, o.Mine ? Ui.Gold : (Color?)null, 0);
+                var r2 = _ui.HRow(card, 40, 0);
+                var col = _ui.Box(r2, 1f, marginDp: 4);
+                _ui.Text(o.Quantity + "× " + o.ItemNamePl + " → " + o.Reward + " KD", col, 13, Ui.Ink, bold: true);
+                _ui.Text(o.OrdererName + (o.Expired ? " · wygasło" : " · do " + o.ExpiresAt.ToLocalTime().ToString("dd.MM")), col, 10, Ui.Muted);
+                var have = economy.Inventory.Count(o.ItemId);
+                if (o.Mine)
+                    _ui.Btn("Anuluj", () => Run(async () => { await _api.CancelCraftOrderAsync(c.Id, o.Id, Ct); close(); RefreshHud(); SetStatus("Zamówienie anulowane, nagroda wróciła."); }),
+                        r2, secondary: true, sp: 11, heightDp: 34).LayoutParameters = new LinearLayout.LayoutParams(Px(80), Px(34));
+                else if (!o.Expired && have >= o.Quantity)
+                    _ui.Btn("Dostarcz", () => Run(async () => { await _api.FulfilCraftOrderAsync(c.Id, o.Id, Ct); close(); Sfx.Play(Sfx.Coin); RefreshHud(); SetStatus("Dostarczono — nagroda w sakwie."); }),
+                        r2, sp: 11, heightDp: 34).LayoutParameters = new LinearLayout.LayoutParams(Px(80), Px(34));
+            }, empty: "Brak zamówień.");
+        }
+
         private void Market(EconomyFlow economy, Ui ui, LinearLayout page, ListingPageDto offersPage, List<MyListingDto> mine, bool showMine)
         {
             var c = _me;
@@ -412,7 +456,7 @@ namespace JianghuGo.Android
                         await Reload(bought == null ? "Ktoś był szybszy — oferta już nieaktualna." : "Kupiono za " + bought.Paid + " KD.");
                     }), row, sp: 12, heightDp: 38).LayoutParameters = new LinearLayout.LayoutParams(Px(70), Px(38)) { Gravity = GravityFlags.CenterVertical };
                 }, empty: "Na targu nic nie ma.");
-                ui.Text("Wystawiasz z sakwy: dotknij przedmiotu → Wystaw na targ.", page, 11, Ui.Muted, center: true);
+                ui.Btn("📋 Zamówienia rzemieślnicze", () => Run(() => CraftOrdersSheetAsync(economy)), page, secondary: true, sp: 12, heightDp: 34);
             }
             else
             {

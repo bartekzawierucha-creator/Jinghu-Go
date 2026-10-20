@@ -96,4 +96,23 @@ namespace JianghuGo.Client.Application
     {
         public List<CodexEntryDto> Items { get; set; } = new List<CodexEntryDto>();
     }
+
+    public sealed class CraftOrderDto
+    {
+        public Guid Id { get; set; }
+        public Guid OrdererCharacterId { get; set; }
+        public string OrdererName { get; set; }
+        public string ItemId { get; set; }
+        public string ItemNamePl { get; set; }
+        public long Quantity { get; set; }
+        public long Reward { get; set; }
+        public DateTimeOffset ExpiresAt { get; set; }
+        public bool Mine { get; set; }
+        public bool Expired { get; set; }
+    }
+
+    public sealed class CraftOrderPageDto
+    {
+        public List<CraftOrderDto> Items { get; set; } = new List<CraftOrderDto>();
+    }
 }

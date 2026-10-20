@@ -951,6 +951,38 @@ paths:
       summary: Market rules (listing fee, sale tax, price range, listing lifetime, per-character listing limit).
       responses:
         "200": { description: OK }
+  /api/v1/market/orders:
+    get:
+      tags: [Market]
+      summary: Open craft orders.
+      parameters: [{ name: characterId, in: query, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK }
+    post:
+      tags: [Market]
+      summary: Place a craft order (reward escrowed).
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+  /api/v1/market/orders/{orderId}/fulfil:
+    post:
+      tags: [Market]
+      summary: Deliver the items and collect the reward (minus 5 % tax).
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/market/orders/{orderId}/cancel:
+    post:
+      tags: [Market]
+      summary: Cancel your order (full refund).
+      parameters: [{ name: orderId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
   /api/v1/market/search:
     get:
       tags: [Market]

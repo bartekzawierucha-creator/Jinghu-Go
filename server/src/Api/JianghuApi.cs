@@ -106,6 +106,7 @@ public static class JianghuApi
         app.MapInventoryEndpoints();
         app.MapCraftingEndpoints();
         app.MapMarketEndpoints();
+        JianghuGo.Modules.Market.Application.CraftOrderEndpoints.MapCraftOrderEndpoints(app);
         app.MapSectEndpoints();
         app.MapTerritoryEndpoints();
         app.MapNotificationEndpoints();
