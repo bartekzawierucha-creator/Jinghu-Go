@@ -800,7 +800,7 @@ namespace JianghuGo.Android
                 var s = StateAt(_foe, now);
                 _text.TextSize = 12 * _d;
                 _text.Color = Color.Rgb(60, 60, 62);
-                canvas.DrawText("» " + (Battle.OpponentIntent.NamePl ?? Battle.OpponentIntent.Action), s.X * w, Height * 0.8f - Math.Min(Height * 0.24f, w * 0.34f) * 1.3f, _text);
+                canvas.DrawText("» " + (Battle.OpponentIntent.NamePl ?? Battle.OpponentIntent.Action), s.X * w, Height * 0.8f - Math.Min(Height * 0.24f, w * 0.34f) * 1.12f, _text);
             }
         }
 
@@ -809,7 +809,10 @@ namespace JianghuGo.Android
             if (f == null) return;
             var plateW = w * 0.42f;
             var cx = left ? x + plateW / 2 : x - plateW / 2;
-            DrawStroke(canvas, cx, top + av * 0.42f, plateW, 225, !left);
+            // a soft paper band behind the plate keeps the ink text readable on any landscape
+            _paint.Color = Color.Argb(150, 245, 242, 236);
+            canvas.DrawRoundRect(new RectF(left ? x : x - plateW, top - 2 * _d, left ? x + plateW : x, top + av + 10 * _d), av / 2, av / 2, _paint);
+            _paint.Color = Color.White;
             var ax = left ? x : x - av;
             if (avatar != null) canvas.DrawBitmap(avatar, null, new RectF(ax, top, ax + av, top + av), _paint);
             _line.Color = Color.Rgb(20, 20, 22);
@@ -817,7 +820,7 @@ namespace JianghuGo.Android
             canvas.DrawCircle(ax + av / 2, top + av / 2, av / 2, _line);
             _text.TextAlign = left ? Paint.Align.Left : Paint.Align.Right;
             var tx = left ? ax + av + 6 * _d : ax - 6 * _d;
-            _text.Color = Color.Rgb(250, 250, 250);
+            _text.Color = Color.Rgb(24, 24, 26);
             _text.TextSize = 14 * _d;
             var name = f.Name ?? string.Empty;
             if (name.Length > 14) name = name[..13] + "…";
