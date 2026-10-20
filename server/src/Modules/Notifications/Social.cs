@@ -370,12 +370,15 @@ public sealed class SocialService(
         Func<IUnitOfWork, CharacterSummary, DateTimeOffset, Task<Result<T>>> action, CancellationToken ct) =>
         db.RunAsync<Result<T>>(async uow =>
         {
-            var result = await Idempotency.ExecuteAsync(idempotency, uow, clock, accountId, operation, key, request, async () =>
+            async Task<Result<T>> Run()
             {
                 var me = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
                 if (me is null) return CharacterNotFound;
                 return await action(uow, me, clock.GetUtcNow());
-            }, ct);
+            }
+
+            // Keyed operations (messages, letters) are idempotent; the others are naturally safe to repeat.
+            var result = key is null ? await Run() : await Idempotency.ExecuteAsync(idempotency, uow, clock, accountId, operation, key, request, Run, ct);
             if (result.IsSuccess) await uow.CommitAsync(ct);
             return result;
         }, ct);

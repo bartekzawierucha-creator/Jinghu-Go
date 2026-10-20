@@ -70,7 +70,7 @@ public class SocialTests : IAsyncLifetime
         // only friends may write
         await Problem(await a.P.PostAsync($"/api/v1/characters/{aId}/social/messages/{bId}", new { text = "hej" }, Player.NewKey()), HttpStatusCode.Forbidden, "not_friends");
         var request = await Ok(await a.P.PostAsync($"/api/v1/characters/{aId}/social/friends", new { name = b.Name.ToUpperInvariant() }));
-        Assert.Single(request["outgoing"]!.AsArray());
+        Assert.Equal(1, request["outgoing"]!.AsArray().Count);
         var incoming = await Ok(await b.P.GetAsync($"/api/v1/characters/{bId}/social/friends"));
         Assert.Equal(aId, incoming["incoming"]![0]!.Str("characterId"));
         await Ok(await b.P.PostAsync($"/api/v1/characters/{bId}/social/friends/{aId}/accept"));
@@ -119,11 +119,15 @@ public class SocialTests : IAsyncLifetime
 
         var before = await BalanceAsync(hunter.C);
         var outbox = _host.Service<IOutbox>();
+        var directory = _host.Service<JianghuGo.Modules.Characters.Contracts.ICharacterDirectory>();
+        Task<Guid> AccountOf(JsonObject c) => _host.Service<IUnitOfWorkFactory>().RunAsync(async uow => (await directory.FindAsync(uow, Guid.Parse(c.Str("id")), default))!.AccountId.Value, default);
+        var hunterAccount = await AccountOf(hunter.C);
+        var targetAccount = await AccountOf(target.C);
         var message = OutboxMessage.Create(CombatEvents.BattleFinished, new CombatEvents.BattleFinishedV1(Guid.NewGuid(), "pvp", "a_won", null,
         [
-            new(Guid.NewGuid(), Guid.Parse(hunter.C.Str("id")), "a", "won", 0),
-            new(Guid.NewGuid(), Guid.Parse(target.C.Str("id")), "b", "lost", 0),
-        ]), DateTimeOffset.UtcNow, null);
+            new(hunterAccount, Guid.Parse(hunter.C.Str("id")), "a", "won", 0),
+            new(targetAccount, Guid.Parse(target.C.Str("id")), "b", "lost", 0),
+        ]), _host.Clock.GetUtcNow(), null);
         await _host.Service<IUnitOfWorkFactory>().RunAsync(async uow =>
         {
             await outbox.EnqueueAsync(uow, message, default);
@@ -132,7 +136,7 @@ public class SocialTests : IAsyncLifetime
         await _host.DrainOutboxAsync();
         Assert.Equal(before + 100, await BalanceAsync(hunter.C));
         var list = await Ok(await hunter.P.GetAsync("/api/v1/bounties?characterId=" + hunter.C.Str("id")));
-        Assert.Empty(list["items"]!.AsArray());
+        Assert.Equal(0, list["items"]!.AsArray().Count);
         await Problem(await poster.P.PostAsync($"/api/v1/bounties/{posted.Str("id")}/withdraw", new { characterId = poster.C.Str("id") }), HttpStatusCode.Conflict, "bounty_closed");
     }
 
@@ -183,6 +187,6 @@ public class SocialTests : IAsyncLifetime
         Assert.Equal(HttpStatusCode.Unauthorized, login.StatusCode);
         var name = await _host.Service<IUnitOfWorkFactory>().RunAsync(
             async uow => (await _host.Service<JianghuGo.Modules.Characters.Contracts.ICharacterDirectory>().FindAsync(uow, Guid.Parse(a.C.Str("id")), default))!.Name, default);
-        Assert.StartsWith("Zapomniany ", name);
+        Assert.True(name.StartsWith("Zapomniany ", StringComparison.Ordinal), name);
     }
 }

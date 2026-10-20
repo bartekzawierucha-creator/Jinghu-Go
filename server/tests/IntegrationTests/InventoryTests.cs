@@ -165,7 +165,9 @@ public class InventoryTests : IAsyncLifetime
         await Problem(await p.PostAsync(Inv(c) + "/equip", new { instanceId = sword.Id, expectedVersion = 7 }), HttpStatusCode.Conflict, "version_conflict");
         var inv = await Ok(await p.PostAsync(Inv(c) + "/equip", new { instanceId = sword.Id, expectedVersion = 1 }));
         var swordView = inv["items"]!.AsArray().Single(i => i!.Str("id") == sword.Id.ToString())!;
-        Assert.Equal(2 + swordView["affixes"]!.AsArray().Where(a => a!.Str("stat") == "strength").Sum(a => a!.Int("value")), inv["bonuses"]!.Int("strength"));
+        // base stats come scaled by the instance's quality (1.8), so read them from the item view
+        int Base(JsonNode view, string stat) => view["stats"]?[stat]?.GetValue<int>() ?? 0;
+        Assert.Equal(Base(swordView, "strength") + swordView["affixes"]!.AsArray().Where(a => a!.Str("stat") == "strength").Sum(a => a!.Int("value")), inv["bonuses"]!.Int("strength"));
         Assert.Equal(sword.Id.ToString(), inv["equipped"]!.Str("weapon"));
         Assert.Equal(2, inv.Int("slotsUsed"));
 
@@ -174,8 +176,8 @@ public class InventoryTests : IAsyncLifetime
         // base stats plus the dagger's own random properties (affixes are derived from the instance id)
         var daggerView = inv["items"]!.AsArray().Single(i => i!.Str("id") == dagger.Id.ToString())!;
         int Affix(string stat) => daggerView["affixes"]!.AsArray().Where(a => a!.Str("stat") == stat).Sum(a => a!.Int("value"));
-        Assert.Equal(1 + Affix("strength"), inv["bonuses"]!.Int("strength"));
-        Assert.Equal(3 + Affix("agility"), inv["bonuses"]!.Int("agility"));
+        Assert.Equal(Base(daggerView, "strength") + Affix("strength"), inv["bonuses"]!.Int("strength"));
+        Assert.Equal(Base(daggerView, "agility") + Affix("agility"), inv["bonuses"]!.Int("agility"));
         Assert.Equal("bag", inv["items"]!.AsArray().Single(i => i!.Str("id") == sword.Id.ToString())!.Str("state"));
 
         inv = await Ok(await p.PostAsync(Inv(c) + "/equip", new { instanceId = ring.Id, expectedVersion = 1 }));
