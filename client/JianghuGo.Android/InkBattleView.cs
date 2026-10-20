@@ -78,7 +78,6 @@ namespace JianghuGo.Android
             public bool Flip;
             public float Alpha = 0.9f;
             public bool FadeIn;
-            public bool Screen;            // full-screen layer
         }
 
         private sealed class Floater
@@ -377,7 +376,7 @@ namespace JianghuGo.Android
                         K(d, impact, "hurt", d.Home + dir * knock * 0.5f);
                         K(d, impact + 120, "hurt", d.Home + dir * knock);
                         K(d, impact + 520, "stance", d.Home);
-                        var slash = a.Set == "body" ? "ink_fist_impact" : variant % 4 switch { 0 => "ink_slash_double", 1 => "ink_slash_triple", 2 => "ink_thrust", _ => "ink_slash_upper" };
+                        var slash = a.Set == "body" ? "ink_fist_impact" : (variant % 4) switch { 0 => "ink_slash_double", 1 => "ink_slash_triple", 2 => "ink_thrust", _ => "ink_slash_upper" };
                         if (ranged) slash = null;
                         if (slash != null) Effect(slash, impact, 260, d.Home - dir * 0.03f, 0.55f, 0.95f, flip: !mine);
                         var burst = Burst(ranged || a.Set != "qi" && a.Set != "rival" ? element : "x");
