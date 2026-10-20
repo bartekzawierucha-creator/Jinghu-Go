@@ -350,8 +350,12 @@ namespace JianghuGo.Android
             var ui = NewScreen(title, () => GoTab(TabCombat), subtitle: combat.Battle.Opponent.Name.ToUpperInvariant(), chrome: false);
             var page = ui.Content;
             var gen = _screen;
-            var stage = new BattleStageView(this, combat.Battle.Kind == "pvp" ? "pvp" : combat.Battle.NpcId, c.Path, combat.Battle.Kind, combat.Battle.Opponent?.Name);
-            ui.AddWeighted(page, stage, 1f, 0);
+            var npc = combat.Battle.Kind == "pvp" ? "pvp" : combat.Battle.NpcId;
+            // 2.2: people are fought in the ink duel; beasts and spirits keep the classic stage until they have ink poses
+            var ink = InkBattleView.Supports(npc, combat.Battle.Kind) ? new InkBattleView(this, npc, c.Path, combat.Battle.Kind, combat.Battle.Opponent?.Name) : null;
+            var classic = ink == null ? new BattleStageView(this, npc, c.Path, combat.Battle.Kind, combat.Battle.Opponent?.Name) : null;
+            ui.AddWeighted(page, (View)ink ?? classic, 1f, 0);
+            var stepMs = ink != null ? InkBattleView.StepMs : 760;
             var ticker = ui.Text(string.Empty, page, 12, Ui.Ink, maxLines: 2);
             var buttons = new List<View>();
             var rewardShown = combat.Battle.Status == "finished";
@@ -415,7 +419,7 @@ namespace JianghuGo.Android
                             if (gen == _screen) Render();
                         }
 
-                        await Task.Delay(Math.Max(1200, combat.Battle.LastTurnEvents.Count * 760 + 500), Ct);
+                        await Task.Delay((int)Math.Max(1200, combat.Battle.LastTurnEvents.Count * stepMs + 900), Ct);
                     }
                     catch (System.OperationCanceledException)
                     {
@@ -455,7 +459,8 @@ namespace JianghuGo.Android
             void Render()
             {
                 var b = combat.Battle;
-                stage.Show(b);
+                if (ink != null) ink.Show(b);
+                else classic.Show(b);
                 ticker.Text = b.Status == "pending_acceptance" ? "Czekasz, aż przeciwnik przyjmie wyzwanie…"
                     : b.Status == "declined" ? "Przeciwnik odrzucił wyzwanie." : b.Status == "expired" ? "Wyzwanie wygasło."
                     : !b.IsActive ? "WYNIK: " + ResultName(b) + (b.RewardQi > 0 ? "  (+" + b.RewardQi + " Qi)" : string.Empty)
