@@ -309,7 +309,7 @@ public class GrowthTests : IAsyncLifetime
         });
         var inv = await Ok(await p.GetAsync(Url(c, "inventory")));
         var item = inv["items"]!.AsArray().Single(i => i!.Str("id") == sword.Id.ToString())!;
-        Assert.Equal(1, item["affixes"]!.AsArray().Count); // earth rarity: one property
+        Assert.Equal(1 + ItemQuality.Of(sword.Id).ExtraAffixes, item["affixes"]!.AsArray().Count); // earth rarity: one property (+ quality)
         Assert.Equal("frost", item.Str("setId"));
         var r = await Ok(await p.PostAsync(Url(c, "inventory/dismantle"), new { instanceId = sword.Id, expectedVersion = sword.Version }, Player.NewKey()));
         Assert.True(r["materials"]!.AsArray().Count >= 0);
