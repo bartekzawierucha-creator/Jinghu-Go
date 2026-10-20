@@ -122,10 +122,9 @@ $UI tap "Drewniany Manekin"
 $UI wait "Prędkość" 60
 $UI noscroll
 $UI shot shots/06b-battle.png
-$UI tap "Prędkość" 20
-sleep 3
-$UI shot shots/06c-battle-turn.png
+# auto battles are fast: no taps during the fight (buttons move when it ends)
 $UI wait "WYNIK" 180
+$UI shot shots/06c-battle-turn.png
 sleep 4
 $UI shot shots/06e-auto-result.png
 $UI tap "Zabierz" 15 || $UI tap "Dalej" 15
