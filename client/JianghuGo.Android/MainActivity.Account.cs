@@ -108,7 +108,7 @@ namespace JianghuGo.Android
         private void CreationStep(CharacterCreationFlow flow, int step, string path, string name)
         {
             var ui = NewScreen("Narodziny wojownika", step == 0 ? null : (System.Action)(() => CreationStep(flow, step - 1, path, name)),
-                Resource.Drawable.key_art, "KROK " + (step + 1) + " Z 3 · " + (step == 0 ? "LOS" : step == 1 ? "ŚCIEŻKA" : "IMIĘ"), chrome: false);
+                Resource.Drawable.bg_login, "KROK " + (step + 1) + " Z 3 · " + (step == 0 ? "LOS" : step == 1 ? "ŚCIEŻKA" : "IMIĘ"), chrome: false);
             var page = ui.Content;
 
             if (step == 0)

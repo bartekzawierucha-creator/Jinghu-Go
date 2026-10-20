@@ -29,7 +29,7 @@ namespace JianghuGo.Android
                 return;
             }
 
-            var ui = NewScreen(null, art: Resource.Drawable.loc_temple, tab: TabSect);
+            var ui = NewScreen(null, art: Resource.Drawable.bg_sect, tab: TabSect);
             var page = ui.Content;
             var mine = flow.Mine;
             ui.Tabs(page, new[] { "Sekta", "Członkowie", "Terytoria", "Ranking", "Rozwój" }, tab, i => Run(() => ShowSectTabAsync(i)),

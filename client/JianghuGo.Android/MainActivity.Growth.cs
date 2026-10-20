@@ -217,7 +217,7 @@ namespace JianghuGo.Android
         {
             var c = _me;
             var arts = await _api.GetArtsAsync(c.Id, Ct);
-            var ui = HeroScreen(5, Resource.Drawable.tile_menu_hero);
+            var ui = HeroScreen(5, Resource.Drawable.bg_hero);
             var page = ui.Content;
             ui.Tabs(page, ArtsTabs, sub, i => Run(() => ShowArtsAsync(i)), 30);
 
@@ -619,7 +619,7 @@ namespace JianghuGo.Android
                 "Plony dojrzały", "Ogród posiadłości czeka na zbiór.");
             Remind("expeditions", e.Disciples.Where(dd => dd.Expedition != null && !dd.Returned).Select(dd => dd.Until).Where(t1 => t1 != null).DefaultIfEmpty(null).Max(),
                 "Uczniowie wrócili", "Wyprawa zakończona — odbierz łupy.");
-            var ui = NewScreen("Posiadłość", BackToTab, Resource.Drawable.loc_village, "OGRÓD · UCZNIOWIE · WYPRAWY");
+            var ui = NewScreen("Posiadłość", BackToTab, Resource.Drawable.bg_estate, "OGRÓD · UCZNIOWIE · WYPRAWY");
             var page = ui.Content;
             ui.Tabs(page, new[] { "Ogród", "Uczniowie", "Wyprawy" }, tab, i => Run(() => ShowEstateAsync(i)),
                 badges: new[] { e.Plots.Count(p => p.Ready), e.Disciples.Count(d => d.Returned), 0 });
@@ -781,7 +781,7 @@ namespace JianghuGo.Android
         private async Task ShowSectDevelopmentAsync(SectFlow flow)
         {
             var c = _me;
-            var ui = NewScreen(null, art: Resource.Drawable.loc_temple, tab: TabSect);
+            var ui = NewScreen(null, art: Resource.Drawable.bg_sect, tab: TabSect);
             var page = ui.Content;
             ui.Tabs(page, new[] { "Sekta", "Członkowie", "Terytoria", "Ranking", "Rozwój" }, 4, i => Run(() => ShowSectTabAsync(i)));
             if (flow.Mine == null)

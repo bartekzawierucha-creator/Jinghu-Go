@@ -21,7 +21,7 @@ namespace JianghuGo.Android
         private void ShowHomeTab()
         {
             var c = _me;
-            var ui = NewScreen(null, art: Resource.Drawable.bg_town, tab: TabHome);
+            var ui = NewScreen(null, art: Resource.Drawable.bg_market, tab: TabHome);
             var page = ui.Content;
             var gen = _screen;
             var flow = new CultivationFlow(_api, c.Id);

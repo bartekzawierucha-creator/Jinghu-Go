@@ -103,6 +103,27 @@ def main() -> None:
         m = Image.open(args["map"]).convert("RGB")
         m = ImageEnhance.Brightness(m).enhance(0.82)
         m.save(out / "map_texture.jpg", quality=86)
+    for bg in ("bg_login", "bg_sect", "bg_forge", "bg_estate", "bg_meditation", "bg_market", "bg_hero"):
+        if bg in args:  # full-screen backdrops (9:16)
+            Image.open(args[bg]).convert("RGB").save(out / f"{bg}.jpg", quality=86)
+    if "map_night" in args:
+        Image.open(args["map_night"]).convert("RGB").save(out / "map_texture_night.jpg", quality=86)
+    if "arena_forest_v2" in args:  # portrait source with open ground at the bottom
+        Image.open(args["arena_forest_v2"]).convert("RGB").crop((0, 860, 768, 1312)).save(out / "arena_bamboo.jpg", quality=88)
+    # portrait (9:16) sources → the battle stage's landscape band (768x452) where the fighters stand
+    bands = {"arena_city": (0, 760, 768, 1212), "arena_swamp": (0, 720, 768, 1172), "arena_ruins": (0, 2, 768, 454),
+             "arena_plains": (0, 520, 768, 972), "arena_tortoise_lake": (0, 560, 768, 1012)}
+    for name, box in bands.items():
+        if name in args:
+            Image.open(args[name]).convert("RGB").crop(box).save(out / f"{name}.jpg", quality=88)
+    # enemy tiles (landscape 1.64:1) and hero avatars (square, around the face)
+    crops = {"tile_bamboo_viper": ((0, 280, 768, 748), (396, 242)), "tile_fire_fox": ((0, 560, 768, 1028), (396, 242)),
+             "portrait_poison": ((220, 170, 520, 470), (384, 384)), "portrait_flame": ((240, 150, 540, 450), (384, 384)),
+             "portrait_body": ((240, 100, 540, 400), (384, 384))}
+    for name, (box, size) in crops.items():
+        if name in args:
+            img = Image.open(args[name]).convert("RGB").crop(box).resize(size, Image.LANCZOS)
+            img.save(out / (f"{name}.png" if name.startswith("tile_") else f"{name}.jpg"), **({"optimize": True} if name.startswith("tile_") else {"quality": 90}))
     if "key_art" in args:
         Image.open(args["key_art"]).convert("RGB").save(out / "key_art.jpg", quality=88)
 

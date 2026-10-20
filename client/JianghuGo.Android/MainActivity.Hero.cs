@@ -97,7 +97,7 @@ namespace JianghuGo.Android
                 // optional extras
             }
 
-            var ui = HeroScreen(0, Resource.Drawable.tile_menu_hero);
+            var ui = HeroScreen(0, Resource.Drawable.bg_hero);
             var page = ui.Content;
             var inv = economy.Inventory;
             var doll = new HeroDollView(this) { PetNpcId = pet?.NpcId };
@@ -191,7 +191,7 @@ namespace JianghuGo.Android
         {
             var c = _me;
             var m = await _api.GetMeridiansAsync(c.Id, Ct);
-            var ui = HeroScreen(1, Resource.Drawable.tile_menu_meridians);
+            var ui = HeroScreen(1, Resource.Drawable.bg_meditation);
             var page = ui.Content;
             var head = ui.HRow(page, 40);
             ui.Icon(head, "menu_meridians", 34);
@@ -240,7 +240,7 @@ namespace JianghuGo.Android
         {
             var c = _me;
             var loadout = await _api.GetLoadoutAsync(c.Id, Ct);
-            var ui = HeroScreen(2, Resource.Drawable.place_qiarray);
+            var ui = HeroScreen(2, Resource.Drawable.bg_meditation);
             var page = ui.Content;
             ui.Text("4 ataki · 2 obrony · specjalna · kontra. Dotknij slotu, by zmienić.", page, 11, Ui.Muted, center: true);
             var slots = loadout.Slots.OrderBy(s => s.Slot).ToList();
@@ -439,7 +439,7 @@ namespace JianghuGo.Android
             await lab.LoadAsync(Ct);
             var economy = new EconomyFlow(_api, c.Id);
             await economy.LoadAsync(Ct);
-            var ui = HeroScreen(4, Resource.Drawable.place_qiarray);
+            var ui = HeroScreen(4, Resource.Drawable.bg_meditation);
             var page = ui.Content;
             var form = ui.Card(page, 1f, 10);
             ui.Text("Ułóż własną technikę ataku. Serwer liczy jej moc i pilnuje budżetu twojego poziomu.", form, 12, Ui.Muted, maxLines: 2);

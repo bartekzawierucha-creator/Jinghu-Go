@@ -35,7 +35,7 @@ namespace JianghuGo.Android
         private void ShowBag(EconomyFlow economy, int tab, ListingPageDto offers, List<MyListingDto> mine, int startPage, bool marketMine = false)
         {
             var c = _me;
-            var ui = NewScreen("Sakwa", BackToTab, Resource.Drawable.loc_village, "EKWIPUNEK · KUŹNIA · TARG");
+            var ui = NewScreen("Sakwa", BackToTab, Resource.Drawable.bg_forge, "EKWIPUNEK · KUŹNIA · TARG");
             var page = ui.Content;
             var inv = economy.Inventory;
             _balance = inv.Balance;

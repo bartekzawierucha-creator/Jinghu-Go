@@ -36,7 +36,8 @@ namespace JianghuGo.Android
             _grove = Ui.Art(context, Resource.Drawable.place_grove);
             _wolf = Ui.Art(context, Resource.Drawable.sprite_wolf);
             _brazier = Ui.Art(context, Resource.Drawable.place_brazier);
-            _texture = Ui.Art(context, Resource.Drawable.map_texture);
+            var hour = DateTime.Now.Hour; // night map from dusk to dawn (local time)
+            _texture = Ui.Art(context, hour >= 20 || hour < 6 ? Resource.Drawable.map_texture_night : Resource.Drawable.map_texture);
             _playerToken = Scaled(Ui.Art(context, Resource.Drawable.map_player), 44);
         }
 
