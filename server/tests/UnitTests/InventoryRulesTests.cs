@@ -13,8 +13,13 @@ public class InventoryRulesTests
 
     private static readonly ItemsConfig Items = InventoryModule.LoadConfig(ConfigPath("items.json"));
 
-    private static ItemInstance Equipped(string itemId, int level = 0) =>
-        new(Guid.NewGuid(), new CharacterId(Guid.NewGuid()), new AccountId(Guid.NewGuid()), itemId, level, InstanceStates.Equipped, 1, DateTimeOffset.UnixEpoch);
+    /// <summary>An equipped item of "normal" quality (1.8: quality comes from the id), so stats are the plain formula.</summary>
+    private static ItemInstance Equipped(string itemId, int level = 0)
+    {
+        var id = Guid.NewGuid();
+        while (JianghuGo.Modules.Inventory.Contracts.ItemQuality.Of(id).StatPermille != 1000) id = Guid.NewGuid();
+        return new(id, new CharacterId(Guid.NewGuid()), new AccountId(Guid.NewGuid()), itemId, level, InstanceStates.Equipped, 1, DateTimeOffset.UnixEpoch);
+    }
 
     [Fact]
     public void Shipped_items_config_is_valid_and_rejects_bad_specs()

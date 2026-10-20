@@ -134,11 +134,11 @@ public class ProgressionTests : IAsyncLifetime
         var fromTitles = await _host.Service<IUnitOfWorkFactory>().RunAsync(async uow =>
         {
             var total = 0;
-            foreach (var provider in _host.Service<IEnumerable<ICombatStatBonuses>>())
+            foreach (var provider in _host.Service<IEnumerable<ICombatStatBonuses>>().Where(x => x.SourcePl == "Tytuły")) // the birth sign varies per character
                 total += (await provider.BonusesAsync(uow, Guid.Parse(id), default)).GetValueOrDefault("constitution");
             return total;
         }, default);
-        Assert.Equal(3, fromTitles);                                                   // no realm/meridians yet: only the title
+        Assert.Equal(3, fromTitles);                                                   // the title's bonus reaches combat
         await Problem(await p.PostAsync(url + "/a_boss_1/claim"), HttpStatusCode.Conflict, "quest_already_claimed");
 
         var leaders = await Ok(await p.GetAsync(url + "/leaders/meditation_minutes"));

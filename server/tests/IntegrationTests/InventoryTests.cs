@@ -137,7 +137,7 @@ public class InventoryTests : IAsyncLifetime
         Assert.Equal(1, await _host.DrainOutboxAsync());
         Assert.Equal(0, await _host.DrainOutboxAsync());
         var cultivation = await Ok(await p.GetAsync($"/api/v1/characters/{c.Str("id")}/cultivation"));
-        Assert.Equal(120, cultivation.Int("qi"));
+        Assert.Equal(105, cultivation.Int("qi"));                              // 1.8 tolerance: 60 + 60 × 75 % the same day
         var inv = await Ok(await p.GetAsync(Inv(c)));
         Assert.Equal(3, inv["stacks"]!.AsArray().Single(s => s!.Str("itemId") == "qi_pill").Int("quantity"));
     }
@@ -240,7 +240,7 @@ public class InventoryTests : IAsyncLifetime
         Assert.Equal(100, (await Ok(await p.GetAsync(Inv(c)))).Int("balance"));
         await _host.DrainOutboxAsync();
         Assert.Equal(0, await _host.DrainOutboxAsync());
-        Assert.Equal(102, (await Ok(await p.GetAsync(Inv(c)))).Int("balance"));
+        Assert.Equal(115, (await Ok(await p.GetAsync(Inv(c)))).Int("balance"));      // 1.7: a tier-1 beast pays 15 stones
 
         var wallet = await Ok(await p.GetAsync(Inv(c) + "/wallet"));
         Assert.Equal("loot,initial_grant", string.Join(",", wallet["items"]!.AsArray().Select(e => e!.Str("reason"))));

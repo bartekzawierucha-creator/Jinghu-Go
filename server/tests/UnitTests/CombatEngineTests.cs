@@ -19,6 +19,7 @@ public class CombatEngineTests
         Damage = Config.Damage with { VariancePermille = 0 },
         HitChance = new HitChanceRules(999, 0, 999, 999),
         Crit = null,
+        Defense = null, // the base formula; damage reduction from Constitution/Willpower is tested on its own
     };
 
     /// <summary>A qi-path character with ten in every stat: 100 + 10 × 8 HP, +10 % qi path health (1.6).</summary>
@@ -116,6 +117,16 @@ public class CombatEngineTests
         Assert.Equal(10, hit.Damage);                                  // 12 × 1.3 = 15 → × (1 − 0.3 block) = 10
         Assert.Equal((b.Stats["constitution"] * 8 + 100) * 1100 / 1000 - 10, s1.B.Hp);
         Assert.Equal(2, s1.Turn);
+    }
+
+    [Fact]
+    public void Constitution_and_willpower_reduce_damage_up_to_the_cap()
+    {
+        var d = new DefenseRules(400, 350);
+        Assert.Equal(0, d.ReductionPermille(0, 0, 10));
+        Assert.Equal(200, d.ReductionPermille(10, 10, 10));        // 400 × 20 / (20 + 20)
+        Assert.Equal(350, d.ReductionPermille(1000, 1000, 1));      // capped at 35 %
+        Assert.True(d.ReductionPermille(10, 10, 40) < d.ReductionPermille(10, 10, 10)); // a stronger attacker pierces more
     }
 
     [Fact]
@@ -272,15 +283,15 @@ public class CombatEngineTests
     /// deliberate rules-version bump (then update this hash). Replays of stored battles depend on it.
     /// </summary>
     [Fact]
-    public void Golden_battle_is_unchanged_for_rules_combat_5()
+    public void Golden_battle_is_unchanged_for_rules_combat_6()
     {
         var (final, log) = Simulate(FromNpc("mountain_bandit"), Player("poison"), 20261012);
         var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(final) + string.Join("\n", log))))[..16];
-        Assert.Equal("combat-5", Config.RulesVersion);
+        Assert.Equal("combat-6", Config.RulesVersion);
         Assert.Equal(GoldenHash, hash, $"outcome {final.Outcome} after {final.Turn} turns, {log.Count} events");
     }
 
-    private const string GoldenHash = "08665E73D8CDEE93"; // bandit vs poison starter, seed 20261012: b_won after 14 turns, 35 events (rules combat-5)
+    private const string GoldenHash = "BB9EC421EE8480B8"; // bandit vs poison starter, seed 20261012: b_won after 15 turns, 39 events (rules combat-6)
 
     [Fact]
     public void Momentum_builds_on_landed_strikes_and_is_lost_by_resting()

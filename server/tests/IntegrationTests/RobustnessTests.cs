@@ -64,8 +64,8 @@ public partial class RobustnessTests : IAsyncLifetime
     [Fact]
     public async Task Every_protected_route_rejects_missing_and_forged_tokens()
     {
-        var anonymous = new[] { "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh" };
-        foreach (var (method, path) in Routes().Where(r => !anonymous.Contains(r.Path)))
+        var anonymous = new[] { "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/reset-password" };
+        foreach (var (method, path) in Routes().Where(r => !anonymous.Contains(r.Path) && !r.Path.StartsWith("/ops/", StringComparison.Ordinal)))
         {
             foreach (var token in new[] { null, "jga_forged-token-value", "Bearer-less" })
             {

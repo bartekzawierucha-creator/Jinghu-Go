@@ -736,18 +736,23 @@ internal sealed class RealmNewsHandler(ISocialRepository repo, ICharacterDirecto
 {
     public string EventType => JianghuGo.Modules.Cultivation.Application.CultivationEvents.BreakthroughSucceeded;
 
-    public async Task HandleAsync(IUnitOfWork uow, OutboxMessage message, CancellationToken ct)
+    public Task HandleAsync(IUnitOfWork uow, OutboxMessage message, CancellationToken ct)
     {
+        // Read the event synchronously: its type is Cultivation's, so it must not live in the async state machine.
         var e = message.Payload<JianghuGo.Modules.Cultivation.Application.CultivationEvents.BreakthroughV1>();
-        if (!e.Success || e.FromRealm == e.ToRealm) return;
-        var realm = ladder.Realms.FirstOrDefault(r => r.Id == e.ToRealm);
+        return e.Success && e.FromRealm != e.ToRealm ? AnnounceAsync(uow, message, e.CharacterId, e.ToRealm, ct) : Task.CompletedTask;
+    }
+
+    private async Task AnnounceAsync(IUnitOfWork uow, OutboxMessage message, Guid characterId, string toRealm, CancellationToken ct)
+    {
+        var realm = ladder.Realms.FirstOrDefault(r => r.Id == toRealm);
         if (realm is null || realm.Index < 2) return;
-        var who = await characters.FindAsync(uow, e.CharacterId, ct);
+        var who = await characters.FindAsync(uow, characterId, ct);
         if (who is null) return;
         var text = realm.Index % 11 == 0
             ? $"{who.Name} otwiera nową erę — {realm.EraPl}! Wkracza w królestwo {realm.NamePl} {realm.Hanzi}."
             : $"{who.Name} wkracza w królestwo {realm.NamePl} {realm.Hanzi} ({realm.Index + 1}.).";
-        await repo.TryAddNewsAsync(uow, new NewsItem(Uuid7.New(), message.Id, "realm", e.CharacterId, text, message.OccurredAt), ct);
+        await repo.TryAddNewsAsync(uow, new NewsItem(Uuid7.New(), message.Id, "realm", characterId, text, message.OccurredAt), ct);
     }
 }
 

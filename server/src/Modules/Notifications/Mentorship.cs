@@ -136,15 +136,19 @@ internal sealed class DiscipleBreakthroughHandler(IMentorRepository repo, IInven
 {
     public string EventType => JianghuGo.Modules.Cultivation.Application.CultivationEvents.BreakthroughSucceeded;
 
-    public async Task HandleAsync(IUnitOfWork uow, OutboxMessage message, CancellationToken ct)
+    public Task HandleAsync(IUnitOfWork uow, OutboxMessage message, CancellationToken ct)
     {
         var e = message.Payload<JianghuGo.Modules.Cultivation.Application.CultivationEvents.BreakthroughV1>();
-        if (!e.Success || e.FromRealm == e.ToRealm) return;
-        var disciple = new CharacterId(e.CharacterId);
+        return e.Success && e.FromRealm != e.ToRealm ? RewardAsync(uow, message, e.CharacterId, ct) : Task.CompletedTask;
+    }
+
+    private async Task RewardAsync(IUnitOfWork uow, OutboxMessage message, Guid discipleId, CancellationToken ct)
+    {
+        var disciple = new CharacterId(discipleId);
         if (await repo.MasterOfAsync(uow, disciple, ct) is not { } bond) return;
         var credited = await inventory.CreditAsync(uow, bond.MasterId, MentorRules.StonesPerRealm, "mentor_reward", message.Id.ToString(), ct);
         if (!credited.IsSuccess && credited.Error!.Code != "duplicate_reference") throw new InvalidOperationException("Mentor reward failed: " + credited.Error.Code);
-        if ((await cultivation.StatusAsync(uow, e.CharacterId, ct)).Realm >= MentorRules.GraduationRealm) await repo.RemoveAsync(uow, disciple, ct);
+        if ((await cultivation.StatusAsync(uow, discipleId, ct)).Realm >= MentorRules.GraduationRealm) await repo.RemoveAsync(uow, disciple, ct);
     }
 }
 

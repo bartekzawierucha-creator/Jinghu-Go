@@ -575,6 +575,32 @@ paths:
       responses:
         "200": { description: OK }
         "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/dao-lab/scrolls/{techniqueId}:
+    get:
+      tags: [DaoLab]
+      summary: What a forged technique scroll holds (rarity, era, path, description).
+      parameters: [{ name: techniqueId, in: path, required: true, schema: { type: string } }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/dao-lab/meditate:
+    post:
+      tags: [DaoLab]
+      summary: Meditation on the Dao — a forged scroll of your era once a day (another costs a Destiny Token with useToken=true).
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }, { name: useToken, in: query, required: false, schema: { type: boolean } }, { $ref: "#/components/parameters/IdempotencyKey" }]
+      responses:
+        "200": { description: OK }
+        "409": { $ref: "#/components/responses/Problem" }
+        "429": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/dao-lab/transmute:
+    post:
+      tags: [DaoLab]
+      summary: Turn 10 Dao essence into a new scroll, one rarity luckier.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }, { $ref: "#/components/parameters/IdempotencyKey" }]
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
   /api/v1/combat/catalog:
     get:
       tags: [Combat]

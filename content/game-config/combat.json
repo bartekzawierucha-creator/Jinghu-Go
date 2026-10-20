@@ -1,5 +1,5 @@
 {
-  "rulesVersion": "combat-5",
+  "rulesVersion": "combat-6",
   "maxTurns": 30,
   "turnDeadlineSeconds": 90,
   "challengeExpirySeconds": 600,

@@ -47,6 +47,9 @@ public class SecurityTests : IAsyncLifetime
         [
             "GET /health/live", "GET /health/ready", "GET /health/economy", // economy: cached scan, at most one per 5 min
             "POST /api/v1/auth/register", "POST /api/v1/auth/login", "POST /api/v1/auth/refresh",
+            "POST /api/v1/auth/reset-password", // recovery code + e-mail instead of a token (rate limited)
+            // operators: 404 unless the Ops:ApiKey header matches (constant-time)
+            "GET /ops/metrics", "GET /ops/reports", "GET /ops/crashes", "POST /ops/reports/{id:guid}/decision",
         ];
         var endpoints = _host.App.Services.GetRequiredService<EndpointDataSource>().Endpoints.OfType<RouteEndpoint>().ToList();
         Assert.True(endpoints.Count > 5);
