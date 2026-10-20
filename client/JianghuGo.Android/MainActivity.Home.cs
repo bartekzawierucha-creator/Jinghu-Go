@@ -37,7 +37,7 @@ namespace JianghuGo.Android
             // the vessel and the meditating hero take what is left of the screen
             var charge = new QiChargeView(this);
             ui.AddWeighted(page, charge, 1f, 2);
-            var info = ui.Text(string.Empty, page, 12, Ui.Muted, maxLines: 2);
+            var info = ui.Text(string.Empty, page, 11, Ui.Muted, maxLines: 1);
 
             var actions = ui.HRow(page, 52);
             var meditate = ui.Btn("Medytuj", () => { }, actions, sp: 16, heightDp: 52, icon: "menu_meditate");
@@ -72,14 +72,15 @@ namespace JianghuGo.Android
                 if (id != 0) emblem.SetImageBitmap(Ui.Art(this, id));
                 charge.State = st;
                 charge.Invalidate();
-                var deviation = st.DeviationUntil.HasValue && st.DeviationUntil > DateTimeOffset.UtcNow ? "  ·  odchylenie Qi do " + st.DeviationUntil.Value.ToLocalTime().ToString("HH:mm") : string.Empty;
+                var deviation = st.DeviationUntil.HasValue && st.DeviationUntil > DateTimeOffset.UtcNow ? " · odchylenie do " + st.DeviationUntil.Value.ToLocalTime().ToString("HH:mm") : string.Empty;
                 var rate = st.IsInRetreat ? st.RetreatPerHour : st.IsMeditating ? st.MeditationPerHour : st.FlowPerHour;
-                var mode = st.IsInRetreat ? "Odosobnienie do " + (st.RetreatUntil?.ToLocalTime().ToString("HH:mm") ?? "?") : st.IsMeditating ? "Medytacja ×5" : "Qi płynie samo ×1";
+                var mode = st.IsInRetreat ? "Odosobnienie do " + (st.RetreatUntil?.ToLocalTime().ToString("HH:mm") ?? "?") : st.IsMeditating ? "Medytacja ×5" : "Qi samo ×1";
+                // one line: small screens (Nexus 5) have room for exactly one here
                 info.Text = mode + " · " + Math.Round(rate) + " Qi/h" + (st.WeekendPermille > 1000 ? " · weekend ×" + (st.WeekendPermille / 1000.0).ToString("0.#") : string.Empty)
-                            + " · naczynie " + st.Qi + "/" + st.Vessel +
-                            (st.TribulationRequired ? "\n⚡ Doskonałość — czeka Niebiańska Próba" : st.BottleneckItem != null && !st.IsPeak && st.Stage == 11 ? "\nWąskie gardło: potrzebna pigułka przełomu" :
-                                "\nSzansa przełomu: " + Math.Round(st.BreakthroughChance * 100) + "%") + deviation +
-                            (steps != null ? "   ·   kroki " + st.DailySteps + "/" + st.DailyStepCap : string.Empty);
+                            + " · " + st.Qi + "/" + st.Vessel +
+                            (st.TribulationRequired ? " · czeka Próba Niebios" : st.BottleneckItem != null && !st.IsPeak && st.Stage == 11 ? " · potrzebna pigułka" :
+                                " · przełom " + Math.Round(st.BreakthroughChance * 100) + "%") + deviation +
+                            (steps != null ? " · kroki " + st.DailySteps + "/" + st.DailyStepCap : string.Empty);
                 meditate.Text = st.IsMeditating ? "Zakończ" : "Medytuj";
                 breakthrough.Text = st.TribulationRequired ? "Próba Niebios" : "Przełom";
             }
