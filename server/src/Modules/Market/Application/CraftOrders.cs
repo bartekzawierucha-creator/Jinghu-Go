@@ -74,7 +74,11 @@ public sealed class CraftOrderService(
         {
             var result = await Idempotency.ExecuteAsync(idempotency, uow, clock, accountId, "market.order_place", key, cmd, async Task<Result<CraftOrderView>> () =>
             {
-                var item = catalog.Find(cmd.ItemId);
+                // The item may be named as the player sees it ("Pigułka Qi"): exact name first, then a single partial match.
+                var term = cmd.ItemId?.Trim() ?? string.Empty;
+                var item = catalog.Find(term)
+                    ?? catalog.All.FirstOrDefault(i => string.Equals(i.NamePl, term, StringComparison.OrdinalIgnoreCase))
+                    ?? (catalog.All.Where(i => term.Length >= 3 && i.NamePl.Contains(term, StringComparison.OrdinalIgnoreCase)).ToList() is { Count: 1 } one ? one[0] : null);
                 if (item is not { Stackable: true, Tradable: true }) return Error.Validation("item_not_orderable", "Only tradable stackable items can be ordered.");
                 if (cmd.Quantity < 1 || cmd.Quantity > catalog.MaxStack) return Error.Validation("quantity_invalid", $"Quantity must be 1-{catalog.MaxStack}.");
                 if (cmd.Reward < config.MinPrice || cmd.Reward > config.MaxPrice) return Error.Validation("price_invalid", $"Reward must be {config.MinPrice}-{config.MaxPrice}.");

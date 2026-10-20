@@ -372,10 +372,7 @@ namespace JianghuGo.Android
             reward.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 0.9f) { LeftMargin = Px(4) };
             _ui.Btn("Złóż zamówienie", () => Run(async () =>
             {
-                var term = item.Text?.Trim() ?? string.Empty;
-                var found = await _api.SearchMarketAsync(term, "newest", 1, Ct);
-                var id = found.Items.FirstOrDefault()?.ItemId ?? economy.Inventory.Stacks.FirstOrDefault(s => s.NamePl.IndexOf(term, StringComparison.OrdinalIgnoreCase) >= 0)?.ItemId
-                    ?? term.ToLowerInvariant().Replace(' ', '_');
+                var id = item.Text?.Trim() ?? string.Empty; // the server accepts the item's name
                 long.TryParse(qty.Text, out var q);
                 long.TryParse(reward.Text, out var r);
                 await _api.PlaceCraftOrderAsync(c.Id, id, Math.Max(1, q), r, Ct);
