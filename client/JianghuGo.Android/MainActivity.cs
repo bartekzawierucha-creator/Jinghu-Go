@@ -104,6 +104,9 @@ namespace JianghuGo.Android
             base.OnPause();
             _paused = true;
             Music.Pause();
+            // A break of the app resets the play-time counter.
+            _sessionStarted = null;
+            _restReminders = 0;
             _location.Stop(); // battery: no GPS in the background
             _compass.Stop();
             _steps.Stop();
@@ -115,6 +118,8 @@ namespace JianghuGo.Android
             base.OnResume();
             _paused = false;
             Music.Resume();
+            _sessionStarted ??= DateTimeOffset.UtcNow;
+            ScheduleRestReminder();
             if (_worldOpen)
             {
                 _location.Start();
@@ -178,6 +183,24 @@ namespace JianghuGo.Android
             ShowLogin();
             SetStatus("Sesja wygasła — zaloguj się ponownie.");
         });
+        private DateTimeOffset? _sessionStarted;
+        private int _restReminders;
+
+        /// <summary>Healthy play (2.5): after each full hour in the game, a gentle reminder to rest your eyes and walk.</summary>
+        private void ScheduleRestReminder()
+        {
+            var due = _sessionStarted!.Value.AddHours(_restReminders + 1) - DateTimeOffset.UtcNow;
+            _frame?.PostDelayed(() =>
+            {
+                if (_paused || _sessionStarted is null) return;
+                var hours = (int)Math.Round((DateTimeOffset.UtcNow - _sessionStarted.Value).TotalHours);
+                if (hours < _restReminders + 1) return;
+                _restReminders = hours;
+                SetStatus("Grasz już " + hours + " h — czas na przerwę: odpocznij oczom, przejdź się (kroki też dają Qi).");
+                ScheduleRestReminder();
+            }, (long)Math.Max(60_000, due.TotalMilliseconds));
+        }
+
         /// <summary>(Re)schedules a local reminder when the player has them on (1.9).</summary>
         private void Remind(string key, DateTimeOffset? when, string title, string text)
         {

@@ -34,6 +34,9 @@ namespace JianghuGo.Android
             var server = ui.Field("http://192.168.1.10:8080", value: _prefs.GetString(ServerUrlKey, DefaultServer), parent: body);
             var email = ui.Field("E-mail", parent: body);
             var password = ui.Field("Hasło (co najmniej 10 znaków)", password: true, parent: body);
+            var age = new CheckBox(this) { Text = "Mam ukończone 16 lat (wymagane do założenia konta)" };
+            age.SetTextColor(Ui.Ink);
+            body.AddView(age);
             ui.Box(body, 1f, marginDp: 0);
 
             bool Connect()
@@ -54,6 +57,12 @@ namespace JianghuGo.Android
             ui.Btn("Załóż konto", () => Run(async () =>
             {
                 if (!Connect()) return;
+                if (!age.Checked)
+                {
+                    SetStatus("Gra jest dla osób od 16 lat — potwierdź wiek, aby założyć konto.");
+                    return;
+                }
+
                 await _api.RegisterAsync(email.Text.Trim(), password.Text, Ct);
                 await _api.LoginAsync(email.Text.Trim(), password.Text, Ct);
                 close();
