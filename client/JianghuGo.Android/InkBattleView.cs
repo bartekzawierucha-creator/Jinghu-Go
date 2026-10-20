@@ -831,16 +831,35 @@ namespace JianghuGo.Android
             var lw = plateW - av - 14 * _d;
             var lx = left ? tx : tx - lw;
             var ly = top + av + 4 * _d;
-            _paint.Color = Color.Argb(70, 0, 0, 0);
-            canvas.DrawRect(lx, ly, lx + lw, ly + 3 * _d, _paint);
-            _paint.Color = Color.Rgb(25, 25, 27);
             var hp = f.MaxHp > 0 ? Math.Clamp(f.Hp / (float)f.MaxHp, 0, 1) : 0;
-            canvas.DrawRect(left ? lx : lx + lw * (1 - hp), ly, left ? lx + lw * hp : lx + lw, ly + 3 * _d, _paint);
+            // 2.2: HP is a brush stroke — a pale full stroke, inked as far as the life left (red when it runs low)
+            if (Art("ink_ui_hp_bar") is { } brush)
+            {
+                var bar = new RectF(lx, ly - 3 * _d, lx + lw, ly + 6 * _d);
+                var save = canvas.Save();
+                if (!left) canvas.Scale(-1, 1, bar.CenterX(), bar.CenterY()); // the foe's stroke drains towards the centre too
+                _paint.Alpha = 45;
+                _paint.SetColorFilter(null);
+                canvas.DrawBitmap(brush, null, bar, _paint);
+                canvas.ClipRect(bar.Left, bar.Top, bar.Left + bar.Width() * hp, bar.Bottom);
+                _paint.Alpha = 255;
+                if (hp < 0.3f) _paint.SetColorFilter(new PorterDuffColorFilter(Ui.Cinnabar, PorterDuff.Mode.SrcIn));
+                canvas.DrawBitmap(brush, null, bar, _paint);
+                _paint.SetColorFilter(null);
+                canvas.RestoreToCount(save);
+            }
+            else
+            {
+                _paint.Color = Color.Argb(70, 0, 0, 0);
+                canvas.DrawRect(lx, ly, lx + lw, ly + 3 * _d, _paint);
+                _paint.Color = Color.Rgb(25, 25, 27);
+                canvas.DrawRect(left ? lx : lx + lw * (1 - hp), ly, left ? lx + lw * hp : lx + lw, ly + 3 * _d, _paint);
+            }
             if (f.MaxQi > 0)
             {
                 _paint.Color = Color.Argb(120, 90, 90, 95);
                 var qi = Math.Clamp(f.Qi / (float)f.MaxQi, 0, 1);
-                canvas.DrawRect(left ? lx : lx + lw * (1 - qi), ly + 5 * _d, left ? lx + lw * qi : lx + lw, ly + 7 * _d, _paint);
+                canvas.DrawRect(left ? lx : lx + lw * (1 - qi), ly + 8 * _d, left ? lx + lw * qi : lx + lw, ly + 10 * _d, _paint);
             }
 
             _paint.Color = Color.White;

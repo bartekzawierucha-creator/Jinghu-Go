@@ -140,6 +140,43 @@ namespace JianghuGo.Android
             {
                 if (gen != _screen || board == null) return;
                 daily.RemoveAllViews();
+                // one tap for every reward waiting: the check-in, finished daily quests and achievements
+                var waiting = board.Daily.Count(q => q.Completed && !q.Claimed) + board.Achievements.Count(q => q.Completed && !q.Claimed) + (board.Checkin.CheckedInToday ? 0 : 1);
+                if (waiting >= 2)
+                {
+                    var all = ui.Card(daily, 0.9f, 6, Ui.Cinnabar);
+                    all.Clickable = true;
+                    all.SetGravity(GravityFlags.Center);
+                    ui.Text("Odbierz", all, 12, Ui.Cinnabar, bold: true, center: true);
+                    ui.Text("wszystko (" + waiting + ")", all, 10, Ui.Ink, center: true);
+                    all.Click += (_, __) => Run(async () =>
+                    {
+                        long stones = 0;
+                        var b = board;
+                        if (!b.Checkin.CheckedInToday)
+                        {
+                            var ci = await _api.CheckinAsync(c.Id, Ct);
+                            stones += ci.Stones;
+                            b = ci.Board;
+                            _balance = ci.Balance;
+                        }
+
+                        foreach (var q in b.Daily.Concat(b.Achievements).Where(q => q.Completed && !q.Claimed).ToList())
+                        {
+                            var r = await _api.ClaimQuestAsync(c.Id, q.Id, Ct);
+                            stones += r.Stones;
+                            b = r.Board;
+                            _balance = r.Balance;
+                        }
+
+                        _board = b;
+                        Sfx.Play(Sfx.Coin);
+                        RenderHud();
+                        RenderDaily(b);
+                        ShowBanner("NAGRODY", "Odebrano wszystko", "+" + stones + " kamieni duchowych", "ink_popup_chest");
+                    });
+                }
+
                 foreach (var q in board.Daily)
                 {
                     var card = ui.Card(daily, 1f, 6, q.Completed && !q.Claimed ? Ui.Gold : (Color?)null);
@@ -166,7 +203,7 @@ namespace JianghuGo.Android
                     ui.Text(q.Completed && !q.Claimed ? "Odbierz!" : q.Claimed ? "✓" : "Idź ›  +" + q.Stones, card, 10, q.Completed && !q.Claimed ? Ui.Cinnabar : Ui.Muted, bold: true);
                 }
 
-                if (!board.Checkin.CheckedInToday)
+                if (!board.Checkin.CheckedInToday && waiting < 2) // with "claim all" the check-in goes with it
                 {
                     var seal = ui.Card(daily, 0.8f, 6, Ui.Cinnabar);
                     seal.Clickable = true;

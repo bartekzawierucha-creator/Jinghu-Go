@@ -610,7 +610,8 @@ namespace JianghuGo.Android
             "leader_must_transfer" => "Najpierw przekaż przywództwo.",
             "rate_limited" => "Za dużo prób — odczekaj chwilę.",
             "busy_retry" => "Serwer jest zajęty — spróbuj ponownie.",
-            _ => "Błąd: " + e.Code + (e.CorrelationId != null ? " (" + e.CorrelationId + ")" : string.Empty),
+            _ when e.Code != null && ErrorTexts.Pl.TryGetValue(e.Code, out var pl) => pl,
+            _ => "Nie udało się (" + e.Code + ")" + (e.CorrelationId != null ? " · " + e.CorrelationId : string.Empty),
         };
     }
 }
