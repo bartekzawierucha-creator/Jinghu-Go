@@ -288,6 +288,9 @@ namespace JianghuGo.Client.Application
         public Task<ProfessionsDto> GetProfessionsAsync(Guid characterId, CancellationToken ct) =>
             SendAsync<ProfessionsDto>("GET", "/api/v1/characters/" + characterId + "/crafting/professions", null, true, null, ct);
 
+        public Task<CombatScoutDto> GetCombatScoutAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<CombatScoutDto>("GET", "/api/v1/characters/" + characterId + "/combat/scout", null, true, null, ct);
+
         public Task<CombatCatalogDto> GetCombatCatalogAsync(CancellationToken ct) =>
             SendAsync<CombatCatalogDto>("GET", "/api/v1/combat/catalog", null, true, null, ct);
 

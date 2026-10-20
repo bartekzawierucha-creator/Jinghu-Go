@@ -1613,6 +1613,14 @@ paths:
         "200": { description: OK }
         "404": { $ref: "#/components/responses/Problem" }
         "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/combat/scout:
+    get:
+      tags: [Combat]
+      summary: The character's combat power and every foe scaled to their realm, with what a won battle pays (display only).
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
   /api/v1/characters/{characterId}/combat/hunt:
     get:
       tags: [Combat]

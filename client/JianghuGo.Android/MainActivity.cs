@@ -158,6 +158,8 @@ namespace JianghuGo.Android
         {
             if (CloseTopOverlay()) return;
             if (_back != null) _back();
+            // a dock tab without its own back: return to cultivation first, leave the app only from there
+            else if (_me != null && _tab != TabHome) GoTab(TabHome);
             else base.OnBackPressed();
         }
 #pragma warning restore CS0618, CS0672

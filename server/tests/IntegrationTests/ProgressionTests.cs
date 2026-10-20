@@ -57,6 +57,29 @@ public class ProgressionTests : IAsyncLifetime
         board[list]!.AsArray().Select(q => q!.AsObject()).Single(q => q.Str("id") == id);
 
     [Fact]
+    public async Task Scout_shows_foes_and_the_hero_growing_with_the_realm()
+    {
+        var (p, c) = await NewAsync();
+        var url = $"/api/v1/characters/{c.Str("id")}/combat/scout";
+        long Power(JsonObject s, string npc) => (long)s["foes"]!.AsArray().Select(f => f!.AsObject()).Single(f => f.Str("npcId") == npc)["power"]!;
+
+        var low = await Ok(await p.GetAsync(url));
+        Assert.Equal(0, low.Int("realm"));
+        Assert.True((long)low["myPower"]! > 0);
+        Assert.True(Power(low, "training_dummy") < Power(low, "grey_wolf"));
+        Assert.True(Power(low, "grey_wolf") < Power(low, "blood_demon_lord"));
+
+        await SetCultivationAsync(p, c, 8, 1, 0);
+        var high = await Ok(await p.GetAsync(url));
+        Assert.Equal(8, high.Int("realm"));
+        // the hero grows (realm bonus to every stat) and so does every foe below the realm
+        Assert.True((long)high["myPower"]! > (long)low["myPower"]!);
+        Assert.True(Power(high, "grey_wolf") > Power(low, "grey_wolf") * 2);
+        // the foe keeps its place relative to the hero: a tier-1 wolf stays weaker than the hero at both realms
+        Assert.True(Power(low, "grey_wolf") * 1000 / (long)low["myPower"]! is var a && Power(high, "grey_wolf") * 1000 / (long)high["myPower"]! is var b && Math.Abs(a - b) < 400, $"{a} vs {b}");
+    }
+
+    [Fact]
     public async Task Checkin_pays_once_per_day_and_builds_a_streak()
     {
         var (p, c) = await NewAsync();

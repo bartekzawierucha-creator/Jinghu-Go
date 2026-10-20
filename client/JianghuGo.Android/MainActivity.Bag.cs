@@ -377,6 +377,7 @@ namespace JianghuGo.Android
                 long.TryParse(reward.Text, out var r);
                 await _api.PlaceCraftOrderAsync(c.Id, id, Math.Max(1, q), r, Ct);
                 close();
+                await ShowBagAsync(2);
                 RefreshHud();
                 SetStatus("Zamówienie złożone — nagroda czeka w depozycie.");
             }), body, sp: 13, heightDp: 38);
@@ -390,10 +391,10 @@ namespace JianghuGo.Android
                 _ui.Text(o.OrdererName + (o.Expired ? " · wygasło" : " · do " + o.ExpiresAt.ToLocalTime().ToString("dd.MM")), col, 10, Ui.Muted);
                 var have = economy.Inventory.Count(o.ItemId);
                 if (o.Mine)
-                    _ui.Btn("Anuluj", () => Run(async () => { await _api.CancelCraftOrderAsync(c.Id, o.Id, Ct); close(); RefreshHud(); SetStatus("Zamówienie anulowane, nagroda wróciła."); }),
+                    _ui.Btn("Anuluj", () => Run(async () => { await _api.CancelCraftOrderAsync(c.Id, o.Id, Ct); close(); await ShowBagAsync(2); RefreshHud(); SetStatus("Zamówienie anulowane, nagroda wróciła."); }),
                         r2, secondary: true, sp: 11, heightDp: 34).LayoutParameters = new LinearLayout.LayoutParams(Px(80), Px(34));
                 else if (!o.Expired && have >= o.Quantity)
-                    _ui.Btn("Dostarcz", () => Run(async () => { await _api.FulfilCraftOrderAsync(c.Id, o.Id, Ct); close(); Sfx.Play(Sfx.Coin); RefreshHud(); SetStatus("Dostarczono — nagroda w sakwie."); }),
+                    _ui.Btn("Dostarcz", () => Run(async () => { await _api.FulfilCraftOrderAsync(c.Id, o.Id, Ct); close(); await ShowBagAsync(2); Sfx.Play(Sfx.Coin); RefreshHud(); SetStatus("Dostarczono — nagroda w sakwie."); }),
                         r2, sp: 11, heightDp: 34).LayoutParameters = new LinearLayout.LayoutParams(Px(80), Px(34));
             }, empty: "Brak zamówień.");
         }

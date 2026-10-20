@@ -339,7 +339,8 @@ namespace JianghuGo.Android
                     var r = await _api.SubdueFlameAsync(c.Id, fl.Id, Ct);
                     var combat = new CombatFlow(_api);
                     await combat.OpenAsync(r.BattleId, Ct);
-                    ShowBattle(combat);
+                    // back to the flames page, where the result (a subdued flame) shows
+                    ShowBattle(combat, new BattleOrigin(() => ShowArtsAsync(0)));
                 }), row, sp: 13, heightDp: 44);
             if (fl.State == "owned")
             {
@@ -821,7 +822,7 @@ namespace JianghuGo.Android
                     var r = await _api.FightSectBossAsync(sectId, c.Id, Ct);
                     var combat = new CombatFlow(_api);
                     await combat.OpenAsync(r.BattleId, Ct);
-                    ShowBattle(combat);
+                    ShowBattle(combat, new BattleOrigin(() => ShowSectDevelopmentAsync(flow)));
                 }), br, sp: 11, heightDp: 32).LayoutParameters = new LinearLayout.LayoutParams(Px(96), Px(32));
 
             ui.Text("MISJE TYGODNIA", page, 11, Ui.GoldDim, bold: true);

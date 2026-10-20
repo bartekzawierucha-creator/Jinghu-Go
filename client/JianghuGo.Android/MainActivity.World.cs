@@ -223,7 +223,7 @@ namespace JianghuGo.Android
                         var battle = await _api.ChallengeAsync(c.Id, o.CharacterId, Ct);
                         var combat = new CombatFlow(_api);
                         await combat.OpenAsync(battle.Id, Ct);
-                        ShowBattle(combat);
+                        ShowBattle(combat, new BattleOrigin(() => { GoTab(TabWorld); return Task.CompletedTask; }));
                     }), row, sp: 12, heightDp: 36).LayoutParameters = new LinearLayout.LayoutParams(Px(92), Px(36));
                 }, empty: "Nikogo w promieniu 2 km.");
             };

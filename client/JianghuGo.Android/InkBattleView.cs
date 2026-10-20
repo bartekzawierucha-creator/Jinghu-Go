@@ -16,7 +16,7 @@ namespace JianghuGo.Android
     /// </summary>
     public sealed class InkBattleView : View
     {
-        public const long StepMs = 950;
+        public const long StepMs = 760; // 2.2: faster by default (×1), ×2 and ×3 via BattleClock
 
         // ---- poses: relative height (of the fighter's stance) and the x anchor (feet) in the image -------------------
         private sealed class PoseInfo
@@ -137,7 +137,7 @@ namespace JianghuGo.Android
             _text.SetTypeface(Ui.Display);
             _text.TextAlign = Paint.Align.Center;
             _line.SetStyle(Paint.Style.Stroke);
-            var now = SystemClock.UptimeMillis();
+            var now = BattleClock.Now;
             Rest(_me, now);
             Rest(_foe, now);
         }
@@ -226,7 +226,7 @@ namespace JianghuGo.Android
             Battle = battle;
             if (previous != null && (battle.Turn != previous.Turn || previous.IsActive && !battle.IsActive))
             {
-                var t = SystemClock.UptimeMillis() + 60;
+                var t = BattleClock.Now + 60;
                 Rest(_me, t);
                 Rest(_foe, t);
                 foreach (var e in battle.LastTurnEvents)
@@ -239,7 +239,7 @@ namespace JianghuGo.Android
             else if (previous == null && !battle.IsActive)
             {
                 _endAt = 0;
-                var now = SystemClock.UptimeMillis();
+                var now = BattleClock.Now;
                 Finish(battle, now - 1);
             }
 
@@ -520,7 +520,7 @@ namespace JianghuGo.Android
         {
             base.OnDraw(canvas);
             if (Battle == null || Width == 0) return;
-            var now = SystemClock.UptimeMillis();
+            var now = BattleClock.Now;
             float w = Width, h = Height;
             foreach (var s in _sounds.Where(s => s.At <= now).ToList())
             {

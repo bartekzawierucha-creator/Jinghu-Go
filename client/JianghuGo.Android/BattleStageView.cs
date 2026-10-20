@@ -74,7 +74,7 @@ namespace JianghuGo.Android
     /// </summary>
     public sealed class BattleStageView : View
     {
-        private const long StepMs = 760;
+        public const long StepMs = 600;
         private readonly float _d;
         private readonly Paint _p = new Paint(PaintFlags.AntiAlias);
         private readonly Paint _pixel = new Paint(PaintFlags.FilterBitmap);
@@ -95,7 +95,7 @@ namespace JianghuGo.Android
         private readonly NpcLooks.Look _look;
         private readonly string _kind;
         private readonly Anim _heroAura;
-        private readonly long _born = SystemClock.UptimeMillis();
+        private readonly long _born = BattleClock.Now;
         private long _endAt = -1;
         private bool _endSoundPlayed;
 
@@ -238,7 +238,7 @@ namespace JianghuGo.Android
             Battle = battle;
             if (previous != null && (battle.Turn != previous.Turn || previous.IsActive && !battle.IsActive))
             {
-                var t = SystemClock.UptimeMillis();
+                var t = BattleClock.Now;
                 foreach (var e in battle.LastTurnEvents)
                 {
                     Schedule(e, battle.IsMine(e), t);
@@ -432,7 +432,7 @@ namespace JianghuGo.Android
         {
             base.OnDraw(canvas);
             if (Battle == null || Width == 0) return;
-            var now = SystemClock.UptimeMillis();
+            var now = BattleClock.Now;
             float w = Width, h = Height;
 
             // screen shake (decays over 260 ms per impact)
@@ -650,7 +650,7 @@ namespace JianghuGo.Android
             var top = Math.Max(52 * _d + 30 * _d, y - 20 * _d);
             var x0 = Math.Clamp(x - tw / 2, 4 * _d, Width - tw - 4 * _d);
             var r = new RectF(x0, top, x0 + tw, top + 20 * _d);
-            var pulse = (float)(0.6 + 0.4 * Math.Sin(SystemClock.UptimeMillis() / 220.0));
+            var pulse = (float)(0.6 + 0.4 * Math.Sin(BattleClock.Now / 220.0));
             _p.Color = Color.Argb(215, 10, 8, 8);
             canvas.DrawRoundRect(r, 10 * _d, 10 * _d, _p);
             _p.SetStyle(Paint.Style.Stroke);

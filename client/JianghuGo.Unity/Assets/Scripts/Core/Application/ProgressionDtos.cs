@@ -299,6 +299,22 @@ namespace JianghuGo.Client.Application
         public Dictionary<string, int> ScalingDamagePermille { get; set; }
     }
 
+    /// <summary>The cultivator's combat power and each foe scaled to their realm, with what a win pays (2.2).</summary>
+    public sealed class CombatScoutDto
+    {
+        public int Realm { get; set; }
+        public long MyPower { get; set; }
+        public List<FoeScoutDto> Foes { get; set; } = new List<FoeScoutDto>();
+    }
+
+    public sealed class FoeScoutDto
+    {
+        public string NpcId { get; set; }
+        public long Power { get; set; }
+        public long RewardQi { get; set; }
+        public long RewardStones { get; set; }
+    }
+
     public sealed class CombatCatalogDto
     {
         public List<CombatNpcDto> Npcs { get; set; } = new List<CombatNpcDto>();

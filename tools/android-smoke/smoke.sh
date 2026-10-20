@@ -119,23 +119,23 @@ $UI wait "Trening" 60
 $UI noscroll
 $UI shot shots/06-combat.png
 $UI tap "Drewniany Manekin"
-$UI wait "+Qi" 60
+$UI wait "Prędkość" 60
 $UI noscroll
 $UI shot shots/06b-battle.png
-$UI tap "+Qi" 20
+$UI tap "Prędkość" 20
 sleep 3
 $UI shot shots/06c-battle-turn.png
-$UI tap "Auto" 20
 $UI wait "WYNIK" 180
 sleep 4
 $UI shot shots/06e-auto-result.png
 $UI tap "Zabierz" 15 || $UI tap "Dalej" 15
+$UI wait "Walcz ponownie" 20
 $UI tap "Wyjdź"
 $UI wait "Trening" 30
 for foe in "Kamienny Golem" "Zdrajca Sekty"; do
   $UI paged "$foe" 6 0.45
   $UI tap "$foe"
-  $UI wait "+Qi" 60
+  $UI wait "Poddaj" 60
   sleep 2
   $UI shot "shots/06-$(echo "$foe" | tr ' ' '_').png"
   $UI tap "Poddaj"
@@ -150,22 +150,22 @@ $UI wait "WIEŻA PRÓB" 30
 $UI noscroll
 $UI shot shots/06h-tower.png
 $UI tap "Wejdź na piętro 1"
-$UI wait "+Qi" 60
+$UI wait "Poddaj" 60
 sleep 2
 $UI shot shots/06i-tower-battle.png
-$UI tap "Auto" 20
 $UI wait "WYNIK" 180
 $UI tap "Zabierz" 15 || $UI tap "Dalej" 15
+$UI wait "Następne piętro" 20 || $UI wait "Spróbuj ponownie" 5
+$UI shot shots/06i2-tower-next.png
 $UI tap "Wyjdź"
-$UI wait "Trening" 30
-$UI tap "Wieża"
+$UI wait "WIEŻA PRÓB" 30
 $UI wait "Piętro 1 z 330" 30
 $UI tap "Bossy"
 $UI wait "legowisk" 30
 $UI noscroll
 $UI shot shots/06d-bosses.png
 $UI tap "Atakuj bossa"
-$UI wait "+Qi" 60
+$UI wait "Poddaj" 60
 sleep 3
 $UI shot shots/06j-world-boss.png
 $UI tap "Poddaj"

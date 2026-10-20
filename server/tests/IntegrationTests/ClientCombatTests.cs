@@ -31,6 +31,29 @@ public class ClientCombatTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task Arrange_best_fills_the_loadout_with_the_strongest_unlocked_techniques_and_the_server_accepts_it()
+    {
+        var (api, character) = await PlayerAsync("uklad@test.dev", "qi");
+        var loadout = await api.GetLoadoutAsync(character.Id, default);
+        var best = LoadoutAdvisor.Best(loadout);
+        Assert.Equal(loadout.Slots.Count, best.Count);
+        Assert.Equal(best.Where(x => x != null).Count(), best.Where(x => x != null).Distinct().Count());
+        foreach (var (slot, id) in loadout.Slots.OrderBy(s => s.Slot).Zip(best))
+        {
+            if (id == null) continue;
+            var k = loadout.Known.Single(x => x.Id == id);
+            Assert.False(k.Locked);
+            Assert.Equal(slot.Kind, k.Slot);
+        }
+
+        var saved = await api.SetLoadoutAsync(character.Id, loadout.Version, best, default);
+        static string Text(IEnumerable<string?> ids) => string.Join(",", ids.Select(x => x ?? "-"));
+        Assert.Equal(Text(best), Text(saved.Slots.OrderBy(s => s.Slot).Select(s => s.TechniqueId)));
+        // arranging again changes nothing (stable)
+        Assert.Equal(Text(best), Text(LoadoutAdvisor.Best(saved)));
+    }
+
+    [Fact]
     public async Task Client_fights_a_pve_battle_to_the_end_using_only_slot_intents()
     {
         var (api, character) = await PlayerAsync("walka@test.dev", "flame");

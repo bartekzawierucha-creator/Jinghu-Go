@@ -338,7 +338,7 @@ namespace JianghuGo.Android
                     Run(ShowWorldTabAsync);
                     break;
                 case TabCombat:
-                    Run(() => ShowCombatTabAsync(0));
+                    Run(() => ShowCombatTabAsync(_combatSub));
                     break;
                 case TabHero:
                     Run(() => ShowHeroTabAsync(0));

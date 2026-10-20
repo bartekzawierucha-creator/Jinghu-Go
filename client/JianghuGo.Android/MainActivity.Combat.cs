@@ -13,30 +13,36 @@ namespace JianghuGo.Android
     public sealed partial class MainActivity
     {
         private CombatCatalogDto _catalog;
+        private int _combatSub;
 
         private async Task ShowCombatTabAsync(int tab)
         {
             var c = _me;
+            _combatSub = tab;
             _catalog ??= await _api.GetCombatCatalogAsync(Ct);
             var open = tab == 4 ? (await _api.GetOpenBattlesAsync(c.Id, Ct)).Items : new List<BattleDto>();
             var hunt = tab == 1 ? (await _api.GetHuntAsync(c.Id, Ct)).Hunt : null;
             var tower = tab == 2 ? await _api.GetTowerAsync(c.Id, Ct) : null;
             var boss = tab == 3 ? await _api.GetWorldBossAsync(c.Id, Ct) : null;
             var arena = tab == 5 ? await _api.GetArenaAsync(c.Id, Ct) : null;
+            // 2.2: foes are shown scaled to the hero's realm (power and the real reward), so growth on both sides is visible
+            var scout = tab == 0 || (tab == 1 && hunt == null) ? await _api.GetCombatScoutAsync(c.Id, Ct) : null;
             var ui = NewScreen(null, art: tab == 2 ? Resource.Drawable.arena_tower : Resource.Drawable.arena_courtyard, tab: TabCombat);
             var page = ui.Content;
             ui.Tabs(page, new[] { "Trening", "Łowy", "Wieża", "Bossy", "PvP", "Arena" }, tab, i => Run(() => ShowCombatTabAsync(i)));
 
             if (tab == 0)
             {
-                var npcs = _catalog.Npcs.Where(n => !n.WorldOnly).OrderBy(n => n.Tier).ThenBy(n => n.RewardQi).ToList();
+                var npcs = TrainingFoes(scout);
+                ui.Text("Twoja moc: " + scout.MyPower.ToString("N0") + "  ·  wrogowie rosną razem z tobą", page, 12, Ui.Ink, bold: true, center: true);
                 ui.Pages(page, npcs.Count, 2, 2, (i, cell) =>
                 {
                     var n = npcs[i];
-                    ui.TileIn(cell, n.NamePl, new string('★', Math.Clamp(n.Tier, 1, 5)) + (n.Tameable ? "  🐾" : string.Empty) + "  ·  +" + n.RewardQi + " Qi",
-                        NpcLooks.For(n.Id).TileArt, () => Run(() => StartTrainingAsync(n.Id)), pixelArt: true, accent: n.Tier >= 3 ? Ui.Violet : Ui.Cinnabar, titleSp: 13);
+                    var (line, color) = FoeLine(n, scout);
+                    ui.TileIn(cell, n.NamePl, line + (n.Tameable ? "  🐾" : string.Empty),
+                        NpcLooks.For(n.Id).TileArt, () => Run(() => StartTrainingAsync(n.Id)), pixelArt: true, accent: color, titleSp: 13);
                 });
-                ui.Text("★ zagrożenie  ·  🐾 można oswoić po zwycięstwie", page, 11, Ui.Muted, center: true);
+                ui.Text("Moc wroga przy twoim królestwie  ·  🐾 można oswoić", page, 11, Ui.Muted, center: true);
             }
             else if (tab == 1)
             {
@@ -96,6 +102,23 @@ namespace JianghuGo.Android
                     }), row, sp: 12, heightDp: 38).LayoutParameters = new LinearLayout.LayoutParams(Px(96), Px(38)) { Gravity = GravityFlags.CenterVertical };
                 }, empty: "Brak trwających walk.");
             }
+        }
+
+        /// <summary>Training foes, weakest first by their power at the hero's realm.</summary>
+        private List<CombatNpcDto> TrainingFoes(CombatScoutDto scout)
+        {
+            var power = scout.Foes.ToDictionary(f => f.NpcId, f => f.Power);
+            return _catalog.Npcs.Where(n => !n.WorldOnly).OrderBy(n => power.GetValueOrDefault(n.Id)).ToList();
+        }
+
+        /// <summary>"Moc 951 · +40 Qi" and a colour from easy (jade) to deadly (red) by power against the hero's.</summary>
+        private static (string Line, Color Color) FoeLine(CombatNpcDto n, CombatScoutDto scout)
+        {
+            var f = scout.Foes.FirstOrDefault(x => x.NpcId == n.Id);
+            if (f == null) return (new string('★', Math.Clamp(n.Tier, 1, 5)), Ui.Cinnabar);
+            var ratio = scout.MyPower > 0 ? f.Power * 100 / scout.MyPower : 100;
+            var (label, color) = ratio < 80 ? ("łatwy", Ui.Jade) : ratio <= 115 ? ("równy", Ui.QiBlue) : ratio <= 160 ? ("trudny", Ui.Violet) : ("zabójczy", Ui.Cinnabar);
+            return ("Moc " + f.Power.ToString("N0") + " · " + label + " · +" + f.RewardQi + " Qi", color);
         }
 
         /// <summary>Codex (2.3): every species, revealed once defeated, with the number of victories.</summary>
@@ -162,17 +185,18 @@ namespace JianghuGo.Android
             if (hunt == null)
             {
                 ui.Text("Wybierz przeciwnika: twoja postać walczy sama co 5 min przez 4 h — także przy zamkniętej grze. Nagrody wliczają się do dziennego limitu.", page, 12, Ui.Muted, center: true, maxLines: 3);
-                var npcs = _catalog.Npcs.Where(n => !n.WorldOnly).OrderBy(n => n.Tier).ThenBy(n => n.RewardQi).ToList();
+                var npcs = TrainingFoes(scout);
                 ui.Pages(page, npcs.Count, 2, 2, (i, cell) =>
                 {
                     var n = npcs[i];
-                    ui.TileIn(cell, n.NamePl, new string('★', Math.Clamp(n.Tier, 1, 5)) + "  ·  +" + n.RewardQi + " Qi / wygrana", NpcLooks.For(n.Id).TileArt, () => Run(async () =>
+                    var (line, color) = FoeLine(n, scout);
+                    ui.TileIn(cell, n.NamePl, line, NpcLooks.For(n.Id).TileArt, () => Run(async () =>
                     {
                         await _api.StartHuntAsync(c.Id, n.Id, Ct);
                         Sfx.Play(Sfx.Chime);
                         await ShowCombatTabAsync(1);
                         SetStatus("Polowanie rozpoczęte. Wróć później po łupy.");
-                    }), pixelArt: true, accent: Ui.Jade, titleSp: 13);
+                    }), pixelArt: true, accent: color, titleSp: 13);
                 });
                 return;
             }
@@ -341,13 +365,40 @@ namespace JianghuGo.Android
             ShowBattle(combat);
         }
 
-        // ---- the duel -----------------------------------------------------------------------------------------
+        // ---- the duel ---------------------------------------------------------------------------------------------
 
-        private void ShowBattle(CombatFlow combat)
+        /// <summary>Where a fight returns to and how to fight again (tower: next floor, training: the same foe...).</summary>
+        private sealed record BattleOrigin(Func<Task> Back, Func<BattleDto, (string Label, Func<Task> Run)?> Again = null);
+
+        private const string SpeedPref = "jianghu.battle_speed";
+
+        /// <summary>Default origin by battle kind, for fights started from the combat tabs.</summary>
+        private BattleOrigin OriginFor(BattleDto b) => b.Kind switch
+        {
+            "tower" => new BattleOrigin(() => ShowCombatTabAsync(2), r => r.Result == "won"
+                ? ("Następne piętro", StartTowerAsync) : ("Spróbuj ponownie", StartTowerAsync)),
+            "boss" => new BattleOrigin(() => ShowCombatTabAsync(3), _ => ("Atakuj ponownie", () => StartOrResumeAsync(() => _api.StartWorldBossAsync(_me.Id, Ct)))),
+            "arena" => new BattleOrigin(() => ShowCombatTabAsync(5), _ => ("Następny rywal", () => ShowCombatTabAsync(5))),
+            "pvp" => new BattleOrigin(() => ShowCombatTabAsync(4)),
+            "tribulation" => new BattleOrigin(() => { GoTab(TabHome); return Task.CompletedTask; }),
+            "spirit" => new BattleOrigin(() => { GoTab(TabWorld); return Task.CompletedTask; }),
+            _ when b.NpcId != null && _catalog?.Npcs.FirstOrDefault(n => n.Id == b.NpcId) is { WorldOnly: false } =>
+                new BattleOrigin(() => ShowCombatTabAsync(0), _ => ("Walcz ponownie", () => StartTrainingAsync(b.NpcId))),
+            // lairs and wandering beasts live in the world: go back to the map
+            _ when b.NpcId != null => new BattleOrigin(() => { GoTab(TabWorld); return Task.CompletedTask; }),
+            _ => new BattleOrigin(() => ShowCombatTabAsync(_combatSub)),
+        };
+
+        /// <summary>
+        /// The fight: always automatic (the server plays each turn with the same AI as the enemies), ×1/×2/×3 speed,
+        /// and when it ends the screen offers the obvious next step (next floor, fight again) and the way back.
+        /// </summary>
+        private void ShowBattle(CombatFlow combat, BattleOrigin origin = null)
         {
             var c = _me;
+            origin ??= OriginFor(combat.Battle);
             var title = combat.Battle.Kind == "tower" ? "Wieża Prób" : combat.Battle.Kind == "boss" ? "Boss Świata" : "Pojedynek";
-            var ui = NewScreen(title, () => GoTab(TabCombat), subtitle: combat.Battle.Opponent.Name.ToUpperInvariant(), chrome: false);
+            var ui = NewScreen(title, () => Run(origin.Back), subtitle: combat.Battle.Opponent.Name.ToUpperInvariant(), chrome: false);
             var page = ui.Content;
             var gen = _screen;
             var npc = combat.Battle.Kind == "pvp" ? "pvp" : combat.Battle.NpcId;
@@ -355,86 +406,22 @@ namespace JianghuGo.Android
             var ink = InkBattleView.Supports(npc, combat.Battle.Kind) ? new InkBattleView(this, npc, c.Path, combat.Battle.Kind, combat.Battle.Opponent?.Name) : null;
             var classic = ink == null ? new BattleStageView(this, npc, c.Path, combat.Battle.Kind, combat.Battle.Opponent?.Name) : null;
             ui.AddWeighted(page, (View)ink ?? classic, 1f, 0);
-            var stepMs = ink != null ? InkBattleView.StepMs : 760;
+            var stepMs = ink != null ? InkBattleView.StepMs : BattleStageView.StepMs;
             var ticker = ui.Text(string.Empty, page, 12, Ui.Ink, maxLines: 2);
-            var buttons = new List<View>();
             var rewardShown = combat.Battle.Status == "finished";
+            BattleClock.Speed = Math.Clamp(_prefs.GetInt(SpeedPref, 1), 1, 3);
 
-            string TechIcon(CombatSlotDto slot) =>
-                slot.TechniqueId != null && ui.ArtId("tech_" + slot.TechniqueId) != 0 ? "tech_" + slot.TechniqueId
-                : slot.Kind == "attack" ? "tech_custom_attack" : slot.Kind == "special" ? "tech_custom_movement" : "tech_custom_defense";
-
-            void Act(int? slot, string direction) => Run(async () =>
+            // during the fight: speed, forfeit, leave; after it: fight again / next floor, back
+            var controls = ui.HRow(page, 46, 6);
+            Button speed = null;
+            speed = ui.Btn("Prędkość ×" + (int)BattleClock.Speed, () =>
             {
-                if (!await combat.ActAsync(slot, direction, Ct)) SetStatus("Tura już minęła — odświeżono.");
-                if (gen == _screen) Render();
-            });
-
-            // 8 slots as a 4×2 grid (slot 7 = the special skill)
-            var slots = combat.Battle.MySlots.OrderBy(s => s.Slot).ToList();
-            for (var r = 0; r < 2; r++)
-            {
-                var row = ui.HRow(page, 64, 4);
-                for (var k = 0; k < 4; k++)
-                {
-                    var idx = r * 4 + k;
-                    if (idx >= slots.Count || slots[idx].TechniqueId == null)
-                    {
-                        var empty = new View(this);
-                        row.AddView(empty, new LinearLayout.LayoutParams(0, Px(64), 1f) { LeftMargin = k > 0 ? Px(6) : 0 });
-                        continue;
-                    }
-
-                    var slot = slots[idx];
-                    var cost = slot.QiCost > 0 ? slot.QiCost + " Qi" : null;
-                    var b = ui.SkillTile(row, TechIcon(slot), (slot.Kind == "special" ? "★ " : string.Empty) + slot.NamePl, cost, slot.Kind is "attack" or "special", () => Act(slot.Slot, null), 64);
-                    b.Tag = slot.Slot;
-                    buttons.Add(b);
-                }
-            }
-
-            var controls = ui.HRow(page, 42, 6);
-            buttons.Add(ui.Btn("+Qi", () => Act(null, null), controls, secondary: true, sp: 13, heightDp: 42));
-            // Auto-battle: the server plays each turn for the player (same AI as the enemies); tap again to take over.
-            var auto = false;
-            Button autoBtn = null;
-            autoBtn = ui.Btn("▶ Auto", () =>
-            {
-                auto = !auto;
-                autoBtn.Text = auto ? "⏸ Auto" : "▶ Auto";
+                var next = (int)BattleClock.Speed % 3 + 1;
+                BattleClock.Speed = next;
+                _prefs.Edit().PutInt(SpeedPref, next).Apply();
+                speed.Text = "Prędkość ×" + next;
                 Sfx.Play(Sfx.Click);
-                if (auto) AutoLoop();
-            }, controls, secondary: true, sp: 12, heightDp: 42);
-            autoBtn.LayoutParameters = new LinearLayout.LayoutParams(Px(74), Px(42)) { LeftMargin = Px(6) };
-
-            async void AutoLoop()
-            {
-                while (auto && gen == _screen && combat.Battle.IsActive && !_lifetime.IsCancellationRequested)
-                {
-                    try
-                    {
-                        if (!combat.Battle.MyActionSubmitted && !_paused)
-                        {
-                            await combat.AutoAsync(Ct);
-                            if (gen == _screen) Render();
-                        }
-
-                        await Task.Delay((int)Math.Max(1200, combat.Battle.LastTurnEvents.Count * stepMs + 900), Ct);
-                    }
-                    catch (System.OperationCanceledException)
-                    {
-                        return;
-                    }
-                    catch (ApiException e)
-                    {
-                        if (gen == _screen) SetStatus(Describe(e));
-                        auto = false;
-                    }
-                }
-
-                auto = false;
-                if (gen == _screen) autoBtn.Text = "▶ Auto";
-            }
+            }, controls, secondary: true, sp: 13, heightDp: 46);
             var confirmForfeit = false;
             Button forfeit = null;
             forfeit = ui.Btn("Poddaj", () =>
@@ -452,9 +439,59 @@ namespace JianghuGo.Android
                     await combat.ForfeitAsync(Ct);
                     if (gen == _screen) Render();
                 });
-            }, controls, secondary: true, sp: 12, heightDp: 42);
-            buttons.Add(forfeit);
-            ui.Btn("Wyjdź", () => GoTab(TabCombat), controls, secondary: true, sp: 12, heightDp: 42);
+            }, controls, secondary: true, sp: 12, heightDp: 46);
+            var again = ui.Btn("Walcz ponownie", () => { }, controls, sp: 13, heightDp: 46);
+            again.Visibility = ViewStates.Gone;
+            ui.Btn("Wyjdź", () => Run(origin.Back), controls, secondary: true, sp: 12, heightDp: 46);
+            Func<Task> againRun = null;
+            again.Click += (_, __) =>
+            {
+                if (againRun != null) Run(againRun);
+            };
+
+            // the fight plays itself: one server turn, then wait for its animation, at the chosen speed
+            async void AutoLoop()
+            {
+                while (gen == _screen && (combat.Battle.IsActive || combat.Battle.Status == "pending_acceptance") && !_lifetime.IsCancellationRequested)
+                {
+                    try
+                    {
+                        if (combat.Battle.IsActive && !combat.Battle.MyActionSubmitted && !_paused)
+                        {
+                            await combat.AutoAsync(Ct);
+                            if (gen == _screen) Render();
+                            await Task.Delay(BattleClock.Real(Math.Max(700, combat.Battle.LastTurnEvents.Count * stepMs + 450)), Ct);
+                        }
+                        else
+                        {
+                            // PvP: the other side acts on their phone; just poll
+                            await Task.Delay(TimeSpan.FromSeconds(combat.Battle.Kind == "pvp" ? 3 : 1), Ct);
+                            if (gen != _screen || _paused) continue;
+                            if (combat.Battle.Kind == "pvp")
+                            {
+                                await combat.RefreshAsync(Ct);
+                                if (gen == _screen) Render();
+                            }
+                        }
+                    }
+                    catch (System.OperationCanceledException)
+                    {
+                        return;
+                    }
+                    catch (ApiException e)
+                    {
+                        if (e.Code == "action_already_submitted" || e.Code == "turn_mismatch")
+                        {
+                            try { await combat.RefreshAsync(Ct); } catch (ApiException) { }
+                            if (gen == _screen) Render();
+                            continue;
+                        }
+
+                        if (gen == _screen) SetStatus(Describe(e));
+                        return;
+                    }
+                }
+            }
 
             void Render()
             {
@@ -464,73 +501,40 @@ namespace JianghuGo.Android
                 ticker.Text = b.Status == "pending_acceptance" ? "Czekasz, aż przeciwnik przyjmie wyzwanie…"
                     : b.Status == "declined" ? "Przeciwnik odrzucił wyzwanie." : b.Status == "expired" ? "Wyzwanie wygasło."
                     : !b.IsActive ? "WYNIK: " + ResultName(b) + (b.RewardQi > 0 ? "  (+" + b.RewardQi + " Qi)" : string.Empty)
-                    : b.OpponentIntent != null ? IntentHint(b.OpponentIntent)
-                    : b.LastTurnEvents.Count == 0 ? "Tura " + b.Turn + " · Qi " + b.Me.Qi + "/" + b.Me.MaxQi + ". Przeciwnicy mierzą się wzrokiem."
+                    : b.LastTurnEvents.Count == 0 ? "Tura " + b.Turn + " · przeciwnicy mierzą się wzrokiem…"
                     : "Tura " + b.Turn + " · " + string.Join("  ·  ", b.LastTurnEvents.Select(e =>
                         (b.IsMine(e) ? "Ty" : "Wróg") + ": " + ActionName(e.Action) + (e.Hit == true ? " " + e.Damage : e.Hit == false ? " pudło" : string.Empty)
                         + (e.Healed > 0 ? " +" + e.Healed + " HP" : string.Empty)));
-                foreach (var button in buttons)
-                {
-                    var on = b.IsActive && !b.MyActionSubmitted;
-                    if (on && button.Tag != null)
-                    {
-                        var s = b.MySlots.FirstOrDefault(x => x.Slot == (int)button.Tag);
-                        on = s != null && s.Unavailable == null;
-                    }
-
-                    button.Enabled = on;
-                    button.Alpha = on ? 1f : 0.4f;
-                }
+                forfeit.Visibility = b.IsActive ? ViewStates.Visible : ViewStates.Gone;
+                speed.Visibility = b.IsActive || b.Status == "pending_acceptance" ? ViewStates.Visible : ViewStates.Gone;
 
                 if (!rewardShown && !b.IsActive && b.Status == "finished")
                 {
                     rewardShown = true;
                     var won = b.Result == "won";
                     var shownGen = _screen;
+                    var next = origin.Again?.Invoke(b);
                     _frame.PostDelayed(() =>
                     {
                         if (shownGen != _screen) return;
-                        if (won) ShowLoot("Zwycięstwo!", b.RewardQi, new List<(string, long)>(), b.TamedPetNpcId);
+                        if (next is { } n)
+                        {
+                            again.Text = n.Label;
+                            againRun = n.Run;
+                            again.Visibility = ViewStates.Visible;
+                            Juice.Pop(again);
+                        }
+
+                        if (won && b.RewardQi == 0 && b.Kind == "pve" && b.TamedPetNpcId == null)
+                            ShowBanner("ZWYCIĘSTWO", "Przeciwnik: " + b.Opponent.Name, "Dzisiejsze nagrody z treningu wyczerpane (20 wygranych) — Qi wróci jutro. Wieża i boss świata płacą dalej.", "menu_battle");
+                        else if (won) ShowLoot("Zwycięstwo!", b.RewardQi, new List<(string, long)>(), b.TamedPetNpcId);
                         else ShowBanner(b.Result == "draw" ? "REMIS" : "PORAŻKA", "Przeciwnik: " + b.Opponent.Name, "Trenuj meridiany i techniki, wróć silniejszy.", "menu_battle");
                         RefreshHud();
-                    }, b.LastTurnEvents.Count * 760 + 1500);
+                    }, BattleClock.Real(b.LastTurnEvents.Count * stepMs + 1200));
                 }
             }
 
-            static string IntentHint(IntentPreviewDto i) => i.Action switch
-            {
-                "attack" => "Wróg szykuje atak" + (i.NamePl != null ? " (" + i.NamePl + ")" : string.Empty) + ". Garda lub kontra go osłabi.",
-                "special" => "Wróg szykuje umiejętność specjalną" + (i.NamePl != null ? " (" + i.NamePl + ")" : string.Empty) + ". Osłoń się!",
-                "defend" => "Wróg się osłania. Zbierz Qi albo przygotuj mocny cios.",
-                "counter" => "Wróg czeka z kontrą. Nie atakuj teraz, odpocznij lub się osłoń.",
-                "stunned" => "Wróg jest ogłuszony. Uderz z całej siły!",
-                _ => "Wróg odpoczywa. Okazja do ataku!",
-            };
-
-            // PvP: the other player acts on their own phone, so poll while waiting
-            async void Poll()
-            {
-                while (gen == _screen && combat.Battle.Kind == "pvp" && (combat.Battle.Status == "pending_acceptance" || combat.Battle.IsActive))
-                {
-                    try
-                    {
-                        await Task.Delay(TimeSpan.FromSeconds(3), Ct);
-                        if (gen != _screen || _paused) continue;
-                        await combat.RefreshAsync(Ct);
-                        if (gen == _screen) Render();
-                    }
-                    catch (System.OperationCanceledException)
-                    {
-                        return;
-                    }
-                    catch (ApiException)
-                    {
-                        // keep polling; the next refresh may succeed
-                    }
-                }
-            }
-
-            Poll();
+            AutoLoop();
             Render();
         }
     }

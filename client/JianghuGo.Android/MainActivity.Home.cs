@@ -181,6 +181,8 @@ namespace JianghuGo.Android
 
         private Task ShowQuestsAsync() => ShowQuestsAsync(0);
 
+        private int _questPage;
+
         private async Task ShowQuestsAsync(int tab)
         {
             var c = _me;
@@ -194,8 +196,11 @@ namespace JianghuGo.Android
                 badges: new[] { board.Daily.Count(q => q.Completed && !q.Claimed) + (board.Checkin.CheckedInToday ? 0 : 1), claimableAch,
                     0, storyReady + board.Seasonal.Count(q => q.Completed && !q.Claimed) + WeeklyClaimable(board.Weekly), board.Pass?.Claimable ?? 0 });
 
+            Pager listPager = null;
             async Task Claim(QuestDto q)
             {
+                // stay on the same page of the list after claiming
+                _questPage = listPager?.Page ?? 0;
                 var r = await _api.ClaimQuestAsync(c.Id, q.Id, Ct);
                 Sfx.Play(Sfx.Coin);
                 _board = r.Board;
@@ -253,7 +258,8 @@ namespace JianghuGo.Android
                 var list = board.Achievements.OrderBy(a => a.Claimed).ThenByDescending(a => a.Completed).ThenBy(a => a.Secret)
                     .ThenByDescending(a => a.Progress / (double)Math.Max(1, a.Target)).ToList();
                 ui.Text("Tajne osiągnięcia: " + board.SecretsFound + " / " + board.SecretsTotal + " — zagadki podpowiadają, czego szukać.", page, 11, Ui.Violet, center: true);
-                ui.Pages(page, list.Count, 1, 4, (i, cell) => QuestCard(cell, list[i], true));
+                listPager = ui.Pages(page, list.Count, 1, 4, (i, cell) => QuestCard(cell, list[i], true), startPage: Math.Min(_questPage, Math.Max(0, (list.Count - 1) / 4)));
+                _questPage = 0;
             }
             else if (tab == 2)
             {

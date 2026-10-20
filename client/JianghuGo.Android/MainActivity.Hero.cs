@@ -242,7 +242,15 @@ namespace JianghuGo.Android
             var loadout = await _api.GetLoadoutAsync(c.Id, Ct);
             var ui = HeroScreen(2, Resource.Drawable.bg_meditation);
             var page = ui.Content;
-            ui.Text("4 ataki · 2 obrony · specjalna · kontra. Dotknij slotu, by zmienić.", page, 11, Ui.Muted, center: true);
+            ui.Text("Walka toczy się sama — postać używa tych technik. Dotknij slotu, by zmienić.", page, 11, Ui.Muted, center: true, maxLines: 2);
+            ui.Btn("Ułóż najlepsze", () => Run(async () =>
+            {
+                var best = LoadoutAdvisor.Best(loadout);
+                await _api.SetLoadoutAsync(c.Id, loadout.Version, best, Ct);
+                Sfx.Play(Sfx.Chime, 0.6f);
+                await ShowTechniquesAsync();
+                SetStatus("Ułożono najsilniejsze odblokowane techniki.");
+            }), page, sp: 13, heightDp: 40, icon: "menu_daolab");
             var slots = loadout.Slots.OrderBy(s => s.Slot).ToList();
             var grid = ui.Pages(page, slots.Count, 2, 4, (i, cell) =>
             {
@@ -390,7 +398,7 @@ namespace JianghuGo.Android
                 ui.Text("Nie masz jeszcze towarzysza.", card, 17, Ui.Gold, bold: true, center: true);
                 ui.Text("Pokonaj bestię oznaczoną 🐾 — w treningu lub w świecie. Po zwycięstwie jest szansa (wyższa z Losem), że pójdzie za tobą. Towarzysz rośnie z każdą wygraną i dodaje część swoich cech do twoich w walce.",
                     card, 13, Ui.Ink, center: true, maxLines: 6);
-                ui.Btn("Do treningu", () => GoTab(TabCombat), page, sp: 14, heightDp: 46);
+                ui.Btn("Do treningu", () => { _combatSub = 0; GoTab(TabCombat); }, page, sp: 14, heightDp: 46);
                 return;
             }
 
