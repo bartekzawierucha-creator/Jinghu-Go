@@ -80,7 +80,8 @@ $UI tap "Dalej" 20
 $UI noscroll
 $UI shot shots/04b-quests.png
 $UI tap "Osiągnięcia"
-$UI wait "Pierwsza krew" 30
+$UI wait "Tajne osiągnięcia" 30
+$UI paged "Pierwsza krew" 8   # list order follows progress, so it may sit on a later page
 $UI shot shots/04c-achievements.png
 $UI tap "Tytuły"
 $UI wait "Nad postacią" 30
