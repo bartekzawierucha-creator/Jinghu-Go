@@ -200,17 +200,24 @@ namespace JianghuGo.Android
         {
             var tile = new LinearLayout(_ctx) { Orientation = Orientation.Vertical, Clickable = true, Focusable = true };
             tile.SetGravity(GravityFlags.Center);
-            tile.Background = ButtonBackground(!primary);
+            tile.Background = ButtonBackground(true); // paper tile; attacks are marked by the red plate
             tile.SetPadding(Dp(2), Dp(3), Dp(2), Dp(2));
+            // the technique glyph sits on a round stone plate (red brush rim for attacks and the special)
+            var disc = new FrameLayout(_ctx);
+            var plate = new ImageView(_ctx);
+            plate.SetImageBitmap(Art(_ctx, primary ? Resource.Drawable.ink_ui_tech_plate_ready : Resource.Drawable.ink_ui_tech_plate));
+            plate.SetScaleType(ImageView.ScaleType.FitCenter);
+            disc.AddView(plate, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
             var img = new ImageView(_ctx);
             var id = ArtId(icon);
             if (id != 0) img.SetImageBitmap(Art(_ctx, id));
             img.SetScaleType(ImageView.ScaleType.FitCenter);
-            tile.AddView(img, new LinearLayout.LayoutParams(Dp(26), Dp(26)));
+            disc.AddView(img, new FrameLayout.LayoutParams(Dp(24), Dp(24), GravityFlags.Center));
+            tile.AddView(disc, new LinearLayout.LayoutParams(Dp(30), Dp(30)));
             // the full technique name: two lines, shrinking to fit instead of being cut off
             var t = new TextView(_ctx) { Text = name, Gravity = GravityFlags.Center };
             t.SetTypeface(Typeface.Create("sans-serif-medium", TypefaceStyle.Normal), TypefaceStyle.Normal);
-            t.SetTextColor(primary ? Ink : Gold);
+            t.SetTextColor(Ink);
             t.SetMaxLines(2);
             t.SetIncludeFontPadding(false);
             t.SetLineSpacing(0, 0.9f);

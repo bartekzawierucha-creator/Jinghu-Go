@@ -24,13 +24,18 @@ namespace JianghuGo.Android
         private readonly Paint _text = new Paint(PaintFlags.AntiAlias);
         private readonly Dictionary<string, Bitmap> _icons = new Dictionary<string, Bitmap>();
         private readonly Bitmap _empty;
+        private readonly Bitmap _slot;
+        private readonly Bitmap _figure;
         private readonly Dictionary<string, RectF> _hit = new Dictionary<string, RectF>();
 
         public HeroDollView(Context ctx) : base(ctx)
         {
             _d = ctx.Resources.DisplayMetrics.Density;
             _idle = HeroArt.Load(ctx, HeroArt.CurrentPath, "idle", 7, true);
-            _empty = Ui.Art(ctx, Resource.Drawable.item_slot_empty);
+            _empty = null;
+            _slot = Ui.Art(ctx, Resource.Drawable.ink_ui_slot_empty);
+            var fig = ctx.Resources.GetIdentifier("ink_hero_full_" + HeroArt.Normalize(HeroArt.CurrentPath), "drawable", ctx.PackageName);
+            _figure = fig != 0 ? Ui.Art(ctx, fig) : null;
             _text.SetTypeface(Ui.Display);
             _text.TextAlign = Paint.Align.Center;
             _text.SetShadowLayer(3, 0, 1, Color.Argb(170, 250, 247, 240));
@@ -70,15 +75,27 @@ namespace JianghuGo.Android
             var now = SystemClock.UptimeMillis();
             float w = Width, h = Height, cx = w / 2;
 
-            // pedestal glow and the hero
-            _p.SetShader(new RadialGradient(cx, h * 0.55f, w * 0.38f, new int[] { Color.Argb(110, 212, 175, 96).ToArgb(), Color.Argb(0, 212, 175, 96).ToArgb() }, null, Shader.TileMode.Clamp));
-            canvas.DrawCircle(cx, h * 0.55f, w * 0.38f, _p);
+            // an ink-wash shadow under the feet and the painted hero, breathing slowly
+            var ground = h * 0.97f;
+            _p.SetShader(new RadialGradient(cx, ground, w * 0.3f, new int[] { Color.Argb(90, 40, 40, 38).ToArgb(), Color.Argb(0, 40, 40, 38).ToArgb() }, null, Shader.TileMode.Clamp));
+            canvas.Save();
+            canvas.Scale(1f, 0.16f, cx, ground);
+            canvas.DrawCircle(cx, ground, w * 0.3f, _p);
+            canvas.Restore();
             _p.SetShader(null);
-            var cellH = h * 0.92f;
-            var cellW = cellH * 320f / 256f;
-            var foot = cellH * 246f / 256f;
-            var ground = h * 0.96f;
-            canvas.DrawBitmap(_idle.Strip, _idle.Frame(now), new RectF(cx - cellW / 2, ground - foot, cx + cellW / 2, ground - foot + cellH), _art);
+            if (_figure != null)
+            {
+                var fh = h * 0.95f * (1f + 0.008f * (float)Math.Sin(now / 800.0));
+                var fw = fh * _figure.Width / _figure.Height;
+                canvas.DrawBitmap(_figure, null, new RectF(cx - fw / 2, ground - fh, cx + fw / 2, ground), _art);
+            }
+            else
+            {
+                var cellH = h * 0.92f;
+                var cellW = cellH * 320f / 256f;
+                var foot = cellH * 246f / 256f;
+                canvas.DrawBitmap(_idle.Strip, _idle.Frame(now), new RectF(cx - cellW / 2, ground - foot, cx + cellW / 2, ground - foot + cellH), _art);
+            }
 
             // slots: weapon & ring right/left of the hands, talisman at the neck, robe at the chest, treasure at the feet
             var size = Math.Min(64 * _d, w * 0.19f);
@@ -102,22 +119,16 @@ namespace JianghuGo.Android
                 _p.Color = Color.Argb(90, rarity.R, rarity.G, rarity.B);
                 _p.StrokeWidth = 1.2f * _d;
                 canvas.DrawLine(x, y, cx + (x - cx) * 0.25f, y, _p);
-                _p.Color = Color.Argb(230, 244, 240, 231);
-                canvas.DrawRoundRect(rect, 10 * _d, 10 * _d, _p);
-                var icon = IconFor(item);
-                if (icon != null) canvas.DrawBitmap(icon, null, new RectF(rect.Left + 5 * _d, rect.Top + 5 * _d, rect.Right - 5 * _d, rect.Bottom - 5 * _d), _art);
-                else
+                // brush-stroke square on paper; the item sits inside, its rarity as a short coloured stroke below
+                canvas.DrawBitmap(_slot, null, rect, _art);
+                var icon = item == null ? null : IconFor(item);
+                var pad = size * 0.2f;
+                if (icon != null) canvas.DrawBitmap(icon, null, new RectF(rect.Left + pad, rect.Top + pad, rect.Right - pad, rect.Bottom - pad), _art);
+                if (item != null)
                 {
-                    _text.TextSize = 22 * _d;
-                    _text.Color = rarity;
-                    canvas.DrawText("✦", x, y + 8 * _d, _text);
+                    _p.Color = rarity;
+                    canvas.DrawRect(x - size * 0.3f, rect.Bottom - 1 * _d, x + size * 0.3f, rect.Bottom + 2 * _d, _p);
                 }
-
-                _p.SetStyle(Paint.Style.Stroke);
-                _p.StrokeWidth = (item == null ? 1.2f : 2.2f) * _d;
-                _p.Color = rarity;
-                canvas.DrawRoundRect(rect, 10 * _d, 10 * _d, _p);
-                _p.SetStyle(Paint.Style.Fill);
                 _text.TextSize = 10 * _d;
                 _text.Color = item == null ? Ui.Muted : Ui.Ink;
                 canvas.DrawText(item == null ? SlotName(slot) : item.NamePl + (item.UpgradeLevel > 0 ? " +" + item.UpgradeLevel : string.Empty), x, rect.Bottom + 12 * _d, _text);
