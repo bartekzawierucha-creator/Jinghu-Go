@@ -38,7 +38,7 @@ namespace JianghuGo.Android
                 ui.Text((ms.Master != null ? "Mistrz: " + ms.Master.Name + " (+5% obrażeń i gardy)" : string.Empty)
                     + (ms.Disciples.Count > 0 ? (ms.Master != null ? " · " : string.Empty) + "Uczniowie: " + string.Join(", ", ms.Disciples.Select(d => d.Name + " (" + (d.Realm + 1) + ")")) : string.Empty),
                     page, 11, Ui.Jade, center: true, maxLines: 2);
-            ui.Btn(f.UnreadMail > 0 ? "✉ Poczta (" + f.UnreadMail + " z darami)" : "✉ Poczta", () => Run(ShowMailAsync), page, secondary: f.UnreadMail == 0, sp: 13, heightDp: 38);
+            ui.Btn(f.UnreadMail > 0 ? "Poczta (" + f.UnreadMail + " z darami)" : "Poczta", () => Run(ShowMailAsync), page, secondary: f.UnreadMail == 0, sp: 13, heightDp: 38, icon: "gi_mail");
 
             var entries = f.Incoming.Concat(f.Friends).Concat(f.Outgoing).ToList();
             ui.Pages(page, entries.Count, 1, 4, (i, cell) =>

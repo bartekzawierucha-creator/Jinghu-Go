@@ -468,7 +468,7 @@ namespace JianghuGo.Android
 
             var buttons = ui.HRow(page, 46);
             ui.Btn("Sprawdź", () => Run(async () => verdict.Text = DescribePreview(await lab.PreviewAsync(Compose(), Ct))), buttons, secondary: true, sp: 13, heightDp: 46);
-            ui.Btn("☯ Stwórz (KD)", () => Run(async () =>
+            ui.Btn("Stwórz (KD)", () => Run(async () =>
             {
                 var created = await lab.CreateAsync(Compose(), Ct);
                 if (created == null)
@@ -501,7 +501,7 @@ namespace JianghuGo.Android
                         SetStatus(ok ? "Technika w zestawie walki." : "Zestaw zmienił się na innym urządzeniu — odświeżono.");
                     }), row, sp: 11, heightDp: 36).LayoutParameters = new LinearLayout.LayoutParams(Px(70), Px(36)) { Gravity = GravityFlags.CenterVertical };
                     if (known.Source == "designed")
-                        ui.Btn("📜 Zwój", () => Run(async () =>
+                        ui.Btn("Zwój", () => Run(async () =>
                         {
                             await lab.InscribeAsync(known.Technique.Id, Ct);
                             close();
@@ -543,7 +543,7 @@ namespace JianghuGo.Android
             var forge = ui.HRow(page, 42);
             var useToken = false;
             Button meditate = null;
-            meditate = ui.Btn("☯ Medytacja nad Dao", () => Run(async () =>
+            meditate = ui.Btn("Medytacja nad Dao", () => Run(async () =>
             {
                 ForgedScrollDto s;
                 try
@@ -563,7 +563,7 @@ namespace JianghuGo.Android
                 await ShowDaoLabAsync();
                 ShowBanner("ZWÓJ " + s.RarityPl.ToUpperInvariant(), s.NamePl, s.DescriptionPl, "item_technique_scroll");
                 RefreshHud();
-            }), forge, secondary: true, sp: 12, heightDp: 42);
+            }), forge, secondary: true, sp: 12, heightDp: 42, icon: "menu_meditate");
             var essence = economy.Inventory.Stacks.FirstOrDefault(x => x.ItemId == "dao_essence")?.Quantity ?? 0;
             ui.Btn("Przemiana esencji (" + essence + "/10)", () => Run(async () =>
             {

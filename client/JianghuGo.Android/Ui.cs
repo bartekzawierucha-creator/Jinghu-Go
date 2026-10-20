@@ -185,20 +185,9 @@ namespace JianghuGo.Android
 
         public Drawable ButtonBackground(bool secondary)
         {
-            GradientDrawable Make(bool pressed)
-            {
-                var g = secondary
-                    ? new GradientDrawable(GradientDrawable.Orientation.TopBottom, new int[] { Color.Argb(235, 32, 38, 44).ToArgb(), Color.Argb(235, 16, 20, 24).ToArgb() })
-                    : new GradientDrawable(GradientDrawable.Orientation.TopBottom, new int[] { Color.Rgb(188, 52, 38).ToArgb(), CinnabarDeep.ToArgb() });
-                g.SetCornerRadius(Dp(8));
-                g.SetStroke(Dp(pressed ? 2 : 1), pressed ? Gold : secondary ? GoldDim : Gold);
-                if (pressed) g.SetAlpha(200);
-                return g;
-            }
-
             var states = new StateListDrawable();
-            states.AddState(new[] { global::Android.Resource.Attribute.StatePressed }, Make(true));
-            states.AddState(new int[0], Make(false));
+            states.AddState(new[] { global::Android.Resource.Attribute.StatePressed }, new ButtonDrawable(_density, secondary, true));
+            states.AddState(new int[0], new ButtonDrawable(_density, secondary, false));
             return states;
         }
 
@@ -358,45 +347,89 @@ namespace JianghuGo.Android
         }
     }
 
-    /// <summary>Rounded lacquer panel with a thin rim and bright corner ornaments.</summary>
+    /// <summary>
+    /// Lacquer panel (2.1 look): soft drop shadow, a lit-from-above gradient, a bevel highlight, a double gold rim and
+    /// diamond corner ornaments. Everything is drawn in code, so it scales to any size and density.
+    /// </summary>
     public sealed class FrameDrawable : Drawable
     {
         private readonly Paint _fill = new Paint(PaintFlags.AntiAlias);
+        private readonly Paint _shadow = new Paint(PaintFlags.AntiAlias);
         private readonly Paint _rim = new Paint(PaintFlags.AntiAlias);
+        private readonly Paint _inner = new Paint(PaintFlags.AntiAlias);
+        private readonly Paint _bevel = new Paint(PaintFlags.AntiAlias);
         private readonly Paint _corner = new Paint(PaintFlags.AntiAlias);
+        private readonly Paint _gem = new Paint(PaintFlags.AntiAlias);
+        private readonly Color _fillColor;
         private readonly float _d;
 
         public FrameDrawable(float density, Color fill, Color rim, Color corner)
         {
             _d = density;
-            _fill.Color = fill;
+            _fillColor = fill;
+            _shadow.Color = Color.Argb(110, 0, 0, 0);
             _rim.Color = rim;
             _rim.SetStyle(Paint.Style.Stroke);
-            _rim.StrokeWidth = 1.2f * density;
+            _rim.StrokeWidth = 1.3f * density;
+            _inner.Color = Color.Argb(70, rim.R, rim.G, rim.B);
+            _inner.SetStyle(Paint.Style.Stroke);
+            _inner.StrokeWidth = 0.8f * density;
+            _bevel.Color = Color.Argb(55, 255, 236, 190);
+            _bevel.SetStyle(Paint.Style.Stroke);
+            _bevel.StrokeWidth = 1f * density;
             _corner.Color = corner;
             _corner.SetStyle(Paint.Style.Stroke);
-            _corner.StrokeWidth = 2.2f * density;
-            _corner.StrokeCap = Paint.Cap.Square;
+            _corner.StrokeWidth = 2f * density;
+            _corner.StrokeCap = Paint.Cap.Round;
+            _gem.Color = corner;
+        }
+
+        protected override void OnBoundsChange(Rect bounds)
+        {
+            base.OnBoundsChange(bounds);
+            Color Shift(Color c, int k) => Color.Argb(c.A, Math.Clamp(c.R + k, 0, 255), Math.Clamp(c.G + k, 0, 255), Math.Clamp(c.B + k, 0, 255));
+            _fill.SetShader(new LinearGradient(0, bounds.Top, 0, bounds.Bottom,
+                new int[] { Shift(_fillColor, 16).ToArgb(), _fillColor.ToArgb(), Shift(_fillColor, -6).ToArgb() }, new float[] { 0f, 0.45f, 1f }, Shader.TileMode.Clamp));
         }
 
         public override void Draw(Canvas canvas)
         {
             var b = Bounds;
-            var r = new RectF(b.Left + _d, b.Top + _d, b.Right - _d, b.Bottom - _d);
             var radius = 8 * _d;
+            var r = new RectF(b.Left + _d, b.Top + _d, b.Right - _d, b.Bottom - (2.5f * _d));
+            // drop shadow under the panel (inside our bounds)
+            canvas.DrawRoundRect(new RectF(r.Left + _d, r.Top + (2 * _d), r.Right + (0.5f * _d), r.Bottom + (2 * _d)), radius, radius, _shadow);
             canvas.DrawRoundRect(r, radius, radius, _fill);
+            // bevel: a faint lit edge along the top
+            canvas.DrawLine(r.Left + radius, r.Top + (1.4f * _d), r.Right - radius, r.Top + (1.4f * _d), _bevel);
             canvas.DrawRoundRect(r, radius, radius, _rim);
-            var len = 14 * _d;
+            var i = 3.2f * _d;
+            canvas.DrawRoundRect(new RectF(r.Left + i, r.Top + i, r.Right - i, r.Bottom - i), radius - (2 * _d), radius - (2 * _d), _inner);
+
+            var len = 12 * _d;
             var inset = 3 * _d;
             float l = r.Left + inset, t = r.Top + inset, rr = r.Right - inset, bb = r.Bottom - inset;
-            canvas.DrawLine(l, t + len, l, t + radius * 0.4f, _corner);
-            canvas.DrawLine(l + radius * 0.4f, t, l + len, t, _corner);
-            canvas.DrawLine(rr, t + len, rr, t + radius * 0.4f, _corner);
-            canvas.DrawLine(rr - radius * 0.4f, t, rr - len, t, _corner);
-            canvas.DrawLine(l, bb - len, l, bb - radius * 0.4f, _corner);
-            canvas.DrawLine(l + radius * 0.4f, bb, l + len, bb, _corner);
-            canvas.DrawLine(rr, bb - len, rr, bb - radius * 0.4f, _corner);
-            canvas.DrawLine(rr - radius * 0.4f, bb, rr - len, bb, _corner);
+            void Corner(float x, float y, float dx, float dy)
+            {
+                canvas.DrawLine(x, y + (dy * radius * 0.5f), x, y + (dy * len), _corner);
+                canvas.DrawLine(x + (dx * radius * 0.5f), y, x + (dx * len), y, _corner);
+                // a small diamond "gem" at the corner
+                var g = 2.4f * _d;
+                using var path = new Path();
+                path.MoveTo(x + (dx * g), y);
+                path.LineTo(x, y + (dy * g));
+                path.LineTo(x - (dx * g * 0.2f), y - (dy * g * 0.2f));
+                path.Close();
+                canvas.DrawPath(path, _gem);
+            }
+
+            if (r.Width() > 3 * len && r.Height() > 2 * len)
+            {
+                Corner(l, t, 1, 1);
+                Corner(rr, t, -1, 1);
+                Corner(l, bb, 1, -1);
+                Corner(rr, bb, -1, -1);
+            }
         }
 
         public override void SetAlpha(int alpha) => _fill.Alpha = alpha;
@@ -409,6 +442,72 @@ namespace JianghuGo.Android
         {
             outline.SetRoundRect(Bounds, 8 * _d);
         }
+    }
+
+    /// <summary>
+    /// Lacquer button (2.1 look): cinnabar or night lacquer with a glossy upper half, a double gold rim and a warm glow when
+    /// pressed.
+    /// </summary>
+    public sealed class ButtonDrawable : Drawable
+    {
+        private readonly Paint _fill = new Paint(PaintFlags.AntiAlias);
+        private readonly Paint _gloss = new Paint(PaintFlags.AntiAlias);
+        private readonly Paint _rim = new Paint(PaintFlags.AntiAlias);
+        private readonly Paint _inner = new Paint(PaintFlags.AntiAlias);
+        private readonly Paint _glow = new Paint(PaintFlags.AntiAlias);
+        private readonly bool _secondary;
+        private readonly bool _pressed;
+        private readonly float _d;
+
+        public ButtonDrawable(float density, bool secondary, bool pressed)
+        {
+            _d = density;
+            _secondary = secondary;
+            _pressed = pressed;
+            _rim.SetStyle(Paint.Style.Stroke);
+            _rim.StrokeWidth = (pressed ? 2f : 1.3f) * density;
+            _rim.Color = secondary && !pressed ? Ui.GoldDim : Ui.Gold;
+            _inner.SetStyle(Paint.Style.Stroke);
+            _inner.StrokeWidth = 0.8f * density;
+            _inner.Color = Color.Argb(secondary ? 50 : 90, 255, 220, 150);
+            _glow.Color = Color.Argb(pressed ? 70 : 0, 255, 200, 110);
+        }
+
+        protected override void OnBoundsChange(Rect b)
+        {
+            base.OnBoundsChange(b);
+            var top = _secondary ? Color.Argb(240, 40, 47, 54) : Color.Rgb(204, 64, 46);
+            var bottom = _secondary ? Color.Argb(240, 14, 18, 22) : Ui.CinnabarDeep;
+            if (_pressed)
+            {
+                (top, bottom) = (bottom, top);
+            }
+
+            _fill.SetShader(new LinearGradient(0, b.Top, 0, b.Bottom, top.ToArgb(), bottom.ToArgb(), Shader.TileMode.Clamp));
+            _gloss.SetShader(new LinearGradient(0, b.Top, 0, b.Top + (b.Height() * 0.55f),
+                Color.Argb(_pressed ? 10 : 46, 255, 255, 255).ToArgb(), Color.Argb(0, 255, 255, 255).ToArgb(), Shader.TileMode.Clamp));
+        }
+
+        public override void Draw(Canvas canvas)
+        {
+            var b = Bounds;
+            var radius = 8 * _d;
+            var r = new RectF(b.Left + _d, b.Top + _d, b.Right - _d, b.Bottom - _d);
+            canvas.DrawRoundRect(r, radius, radius, _fill);
+            canvas.DrawRoundRect(new RectF(r.Left + _d, r.Top + _d, r.Right - _d, r.Top + (r.Height() * 0.55f)), radius, radius, _gloss);
+            if (_pressed) canvas.DrawRoundRect(r, radius, radius, _glow);
+            canvas.DrawRoundRect(r, radius, radius, _rim);
+            var i = 2.6f * _d;
+            canvas.DrawRoundRect(new RectF(r.Left + i, r.Top + i, r.Right - i, r.Bottom - i), radius - (2 * _d), radius - (2 * _d), _inner);
+        }
+
+        public override void SetAlpha(int alpha) => _fill.Alpha = alpha;
+        public override void SetColorFilter(ColorFilter colorFilter) => _fill.SetColorFilter(colorFilter);
+#pragma warning disable CS0672, CS0618
+        public override int Opacity => (int)Format.Translucent;
+#pragma warning restore CS0672, CS0618
+
+        public override void GetOutline(Outline outline) => outline.SetRoundRect(Bounds, 8 * _d);
     }
 
     /// <summary>HP / Qi / progress bar: dark trough, glossy gradient fill, gold rim, caption inside.</summary>

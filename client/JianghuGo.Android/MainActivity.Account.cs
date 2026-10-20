@@ -21,7 +21,7 @@ namespace JianghuGo.Android
             ui.Text("JIANGHU GO", page, 22, Ui.Ink, bold: true, center: true);
             ui.Text("Świat wuxia na twoich ulicach — kultywuj Qi, zbieraj zioła, walcz z bestiami, zakładaj sekty.", page, 13, Ui.Ink, center: true, maxLines: 3);
             ui.Box(page, 0.3f);
-            ui.Btn("☯  Graj offline", () => Run(PlayOfflineAsync), page, sp: 18, heightDp: 56);
+            ui.Btn("Graj offline", () => Run(PlayOfflineAsync), page, sp: 18, heightDp: 56, icon: "gi_zodiac");
             ui.Text("Świat działa w telefonie, postęp zapisuje się w aplikacji.", page, 11, Ui.Muted, center: true);
             ui.Btn("Gra z serwerem", () => ServerSheet(), page, secondary: true, sp: 14, heightDp: 46);
         }

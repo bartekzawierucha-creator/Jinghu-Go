@@ -46,7 +46,7 @@ namespace JianghuGo.Android
             ui.Text(inv.Balance.ToString("N0") + " Kamieni Duchowych", head, 13, Ui.Gold, bold: true).LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f) { LeftMargin = Px(6), Gravity = GravityFlags.CenterVertical };
             ui.Text("Miejsca " + inv.SlotsUsed + "/" + inv.Capacity, head, 12, Ui.Muted).Gravity = GravityFlags.End;
             if (tab == 0 && inv.Talisman != null)
-                ui.Text("🔥 " + inv.Talisman.NamePl + " płonie do " + inv.Talisman.Until.ToLocalTime().ToString("HH:mm"), page, 11, Ui.Jade, center: true);
+                ui.Text(inv.Talisman.NamePl + " płonie do " + inv.Talisman.Until.ToLocalTime().ToString("HH:mm"), page, 11, Ui.Jade, center: true);
 
             if (tab == 0 && economy.Merchant != null)
                 ui.Btn("🏮 Wędrowny kupiec", () => MerchantSheet(economy), page, secondary: true, sp: 13, heightDp: 40);
@@ -453,7 +453,7 @@ namespace JianghuGo.Android
                         await Reload(bought == null ? "Ktoś był szybszy — oferta już nieaktualna." : "Kupiono za " + bought.Paid + " KD.");
                     }), row, sp: 12, heightDp: 38).LayoutParameters = new LinearLayout.LayoutParams(Px(70), Px(38)) { Gravity = GravityFlags.CenterVertical };
                 }, empty: "Na targu nic nie ma.");
-                ui.Btn("📋 Zamówienia rzemieślnicze", () => Run(() => CraftOrdersSheetAsync(economy)), page, secondary: true, sp: 12, heightDp: 34);
+                ui.Btn("Zamówienia rzemieślnicze", () => Run(() => CraftOrdersSheetAsync(economy)), page, secondary: true, sp: 12, heightDp: 34, icon: "gi_orders");
             }
             else
             {

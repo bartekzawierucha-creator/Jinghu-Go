@@ -107,6 +107,7 @@ namespace JianghuGo.Android
             base.OnPause();
             _paused = true;
             Music.Pause();
+            if (_motes != null) _motes.Running = false;
             // A break of the app resets the play-time counter.
             _sessionStarted = null;
             _restReminders = 0;
@@ -121,6 +122,11 @@ namespace JianghuGo.Android
             base.OnResume();
             _paused = false;
             Music.Resume();
+            if (_motes != null)
+            {
+                _motes.Running = true;
+                _motes.Invalidate();
+            }
             _sessionStarted ??= DateTimeOffset.UtcNow;
             ScheduleRestReminder();
             if (_worldOpen)

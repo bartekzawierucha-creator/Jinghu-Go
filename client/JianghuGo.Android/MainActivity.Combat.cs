@@ -60,7 +60,7 @@ namespace JianghuGo.Android
                     }, pixelArt: true, accent: Ui.Cinnabar, titleSp: 13, badge: "BOSS");
                 });
                 ui.Text("Bossowie legowisk walczą tylko w świecie — szukaj 👹 na mapie.", page, 11, Ui.Muted, center: true);
-                ui.Btn("📖 Kodeks bestii", () => Run(CodexSheetAsync), page, secondary: true, sp: 12, heightDp: 34);
+                ui.Btn("Kodeks bestii", () => Run(CodexSheetAsync), page, secondary: true, sp: 12, heightDp: 34, icon: "gi_codex");
             }
             else if (tab == 5)
             {
@@ -69,7 +69,7 @@ namespace JianghuGo.Android
             else
             {
                 ui.Text("Wyzwij kultywatora w Świecie (w okolicy) albo członka sekty.", page, 12, Ui.Muted, center: true, maxLines: 2);
-                ui.Btn("📜 Listy gończe", () => Run(BountySheetAsync), page, secondary: true, sp: 12, heightDp: 34);
+                ui.Btn("Listy gończe", () => Run(BountySheetAsync), page, secondary: true, sp: 12, heightDp: 34, icon: "gi_wanted");
                 ui.Pages(page, open.Count, 1, 4, (i, cell) =>
                 {
                     var b = open[i];

@@ -153,7 +153,8 @@ namespace JianghuGo.Android
                 else if (n?.NearestFlameSite != null)
                 {
                     eventLine.Visibility = ViewStates.Visible;
-                    eventLine.Text = "🔥 " + n.NearestFlameSite.NamePl + " — " + (n.NearestFlameSite.DistanceM < 1000 ? n.NearestFlameSite.DistanceM + " m" : n.NearestFlameSite.DistanceM / 1000 + " km");
+                    eventLine.Text = n.NearestFlameSite.NamePl + " — " + (n.NearestFlameSite.DistanceM < 1000 ? n.NearestFlameSite.DistanceM + " m" : n.NearestFlameSite.DistanceM / 1000 + " km");
+                    ui.WithIcon(eventLine, "map_flame", 22);
                 }
                 else
                 {
@@ -233,7 +234,7 @@ namespace JianghuGo.Android
                 var nearest = exploration.Nearby?.NearestFlameSite;
                 var body = Sheet("Miejsca Płomienia", 0.7f, out var close, "map_flame");
                 ui.Text("Dostrój się, stojąc w promieniu " + Math.Round(sites.RadiusM) + " m od miejsca. Płomień odnawia się co " + sites.CooldownHours + " h.", body, 12, Ui.Muted, maxLines: 2);
-                var attune = ui.Btn(nearest != null && nearest.InRange ? "🔥 Dostrój się: " + nearest.NamePl : "🔥 Najbliższe: " + (nearest?.NamePl ?? "—"), () => Run(async () =>
+                var attune = ui.Btn(nearest != null && nearest.InRange ? "Dostrój się: " + nearest.NamePl : "Najbliższe: " + (nearest?.NamePl ?? "—"), () => Run(async () =>
                 {
                     if (nearest == null || !nearest.InRange)
                     {
@@ -246,7 +247,7 @@ namespace JianghuGo.Android
                     Sfx.Play(Sfx.Breakthrough, 0.6f);
                     ShowBanner("PŁOMIEŃ", nearest.NamePl, "+" + r.RewardQi + " Qi", "site_" + nearest.Id);
                     RefreshHud();
-                }), body, secondary: nearest == null || !nearest.InRange, sp: 14, heightDp: 46);
+                }), body, secondary: nearest == null || !nearest.InRange, sp: 14, heightDp: 46, icon: "map_flame");
                 var here = _location.Last;
                 var list = sites.Items.OrderBy(x => here == null ? 0 : DistanceKm(here.Lat, here.Lon, x.Lat, x.Lon)).ToList();
                 ui.Pages(body, list.Count, 2, 3, (i, cell) =>

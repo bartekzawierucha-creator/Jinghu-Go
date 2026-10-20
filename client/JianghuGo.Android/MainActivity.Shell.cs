@@ -51,6 +51,8 @@ namespace JianghuGo.Android
 
         private int Px(float dp) => (int)(dp * Resources.DisplayMetrics.Density + 0.5f);
 
+        private QiMotesView _motes;
+
         private void BuildShell()
         {
             Window.SetStatusBarColor(Ui.Night);
@@ -65,6 +67,8 @@ namespace JianghuGo.Android
             veil.Background = new GradientDrawable(GradientDrawable.Orientation.TopBottom,
                 new int[] { Color.Argb(170, 6, 8, 10).ToArgb(), Color.Argb(120, 8, 10, 12).ToArgb(), Color.Argb(235, 8, 10, 12).ToArgb() });
             frame.AddView(veil, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
+            _motes = new QiMotesView(this);
+            frame.AddView(_motes, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
 
             var root = new LinearLayout(this) { Orientation = Orientation.Vertical };
             root.SetFitsSystemWindows(true);

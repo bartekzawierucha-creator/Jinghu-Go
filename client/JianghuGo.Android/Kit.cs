@@ -92,6 +92,9 @@ namespace JianghuGo.Android
                 Sfx.Play(Sfx.Click, 0.5f);
                 onClick();
             };
+            Juice.Press(b);
+            // long labels shrink to fit instead of being cut ("Schody wi…")
+            b.SetAutoSizeTextTypeUniformWithConfiguration(Math.Max(8, (int)sp - 5), Math.Max(9, (int)Math.Ceiling(sp)), 1, (int)global::Android.Util.ComplexUnitType.Sp);
             if (icon != null) WithIcon(b, icon, Math.Min(28, heightDp - 14));
             AddFixed(parent, b, heightDp);
             return b;

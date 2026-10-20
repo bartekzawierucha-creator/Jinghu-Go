@@ -481,6 +481,7 @@ namespace JianghuGo.Android
             }, gdpr, secondary: true, sp: 12, heightDp: 40);
             _ui.Text("Przypomnienia: koniec odosobnienia, gotowe partie w kotle i kuźni, plony, powrót uczniów i koniec polowania. Nic nie opuszcza telefonu.",
                 body, 11, Ui.Muted, maxLines: 3);
+            _ui.Text("Ikony: game-icons.net (Lorc, Delapouite i in.), CC BY 3.0 · Pogoda: Open-Meteo · Miejsca: © OpenStreetMap", body, 9, Ui.Muted, center: true, maxLines: 2);
             _ui.Text("Jianghu Go " + (PackageManager?.GetPackageInfo(PackageName, 0)?.VersionName ?? string.Empty), body, 10, Ui.Muted, center: true);
         }
 
@@ -528,9 +529,9 @@ namespace JianghuGo.Android
             var ui = NewScreen("Wieści", BackToTab, Resource.Drawable.place_altar, "Z CAŁEGO JIANGHU");
             var items = pageDto.Items;
             var bar = ui.HRow(ui.Content, 34, 4);
-            ui.Btn("⚙ Ustawienia", ShowSettingsSheet, bar, secondary: true, sp: 12, heightDp: 34);
-            ui.Btn("👥 Przyjaciele", () => Run(ShowFriendsAsync), bar, secondary: true, sp: 12, heightDp: 34);
-            ui.Btn("📜 Kronika", () => Run(ShowChronicleAsync), bar, secondary: true, sp: 12, heightDp: 34);
+            ui.Btn("Ustawienia", ShowSettingsSheet, bar, secondary: true, sp: 12, heightDp: 34, icon: "gi_settings");
+            ui.Btn("Przyjaciele", () => Run(ShowFriendsAsync), bar, secondary: true, sp: 12, heightDp: 34, icon: "gi_friends");
+            ui.Btn("Kronika", () => Run(ShowChronicleAsync), bar, secondary: true, sp: 12, heightDp: 34, icon: "gi_chronicle");
             ui.Pages(ui.Content, items.Count, 1, 5, (i, cell) =>
             {
                 var n = items[i];

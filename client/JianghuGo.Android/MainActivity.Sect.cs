@@ -50,12 +50,12 @@ namespace JianghuGo.Android
                 ui.Text("Nie należysz do żadnej sekty", found, 15, Ui.Gold, bold: true);
                 ui.Text("Załóż własną (opłata w KD) albo poproś o przyjęcie do istniejącej.", found, 12, Ui.Muted, maxLines: 2);
                 var name = ui.Field("Nazwa nowej sekty", parent: found);
-                ui.Btn("🏯 Załóż sektę", () => Run(async () =>
+                ui.Btn("Załóż sektę", () => Run(async () =>
                 {
                     await flow.FoundAsync(name.Text.Trim(), Ct);
                     Sfx.Play(Sfx.Breakthrough, 0.6f);
                     await Reload(0, "Sekta założona.");
-                }), page, sp: 14, heightDp: 44);
+                }), page, sp: 14, heightDp: 44, icon: "gi_pagoda");
                 var sects = (await flow.BrowseAsync(Ct)).Items;
                 var pending = (await _api.MyApplicationsAsync(c.Id, Ct)).Items;
                 ui.Pages(page, sects.Count, 1, 4, (i, cell) =>
@@ -170,14 +170,14 @@ namespace JianghuGo.Android
                         var body = Sheet(m.Name, 0.42f, out var close, "menu_sect");
                         ui.Text(RoleName(m.Role) + " · wkład " + m.Contribution, body, 13, Ui.Muted);
                         ui.Box(body, 1f, marginDp: 0);
-                        ui.Btn("⚔ Wyzwij na pojedynek", () => Run(async () =>
+                        ui.Btn("Wyzwij na pojedynek", () => Run(async () =>
                         {
                             close();
                             var battle = await _api.ChallengeAsync(c.Id, m.CharacterId, Ct);
                             var combat = new CombatFlow(_api);
                             await combat.OpenAsync(battle.Id, Ct);
                             ShowBattle(combat);
-                        }), body, sp: 14, heightDp: 44);
+                        }), body, sp: 14, heightDp: 44, icon: "menu_battle");
                         var outranks = mine.MyRole == "leader" || (mine.MyRole == "elder" && m.Role == "member");
                         var r2 = ui.HRow(body, 42);
                         if (mine.MyRole == "leader")
@@ -228,7 +228,7 @@ namespace JianghuGo.Android
                         Sfx.Play(Sfx.Chime);
                         await Reload(2, "Zajęto " + claimed.Key + ".");
                     }), acts, sp: 12, heightDp: 44);
-                    ui.Btn("⚔ Wojna", () => Run(async () =>
+                    ui.Btn("Wojna", () => Run(async () =>
                     {
                         var w = await flow.ChallengeHereAsync(Ct);
                         await Reload(2, "Wojna o " + w.TerritoryKey + " od " + w.StartsAt.ToLocalTime().ToString("dd.MM HH:mm") + ".");
