@@ -131,7 +131,7 @@ namespace JianghuGo.Android
                 {
                     var t = _ui.Text(m.CreatedAt.ToLocalTime().ToString("dd.MM HH:mm") + "\n" + m.Text, list, 12, m.Mine ? Ui.Gold : Ui.Ink, maxLines: 3);
                     var bg = new global::Android.Graphics.Drawables.GradientDrawable();
-                    bg.SetColor(m.Mine ? Color.Argb(60, 200, 160, 80) : Color.Argb(110, 20, 24, 28));
+                    bg.SetColor(m.Mine ? Color.Argb(60, 200, 160, 80) : Color.Argb(110, 244, 240, 231));
                     bg.SetCornerRadius(Px(10));
                     t.Background = bg;
                     t.Gravity = m.Mine ? GravityFlags.End : GravityFlags.Start;

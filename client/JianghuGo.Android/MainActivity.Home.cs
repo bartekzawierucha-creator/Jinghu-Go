@@ -122,7 +122,7 @@ namespace JianghuGo.Android
                 {
                     PlayOverlay(Resource.Drawable.fx_breakthrough, 256, 9);
                     Sfx.Play(Sfx.Breakthrough);
-                    ShowBanner("PRZEŁOM!", flow.State.RealmNamePl + " · etap " + flow.State.Stage, "+1 punkt meridianu do otwarcia", "emblem_" + flow.State.RealmId);
+                    ShowBanner("PRZEŁOM!", flow.State.RealmNamePl + " · etap " + flow.State.Stage, "+1 punkt meridianu do otwarcia", "ink_popup_breakthrough");
                 }
                 else
                 {

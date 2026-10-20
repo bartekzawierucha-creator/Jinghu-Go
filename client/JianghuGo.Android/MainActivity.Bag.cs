@@ -69,7 +69,7 @@ namespace JianghuGo.Android
                 var e = entries[i];
                 var rarity = Ui.RarityOf(e.Stack?.Rarity ?? e.Item.Rarity).Color;
                 var box = new FrameLayout(this) { Clickable = true };
-                box.Background = new FrameDrawable(Resources.DisplayMetrics.Density, Color.Argb(235, 14, 18, 22), e.Item?.IsEquipped == true ? Ui.Gold : rarity, rarity);
+                box.Background = new FrameDrawable(Resources.DisplayMetrics.Density, Color.Argb(235, 244, 240, 231), e.Item?.IsEquipped == true ? Ui.Gold : rarity, rarity);
                 var img = new ImageView(this);
                 var art = ui.ArtId("item_" + e.ItemId);
                 img.SetImageBitmap(Ui.Art(this, art != 0 ? art : Resource.Drawable.item_slot_empty));
@@ -80,7 +80,7 @@ namespace JianghuGo.Android
                 label.SetTextColor(Ui.Ink);
                 label.SetMaxLines(1);
                 label.Ellipsize = global::Android.Text.TextUtils.TruncateAt.End;
-                label.SetShadowLayer(3, 0, 1, Color.Black);
+                label.SetShadowLayer(3, 0, 1, Color.Argb(170, 250, 247, 240));
                 box.AddView(label, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent, GravityFlags.Bottom) { BottomMargin = Px(3) });
                 var tag = e.Stack != null ? "×" + e.Stack.Quantity : e.Item.IsEquipped ? "✓" : e.Item.State == "listed" ? "targ" : e.Item.UpgradeLevel > 0 ? "+" + e.Item.UpgradeLevel : null;
                 if (tag != null)

@@ -36,7 +36,7 @@ namespace JianghuGo.Android
             _name = statName;
             _text.SetTypeface(Ui.Display);
             _text.TextAlign = Paint.Align.Center;
-            _text.SetShadowLayer(4, 0, 1, Color.Black);
+            _text.SetShadowLayer(4, 0, 1, Color.Argb(170, 250, 247, 240));
             _silhouette = Ui.Art(ctx, HeroArt.Id(ctx, HeroArt.CurrentPath, "meditate"));
             foreach (var (stat, _, _) in Nodes)
             {
@@ -93,7 +93,7 @@ namespace JianghuGo.Android
                 _p.SetShader(new RadialGradient(x, y, glowR, new int[] { Color.Argb(pts > 0 ? 170 : 90, 110, 190, 255).ToArgb(), Color.Argb(0, 110, 190, 255).ToArgb() }, null, Shader.TileMode.Clamp));
                 canvas.DrawCircle(x, y, glowR, _p);
                 _p.SetShader(null);
-                _p.Color = Color.Argb(240, 10, 13, 16);
+                _p.Color = Color.Argb(240, 244, 240, 231);
                 canvas.DrawCircle(x, y, r, _p);
                 if (_icons.TryGetValue(stat, out var icon))
                     canvas.DrawBitmap(icon, null, new RectF(x - r * 0.7f, y - r * 0.7f, x + r * 0.7f, y + r * 0.7f), _art);

@@ -34,7 +34,7 @@ namespace JianghuGo.Android
             _ring.Color = Ui.Gold;
 
             _card = new LinearLayout(ctx) { Orientation = Orientation.Horizontal };
-            _card.Background = new FrameDrawable(_d, Color.Argb(250, 18, 20, 24), Ui.Gold, Ui.Gold);
+            _card.Background = new FrameDrawable(_d, Color.Argb(250, 244, 240, 231), Ui.Gold, Ui.Gold);
             _card.SetPadding(D(12), D(10), D(12), D(10));
             var portrait = new ImageView(ctx);
             portrait.SetImageBitmap(Ui.Art(ctx, Resource.Drawable.portrait));

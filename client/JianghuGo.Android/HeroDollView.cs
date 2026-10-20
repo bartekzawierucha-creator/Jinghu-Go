@@ -33,7 +33,7 @@ namespace JianghuGo.Android
             _empty = Ui.Art(ctx, Resource.Drawable.item_slot_empty);
             _text.SetTypeface(Ui.Display);
             _text.TextAlign = Paint.Align.Center;
-            _text.SetShadowLayer(3, 0, 1, Color.Black);
+            _text.SetShadowLayer(3, 0, 1, Color.Argb(170, 250, 247, 240));
         }
 
         /// <summary>Equipped item per slot (null = empty).</summary>
@@ -102,7 +102,7 @@ namespace JianghuGo.Android
                 _p.Color = Color.Argb(90, rarity.R, rarity.G, rarity.B);
                 _p.StrokeWidth = 1.2f * _d;
                 canvas.DrawLine(x, y, cx + (x - cx) * 0.25f, y, _p);
-                _p.Color = Color.Argb(230, 10, 13, 16);
+                _p.Color = Color.Argb(230, 244, 240, 231);
                 canvas.DrawRoundRect(rect, 10 * _d, 10 * _d, _p);
                 var icon = IconFor(item);
                 if (icon != null) canvas.DrawBitmap(icon, null, new RectF(rect.Left + 5 * _d, rect.Top + 5 * _d, rect.Right - 5 * _d, rect.Bottom - 5 * _d), _art);

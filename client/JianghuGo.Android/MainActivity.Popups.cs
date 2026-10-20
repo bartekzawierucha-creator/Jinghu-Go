@@ -21,10 +21,10 @@ namespace JianghuGo.Android
         private LinearLayout Popup(string title, int accentArt, out System.Action close, string button = "Dalej", System.Action onClose = null)
         {
             var overlay = new FrameLayout(this) { Clickable = true };
-            overlay.SetBackgroundColor(Color.Argb(170, 0, 0, 0));
+            overlay.SetBackgroundColor(Color.Argb(130, 30, 28, 26));
             var panel = new LinearLayout(this) { Orientation = Orientation.Vertical };
             panel.SetGravity(GravityFlags.CenterHorizontal);
-            panel.Background = new FrameDrawable(Resources.DisplayMetrics.Density, Color.Argb(250, 16, 20, 24), Ui.Gold, Ui.Gold);
+            panel.Background = new FrameDrawable(Resources.DisplayMetrics.Density, Color.Argb(250, 244, 240, 231), Ui.Gold, Ui.Gold);
             panel.SetPadding(_ui.Dp(20), _ui.Dp(16), _ui.Dp(20), _ui.Dp(16));
             var lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent, GravityFlags.Center)
             {
@@ -35,9 +35,12 @@ namespace JianghuGo.Android
             if (accentArt != 0)
             {
                 var img = new ImageView(this);
-                img.SetImageBitmap(Ui.Art(this, accentArt));
+                var bmp = Ui.Art(this, accentArt);
+                img.SetImageBitmap(bmp);
                 img.SetScaleType(ImageView.ScaleType.FitCenter);
-                panel.AddView(img, new LinearLayout.LayoutParams(_ui.Dp(84), _ui.Dp(84)));
+                // the tall ink illustrations (chest, scroll, breakthrough) get a real stage, icons stay small
+                var tall = bmp != null && bmp.Height > bmp.Width * 1.3f;
+                panel.AddView(img, new LinearLayout.LayoutParams(tall ? ViewGroup.LayoutParams.MatchParent : _ui.Dp(84), _ui.Dp(tall ? 170 : 84)));
             }
 
             var t = _ui.Label(title, 24, Ui.Gold, bold: true, parent: panel);
@@ -82,7 +85,7 @@ namespace JianghuGo.Android
         /// <summary>Loot popup: Qi, items (names resolved from the bag) and a tamed spirit beast, if any.</summary>
         private void ShowLoot(string title, long qi, List<(string ItemId, long Quantity)> items, string tamedNpcId)
         {
-            var body = Popup(title, Resource.Drawable.icon_stones, out _, "Zabierz");
+            var body = Popup(title, Resource.Drawable.ink_popup_chest, out _, "Zabierz");
             if (qi > 0) _ui.WithIcon(_ui.Label("+" + qi + " Qi", 18, Ui.QiBlue, bold: true, parent: body), "menu_meditate", 28);
             var rows = new List<(TextView Label, string ItemId, long Quantity)>();
             foreach (var (id, qty) in items)

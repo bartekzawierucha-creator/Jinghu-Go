@@ -57,15 +57,20 @@ namespace JianghuGo.Android
         {
             Window.SetStatusBarColor(Ui.Night);
             Window.SetNavigationBarColor(Ui.Night);
+            // paper theme: dark status/navigation bar icons
+            Window.DecorView.SystemUiVisibility = (StatusBarVisibility)(SystemUiFlags.LightStatusBar | SystemUiFlags.LightNavigationBar);
 
             var frame = _frame = new FrameLayout(this);
             frame.SetBackgroundColor(Ui.Night);
             _backdrop = new ImageView(this);
             _backdrop.SetScaleType(ImageView.ScaleType.CenterCrop);
+            var mono = new ColorMatrix();
+            mono.SetSaturation(0.12f); // every backdrop reads as an ink wash on paper
+            _backdrop.SetColorFilter(new ColorMatrixColorFilter(mono));
             frame.AddView(_backdrop, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
             var veil = new View(this);
             veil.Background = new GradientDrawable(GradientDrawable.Orientation.TopBottom,
-                new int[] { Color.Argb(170, 6, 8, 10).ToArgb(), Color.Argb(120, 8, 10, 12).ToArgb(), Color.Argb(235, 8, 10, 12).ToArgb() });
+                new int[] { Color.Argb(170, 244, 240, 231).ToArgb(), Color.Argb(120, 244, 240, 231).ToArgb(), Color.Argb(235, 244, 240, 231).ToArgb() });
             frame.AddView(veil, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
             _motes = new QiMotesView(this);
             frame.AddView(_motes, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
@@ -83,7 +88,7 @@ namespace JianghuGo.Android
             _titleBack = new TextView(this) { Text = "‹", Gravity = GravityFlags.Center, Clickable = true };
             _titleBack.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 26);
             _titleBack.SetTextColor(Ui.Gold);
-            _titleBack.Background = new FrameDrawable(Resources.DisplayMetrics.Density, Color.Argb(200, 14, 18, 22), Ui.GoldDim, Ui.Gold);
+            _titleBack.Background = new FrameDrawable(Resources.DisplayMetrics.Density, Color.Argb(200, 244, 240, 231), Ui.GoldDim, Ui.Gold);
             _titleBack.Click += (_, __) =>
             {
                 Sfx.Play(Sfx.Click, 0.5f);
@@ -95,7 +100,7 @@ namespace JianghuGo.Android
             _titleText.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 20);
             _titleText.SetTextColor(Ui.Gold);
             _titleText.SetTypeface(Ui.Display, TypefaceStyle.Bold);
-            _titleText.SetShadowLayer(8, 0, 2, Color.Black);
+            _titleText.SetShadowLayer(8, 0, 2, Color.Argb(170, 250, 247, 240));
             _titleText.SetMaxLines(1);
             _titleText.Ellipsize = global::Android.Text.TextUtils.TruncateAt.End;
             titles.AddView(_titleText);
@@ -121,8 +126,8 @@ namespace JianghuGo.Android
             _status.SetTextColor(Ui.Ink);
             _status.SetTypeface(Ui.Body, TypefaceStyle.Normal);
             var statusBg = new GradientDrawable();
-            statusBg.SetColor(Color.Argb(240, 60, 16, 12));
-            statusBg.SetStroke(Px(1), Ui.Gold);
+            statusBg.SetColor(Color.Argb(246, 248, 245, 238));
+            statusBg.SetStroke(Px(2), Ui.Cinnabar);
             statusBg.SetCornerRadius(Px(10));
             _status.Background = statusBg;
             _status.SetPadding(Px(14), Px(10), Px(14), Px(10));
@@ -150,7 +155,7 @@ namespace JianghuGo.Android
             hud.SetGravity(GravityFlags.CenterVertical);
             hud.SetPadding(Px(10), Px(6), Px(8), Px(6));
             hud.Background = new GradientDrawable(GradientDrawable.Orientation.TopBottom,
-                new int[] { Color.Argb(250, 20, 16, 12).ToArgb(), Color.Argb(235, 12, 12, 12).ToArgb() });
+                new int[] { Color.Argb(250, 244, 240, 231).ToArgb(), Color.Argb(235, 244, 240, 231).ToArgb() });
 
             _hudPortrait = new ImageView(this);
             _hudPortrait.SetScaleType(ImageView.ScaleType.CenterCrop);
@@ -181,9 +186,9 @@ namespace JianghuGo.Android
             _hudStones.CompoundDrawablePadding = Px(4);
             hud.AddView(_hudStones, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent) { LeftMargin = Px(8), RightMargin = Px(4) });
 
-            (_hudQuestButton, _hudQuestBadge) = HudButton(hud, Resource.Drawable.menu_quests, "Zadania", () => Run(ShowQuestsAsync));
-            (_hudBagButton, _) = HudButton(hud, Resource.Drawable.menu_bag, "Sakwa", () => Run(() => ShowBagAsync(0)));
-            (_, _hudNewsBadge) = HudButton(hud, Resource.Drawable.menu_notifications, "Wieści", () => Run(ShowInboxAsync));
+            (_hudQuestButton, _hudQuestBadge) = HudButton(hud, Resource.Drawable.ink_ico_quest, "Zadania", () => Run(ShowQuestsAsync));
+            (_hudBagButton, _) = HudButton(hud, Resource.Drawable.ink_nav_bag, "Sakwa", () => Run(() => ShowBagAsync(0)));
+            (_, _hudNewsBadge) = HudButton(hud, Resource.Drawable.ink_ico_event, "Wieści", () => Run(ShowInboxAsync));
             return hud;
         }
 
@@ -257,12 +262,12 @@ namespace JianghuGo.Android
             var dock = new LinearLayout(this) { Orientation = Orientation.Horizontal };
             dock.SetGravity(GravityFlags.Center);
             dock.Background = new GradientDrawable(GradientDrawable.Orientation.TopBottom,
-                new int[] { Color.Argb(240, 14, 14, 14).ToArgb(), Color.Argb(255, 22, 16, 12).ToArgb() });
+                new int[] { Color.Argb(240, 244, 240, 231).ToArgb(), Color.Argb(255, 244, 240, 231).ToArgb() });
             dock.SetPadding(Px(4), Px(2), Px(4), Px(2));
             foreach (var (tab, label, art) in new[]
                      {
-                         (TabHome, "Kultywacja", Resource.Drawable.menu_meditate), (TabWorld, "Świat", Resource.Drawable.menu_explore),
-                         (TabCombat, "Walka", Resource.Drawable.menu_battle), (TabHero, "Bohater", Resource.Drawable.menu_hero), (TabSect, "Sekta", Resource.Drawable.menu_sect),
+                         (TabHome, "Kultywacja", Resource.Drawable.ink_nav_home), (TabWorld, "Świat", Resource.Drawable.ink_nav_world),
+                         (TabCombat, "Walka", Resource.Drawable.ink_nav_combat), (TabHero, "Bohater", Resource.Drawable.ink_nav_hero), (TabSect, "Sekta", Resource.Drawable.ink_nav_sect),
                      })
             {
                 var t = tab;
@@ -271,7 +276,7 @@ namespace JianghuGo.Android
                 var icon = new ImageView(this);
                 icon.SetImageBitmap(Ui.Art(this, art));
                 icon.SetScaleType(ImageView.ScaleType.FitCenter);
-                item.AddView(icon, new LinearLayout.LayoutParams(Px(30), Px(30)));
+                item.AddView(icon, new LinearLayout.LayoutParams(Px(36), Px(36)));
                 var text = new TextView(this) { Text = label, Gravity = GravityFlags.Center };
                 text.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 10);
                 text.SetTypeface(Ui.Display, TypefaceStyle.Bold);
@@ -288,6 +293,16 @@ namespace JianghuGo.Android
             }
 
             return dock;
+        }
+
+        /// <summary>The old painted screen backgrounds swapped for the ink-wash set.</summary>
+        private static int InkBackdrop(int art)
+        {
+            if (art == Resource.Drawable.bg_market) return Resource.Drawable.ink_bg_home;
+            if (art == Resource.Drawable.bg_sect) return Resource.Drawable.ink_bg_sect;
+            if (art == Resource.Drawable.bg_forge) return Resource.Drawable.ink_bg_market;
+            if (art == Resource.Drawable.bg_hero || art == Resource.Drawable.bg_meditation) return Resource.Drawable.ink_bg_hero;
+            return art;
         }
 
         private void HighlightDock(string tab)
@@ -401,6 +416,7 @@ namespace JianghuGo.Android
                 RenderHud();
             }
 
+            art = InkBackdrop(art);
             if (art != 0)
             {
                 _backdrop.SetImageBitmap(Ui.Art(this, art));
@@ -539,7 +555,7 @@ namespace JianghuGo.Android
             var overlay = new FrameLayout(this) { Clickable = true };
             overlay.SetBackgroundColor(Color.Argb(150, 0, 0, 0));
             var panel = new LinearLayout(this) { Orientation = Orientation.Vertical, Clickable = true };
-            var bg = new GradientDrawable(GradientDrawable.Orientation.TopBottom, new int[] { Color.Argb(252, 24, 22, 20).ToArgb(), Color.Argb(252, 12, 13, 15).ToArgb() });
+            var bg = new GradientDrawable(GradientDrawable.Orientation.TopBottom, new int[] { Color.Argb(252, 244, 240, 231).ToArgb(), Color.Argb(252, 244, 240, 231).ToArgb() });
             bg.SetCornerRadii(new float[] { Px(18), Px(18), Px(18), Px(18), 0, 0, 0, 0 });
             bg.SetStroke(Px(1), Ui.Gold);
             panel.Background = bg;

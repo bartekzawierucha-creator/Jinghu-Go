@@ -100,9 +100,9 @@ namespace JianghuGo.Android
                 if (m.Y < -10 * _d) _motes[i] = m = NewMote(false);
                 var twinkle = 0.6f + (0.4f * (float)Math.Sin(m.Phase * 2.3f));
                 var a = (int)(255 * m.Alpha * twinkle);
-                _paint.Color = m.Jade ? Color.Argb(a / 2, 120, 220, 170) : Color.Argb(a / 2, 255, 210, 120);
+                _paint.Color = m.Jade ? Color.Argb(a / 3, 60, 70, 66) : Color.Argb(a / 3, 70, 66, 60);
                 canvas.DrawCircle(m.X, m.Y, m.R * 2.4f, _paint); // halo
-                _paint.Color = m.Jade ? Color.Argb(a, 180, 255, 210) : Color.Argb(a, 255, 236, 180);
+                _paint.Color = m.Jade ? Color.Argb(a * 2 / 3, 40, 46, 44) : Color.Argb(a * 2 / 3, 48, 44, 40);
                 canvas.DrawCircle(m.X, m.Y, m.R, _paint);
             }
 

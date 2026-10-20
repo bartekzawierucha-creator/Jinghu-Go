@@ -281,7 +281,7 @@ namespace JianghuGo.Android
                     var mine = m.CharacterId == c.Id;
                     var t = _ui.Text(m.Name + "  " + m.At.ToLocalTime().ToString("HH:mm") + "\n" + m.Text, list, 12, mine ? Ui.Gold : Ui.Ink, maxLines: 3);
                     var bg = new global::Android.Graphics.Drawables.GradientDrawable();
-                    bg.SetColor(mine ? Color.Argb(60, 200, 160, 80) : Color.Argb(110, 20, 24, 28));
+                    bg.SetColor(mine ? Color.Argb(60, 200, 160, 80) : Color.Argb(110, 244, 240, 231));
                     bg.SetCornerRadius(Px(10));
                     t.Background = bg;
                     t.SetPadding(Px(8), Px(4), Px(8), Px(4));

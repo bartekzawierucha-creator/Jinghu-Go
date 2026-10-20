@@ -16,19 +16,19 @@ namespace JianghuGo.Android
     public sealed partial class Ui
     {
         // palette
-        public static readonly Color Night = Color.Rgb(11, 14, 17);
-        public static readonly Color Paper = Color.Rgb(11, 14, 17);          // screen background
-        public static readonly Color PaperDark = Color.Rgb(18, 24, 28);      // inset background
-        public static readonly Color PanelFill = Color.Argb(224, 20, 26, 31);
-        public static readonly Color Ink = Color.Rgb(232, 220, 192);         // main text (parchment on night)
-        public static readonly Color Muted = Color.Rgb(150, 142, 124);
-        public static readonly Color Gold = Color.Rgb(212, 175, 96);
-        public static readonly Color GoldDim = Color.Rgb(122, 100, 56);
-        public static readonly Color Cinnabar = Color.Rgb(214, 72, 56);
-        public static readonly Color CinnabarDeep = Color.Rgb(120, 22, 18);
-        public static readonly Color Jade = Color.Rgb(86, 170, 104);
-        public static readonly Color QiBlue = Color.Rgb(74, 150, 222);
-        public static readonly Color Violet = Color.Rgb(160, 96, 220);
+        public static readonly Color Night = Color.Rgb(236, 231, 220);
+        public static readonly Color Paper = Color.Rgb(236, 231, 220);       // screen background (rice paper)
+        public static readonly Color PaperDark = Color.Rgb(222, 216, 203);   // inset background
+        public static readonly Color PanelFill = Color.Argb(232, 245, 241, 232);
+        public static readonly Color Ink = Color.Rgb(30, 28, 26);            // main text (ink on paper)
+        public static readonly Color Muted = Color.Rgb(110, 104, 96);
+        public static readonly Color Gold = Color.Rgb(158, 38, 28);
+        public static readonly Color GoldDim = Color.Rgb(84, 80, 74);
+        public static readonly Color Cinnabar = Color.Rgb(178, 40, 30);
+        public static readonly Color CinnabarDeep = Color.Rgb(118, 22, 16);
+        public static readonly Color Jade = Color.Rgb(40, 118, 80);
+        public static readonly Color QiBlue = Color.Rgb(38, 96, 160);
+        public static readonly Color Violet = Color.Rgb(104, 58, 150);
 
         private static readonly Dictionary<int, Bitmap> Bitmaps = new Dictionary<int, Bitmap>();
         private readonly Context _ctx;
@@ -116,7 +116,7 @@ namespace JianghuGo.Android
             t.SetTextColor(color ?? Ink);
             t.SetTypeface(bold ? Display : Body, bold ? TypefaceStyle.Bold : TypefaceStyle.Normal);
             t.SetLineSpacing(0, 1.12f);
-            t.SetShadowLayer(3, 0, 1, Color.Argb(200, 0, 0, 0));
+            t.SetShadowLayer(3, 0, 1, Color.Argb(170, 250, 247, 240));
             (parent ?? Content).AddView(t, Row());
             return t;
         }
@@ -157,7 +157,7 @@ namespace JianghuGo.Android
                 : number ? InputTypes.ClassNumber
                 : InputTypes.ClassText;
             var bg = new GradientDrawable();
-            bg.SetColor(Color.Argb(200, 8, 11, 13));
+            bg.SetColor(Color.Argb(200, 244, 240, 231));
             bg.SetStroke(Dp(1), GoldDim);
             bg.SetCornerRadius(Dp(6));
             e.Background = bg;
@@ -174,7 +174,7 @@ namespace JianghuGo.Android
             b.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 16);
             b.SetTypeface(Display, TypefaceStyle.Bold);
             b.SetTextColor(secondary ? Gold : Ink);
-            b.SetShadowLayer(2, 0, 1, Color.Argb(220, 0, 0, 0));
+            b.SetShadowLayer(2, 0, 1, Color.Argb(170, 250, 247, 240));
             b.Background = ButtonBackground(secondary);
             b.StateListAnimator = null;
             b.SetPadding(Dp(14), Dp(12), Dp(14), Dp(12));
@@ -254,7 +254,7 @@ namespace JianghuGo.Android
         public FrameLayout Tile(string title, string subtitle, int artRes, System.Action onClick, ViewGroup parent = null, int heightDp = 120, bool pixelArt = false, Color? accent = null, float titleSp = 17)
         {
             var tile = new FrameLayout(_ctx) { Clickable = true, Focusable = true, ClipToOutline = true };
-            tile.Background = new FrameDrawable(_density, Color.Argb(255, 14, 18, 22), accent ?? GoldDim, accent ?? Gold);
+            tile.Background = new FrameDrawable(_density, Color.Argb(255, 244, 240, 231), accent ?? GoldDim, accent ?? Gold);
             tile.SetPadding(Dp(2), Dp(2), Dp(2), Dp(2));
             if (artRes != 0)
             {
@@ -267,7 +267,7 @@ namespace JianghuGo.Android
             }
 
             var shade = new View(_ctx);
-            shade.Background = new GradientDrawable(GradientDrawable.Orientation.TopBottom, new int[] { Color.Argb(0, 0, 0, 0).ToArgb(), Color.Argb(60, 0, 0, 0).ToArgb(), Color.Argb(235, 6, 8, 10).ToArgb() });
+            shade.Background = new GradientDrawable(GradientDrawable.Orientation.TopBottom, new int[] { Color.Argb(0, 0, 0, 0).ToArgb(), Color.Argb(60, 0, 0, 0).ToArgb(), Color.Argb(235, 244, 240, 231).ToArgb() });
             tile.AddView(shade, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
 
             var text = new LinearLayout(_ctx) { Orientation = Orientation.Vertical };
@@ -276,7 +276,7 @@ namespace JianghuGo.Android
             t.SetTextSize(global::Android.Util.ComplexUnitType.Sp, titleSp);
             t.SetTypeface(Display, TypefaceStyle.Bold);
             t.SetTextColor(Ink);
-            t.SetShadowLayer(4, 0, 1, Color.Black);
+            t.SetShadowLayer(4, 0, 1, Color.Argb(170, 250, 247, 240));
             t.BreakStrategy = global::Android.Text.BreakStrategy.Simple;
             t.HyphenationFrequency = global::Android.Text.HyphenationFrequency.None;
             text.AddView(t);
@@ -286,7 +286,7 @@ namespace JianghuGo.Android
                 s.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 12);
                 s.SetTypeface(Body, TypefaceStyle.Normal);
                 s.SetTextColor(Gold);
-                s.SetShadowLayer(3, 0, 1, Color.Black);
+                s.SetShadowLayer(3, 0, 1, Color.Argb(170, 250, 247, 240));
                 text.AddView(s);
             }
 
@@ -305,7 +305,29 @@ namespace JianghuGo.Android
         }
 
         /// <summary>Drawable id by name ("item_jade"), or 0 when the art is missing.</summary>
-        public int ArtId(string name) => string.IsNullOrEmpty(name) ? 0 : _ctx.Resources.GetIdentifier(name, "drawable", _ctx.PackageName);
+        public int ArtId(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return 0;
+            if (InkAlias.TryGetValue(name, out var ink)) name = ink;
+            return _ctx.Resources.GetIdentifier(name, "drawable", _ctx.PackageName);
+        }
+
+        /// <summary>Old gold/pixel menu icons mapped to the brush-ink set (2.2 paper theme).</summary>
+        public static readonly Dictionary<string, string> InkAlias = new Dictionary<string, string>
+        {
+            ["menu_meditate"] = "ink_nav_home", ["menu_explore"] = "ink_nav_world", ["menu_battle"] = "ink_nav_combat",
+            ["menu_hero"] = "ink_nav_hero", ["menu_sect"] = "ink_nav_sect", ["menu_bag"] = "ink_nav_bag",
+            ["menu_chat"] = "ink_nav_social", ["gi_friends"] = "ink_nav_social", ["gi_mail"] = "ink_nav_social",
+            ["menu_quests"] = "ink_ico_quest", ["menu_scroll"] = "ink_ico_quest", ["gi_orders"] = "ink_ico_quest",
+            ["menu_market"] = "ink_ico_market", ["menu_daolab"] = "ink_ico_alchemy", ["menu_forge"] = "ink_ico_forge",
+            ["menu_meridians"] = "ink_ico_meridian", ["menu_pet"] = "ink_ico_beast", ["gi_evolve"] = "ink_ico_beast",
+            ["menu_settings"] = "ink_ico_settings", ["gi_settings"] = "ink_ico_settings",
+            ["menu_tower"] = "ink_ico_tower", ["gi_pagoda"] = "ink_ico_tower", ["menu_ranking"] = "ink_ico_ranking",
+            ["menu_breakthrough"] = "ink_ico_dao", ["menu_notifications"] = "ink_ico_event", ["menu_checkin"] = "ink_ico_journey",
+            ["menu_war"] = "ink_ico_demon", ["menu_worldboss"] = "ink_ico_demon", ["gi_wanted"] = "ink_ico_hunt", ["gi_bounty"] = "ink_ico_hunt",
+            ["menu_donate"] = "ink_ico_shop", ["menu_tribute"] = "ink_ico_shop", ["gi_pass"] = "ink_ico_achievement",
+            ["menu_territory"] = "ink_ico_place", ["gi_chronicle"] = "ink_ico_achievement",
+        };
 
         /// <summary>Puts an icon on the left of a label or button (no-op when the art is missing).</summary>
         public T WithIcon<T>(T view, string artName, float sizeDp = 34) where T : TextView
@@ -328,7 +350,7 @@ namespace JianghuGo.Android
             t.SetTypeface(Display, TypefaceStyle.Bold);
             t.SetTextColor(color);
             var bg = new GradientDrawable();
-            bg.SetColor(Color.Argb(200, 10, 13, 16));
+            bg.SetColor(Color.Argb(200, 244, 240, 231));
             bg.SetStroke(Dp(1), Color.Argb(160, color.R, color.G, color.B));
             bg.SetCornerRadius(Dp(12));
             t.Background = bg;
@@ -367,14 +389,16 @@ namespace JianghuGo.Android
         {
             _d = density;
             _fillColor = fill;
-            _shadow.Color = Color.Argb(110, 0, 0, 0);
+            _shadow.Color = Color.Argb(36, 0, 0, 0);
+            // paper theme: frames are ink lines; the seal red is kept only for the small corner accents
+            if (rim == Ui.Gold) rim = Color.Argb(190, 46, 43, 39);
             _rim.Color = rim;
             _rim.SetStyle(Paint.Style.Stroke);
             _rim.StrokeWidth = 1.3f * density;
             _inner.Color = Color.Argb(70, rim.R, rim.G, rim.B);
             _inner.SetStyle(Paint.Style.Stroke);
             _inner.StrokeWidth = 0.8f * density;
-            _bevel.Color = Color.Argb(55, 255, 236, 190);
+            _bevel.Color = Color.Argb(70, 255, 255, 255);
             _bevel.SetStyle(Paint.Style.Stroke);
             _bevel.StrokeWidth = 1f * density;
             _corner.Color = corner;
@@ -469,15 +493,15 @@ namespace JianghuGo.Android
             _rim.Color = secondary && !pressed ? Ui.GoldDim : Ui.Gold;
             _inner.SetStyle(Paint.Style.Stroke);
             _inner.StrokeWidth = 0.8f * density;
-            _inner.Color = Color.Argb(secondary ? 50 : 90, 255, 220, 150);
-            _glow.Color = Color.Argb(pressed ? 70 : 0, 255, 200, 110);
+            _inner.Color = Color.Argb(secondary ? 40 : 70, 255, 255, 255);
+            _glow.Color = Color.Argb(pressed ? 60 : 0, 178, 40, 30);
         }
 
         protected override void OnBoundsChange(Rect b)
         {
             base.OnBoundsChange(b);
-            var top = _secondary ? Color.Argb(240, 40, 47, 54) : Color.Rgb(204, 64, 46);
-            var bottom = _secondary ? Color.Argb(240, 14, 18, 22) : Ui.CinnabarDeep;
+            var top = _secondary ? Color.Argb(240, 248, 245, 238) : Color.Rgb(186, 52, 38);
+            var bottom = _secondary ? Color.Argb(240, 244, 240, 231) : Ui.CinnabarDeep;
             if (_pressed)
             {
                 (top, bottom) = (bottom, top);
@@ -530,7 +554,7 @@ namespace JianghuGo.Android
             _text.SetTypeface(Ui.Display);
             _text.Color = Ui.Ink;
             _text.TextAlign = Paint.Align.Center;
-            _text.SetShadowLayer(3, 0, 1, Color.Black);
+            _text.SetShadowLayer(3, 0, 1, Color.Argb(170, 250, 247, 240));
         }
 
         public string Text { get; set; }
@@ -552,7 +576,7 @@ namespace JianghuGo.Android
             var rect = new RectF(0, 0, w, h);
             _p.SetShader(null);
             _p.SetStyle(Paint.Style.Fill);
-            _p.Color = Color.Argb(230, 6, 8, 10);
+            _p.Color = Color.Argb(230, 244, 240, 231);
             canvas.DrawRoundRect(rect, r, r, _p);
 
             // ease towards the target value

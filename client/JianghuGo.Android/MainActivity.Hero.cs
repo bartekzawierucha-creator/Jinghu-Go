@@ -479,7 +479,7 @@ namespace JianghuGo.Android
 
                 Sfx.Play(Sfx.Breakthrough, 0.6f);
                 await ShowDaoLabAsync();
-                ShowBanner("NOWA TECHNIKA", created.Technique.NamePl, "Załóż ją w zakładce Techniki.", "tech_custom_attack");
+                ShowBanner("NOWA TECHNIKA", created.Technique.NamePl, "Załóż ją w zakładce Techniki.", "ink_popup_technique");
                 RefreshHud();
             }), buttons, sp: 13, heightDp: 46);
 

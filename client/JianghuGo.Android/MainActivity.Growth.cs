@@ -73,7 +73,7 @@ namespace JianghuGo.Android
             if (s.AutoBreakthroughs > 0) extra.Add(s.AutoBreakthroughs + "× auto-przełom");
             if (s.VesselFull) extra.Add("naczynie pełne");
             if (s.RetreatFinished) extra.Add("odosobnienie zakończone");
-            ShowBanner("GDY CIĘ NIE BYŁO", "+" + s.Qi.ToString("N0") + " Qi w " + hours.ToString("0.#") + " h", extra.Count > 0 ? string.Join(" · ", extra) : "Qi płynęło samo.", "menu_meditate");
+            ShowBanner("GDY CIĘ NIE BYŁO", "+" + s.Qi.ToString("N0") + " Qi w " + hours.ToString("0.#") + " h", extra.Count > 0 ? string.Join(" · ", extra) : "Qi płynęło samo.", "ink_popup_chest");
             Run(async () =>
             {
                 await flow.ApplyAsync(_api.AcknowledgeSummaryAsync, Ct);

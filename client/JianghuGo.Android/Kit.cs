@@ -77,8 +77,8 @@ namespace JianghuGo.Android
             b.SetAllCaps(false);
             b.SetTextSize(global::Android.Util.ComplexUnitType.Sp, sp);
             b.SetTypeface(Display, TypefaceStyle.Bold);
-            b.SetTextColor(secondary ? Gold : Ink);
-            b.SetShadowLayer(2, 0, 1, Color.Argb(220, 0, 0, 0));
+            b.SetTextColor(secondary ? Ink : Color.Rgb(252, 248, 240));
+            b.SetShadowLayer(2, 0, 1, Color.Argb(170, 250, 247, 240));
             b.Background = ButtonBackground(secondary);
             b.StateListAnimator = null;
             b.SetPadding(Dp(8), Dp(2), Dp(8), Dp(2));
@@ -107,7 +107,7 @@ namespace JianghuGo.Android
             t.SetTextSize(global::Android.Util.ComplexUnitType.Sp, sp);
             t.SetTextColor(color ?? Ink);
             t.SetTypeface(bold ? Display : Body, bold ? TypefaceStyle.Bold : TypefaceStyle.Normal);
-            t.SetShadowLayer(3, 0, 1, Color.Argb(200, 0, 0, 0));
+            t.SetShadowLayer(3, 0, 1, Color.Argb(170, 250, 247, 240));
             t.SetMaxLines(maxLines);
             t.Ellipsize = global::Android.Text.TextUtils.TruncateAt.End;
             if (center) t.Gravity = GravityFlags.Center;
@@ -132,7 +132,7 @@ namespace JianghuGo.Android
         public FrameLayout TileIn(ViewGroup cell, string title, string subtitle, int artRes, System.Action onClick, bool pixelArt = false, Color? accent = null, float titleSp = 14, string badge = null)
         {
             var tile = new FrameLayout(_ctx) { Clickable = true, Focusable = true, ClipToOutline = true };
-            tile.Background = new FrameDrawable(_density, Color.Argb(255, 14, 18, 22), accent ?? GoldDim, accent ?? Gold);
+            tile.Background = new FrameDrawable(_density, Color.Argb(255, 244, 240, 231), accent ?? GoldDim, accent ?? Gold);
             tile.SetPadding(Dp(2), Dp(2), Dp(2), Dp(2));
             if (artRes != 0)
             {
@@ -148,7 +148,7 @@ namespace JianghuGo.Android
             }
 
             var shade = new View(_ctx);
-            shade.Background = new GradientDrawable(GradientDrawable.Orientation.TopBottom, new int[] { Color.Argb(0, 0, 0, 0).ToArgb(), Color.Argb(40, 0, 0, 0).ToArgb(), Color.Argb(235, 6, 8, 10).ToArgb() });
+            shade.Background = new GradientDrawable(GradientDrawable.Orientation.TopBottom, new int[] { Color.Argb(0, 0, 0, 0).ToArgb(), Color.Argb(40, 0, 0, 0).ToArgb(), Color.Argb(235, 244, 240, 231).ToArgb() });
             tile.AddView(shade, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent));
             var text = new LinearLayout(_ctx) { Orientation = Orientation.Vertical };
             text.SetPadding(Dp(8), Dp(4), Dp(8), Dp(6));
@@ -156,7 +156,7 @@ namespace JianghuGo.Android
             t.SetTextSize(global::Android.Util.ComplexUnitType.Sp, titleSp);
             t.SetTypeface(Display, TypefaceStyle.Bold);
             t.SetTextColor(Ink);
-            t.SetShadowLayer(4, 0, 1, Color.Black);
+            t.SetShadowLayer(4, 0, 1, Color.Argb(170, 250, 247, 240));
             t.SetMaxLines(2);
             t.Ellipsize = global::Android.Text.TextUtils.TruncateAt.End;
             text.AddView(t);
@@ -166,7 +166,7 @@ namespace JianghuGo.Android
                 s.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 11);
                 s.SetTypeface(Body, TypefaceStyle.Normal);
                 s.SetTextColor(Gold);
-                s.SetShadowLayer(3, 0, 1, Color.Black);
+                s.SetShadowLayer(3, 0, 1, Color.Argb(170, 250, 247, 240));
                 s.SetMaxLines(1);
                 s.Ellipsize = global::Android.Text.TextUtils.TruncateAt.End;
                 text.AddView(s);
@@ -276,7 +276,7 @@ namespace JianghuGo.Android
                 }
                 else
                 {
-                    bg.SetColor(Color.Argb(220, 16, 20, 24));
+                    bg.SetColor(Color.Argb(220, 244, 240, 231));
                 }
 
                 bg.SetStroke(Dp(1), i == selected ? Gold : GoldDim);

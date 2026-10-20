@@ -41,7 +41,7 @@ namespace JianghuGo.Android
             var banner = new LinearLayout(this) { Orientation = Orientation.Vertical };
             banner.SetPadding(Px(10), Px(6), Px(10), Px(6));
             var bannerBg = new global::Android.Graphics.Drawables.GradientDrawable();
-            bannerBg.SetColor(Color.Argb(200, 8, 10, 12));
+            bannerBg.SetColor(Color.Argb(200, 244, 240, 231));
             bannerBg.SetCornerRadius(Px(10));
             banner.Background = bannerBg;
             mapFrame.AddView(banner, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent, GravityFlags.Top) { LeftMargin = Px(8), RightMargin = Px(56), TopMargin = Px(8) });
