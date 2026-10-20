@@ -46,7 +46,7 @@ namespace JianghuGo.Android
             }
             else if (tab == 1)
             {
-                Hunt(ui, page, hunt);
+                Hunt(ui, page, hunt, scout);
             }
             else if (tab == 2)
             {
@@ -179,7 +179,7 @@ namespace JianghuGo.Android
         /// Idle hunt: pick a training opponent and the character fights it on its own, one battle every few minutes for
         /// a few hours, even with the game closed. Rewards are real (Qi, loot, quests, pet XP) and share the daily cap.
         /// </summary>
-        private void Hunt(Ui ui, LinearLayout page, HuntDto hunt)
+        private void Hunt(Ui ui, LinearLayout page, HuntDto hunt, CombatScoutDto scout)
         {
             var c = _me;
             if (hunt == null)
@@ -414,6 +414,7 @@ namespace JianghuGo.Android
             // during the fight: speed, forfeit, leave; after it: fight again / next floor, back
             var controls = ui.HRow(page, 46, 6);
             Button speed = null;
+            Button again = null; // assigned below; Render (captured earlier) only runs after that
             speed = ui.Btn("Prędkość ×" + (int)BattleClock.Speed, () =>
             {
                 var next = (int)BattleClock.Speed % 3 + 1;
@@ -440,7 +441,7 @@ namespace JianghuGo.Android
                     if (gen == _screen) Render();
                 });
             }, controls, secondary: true, sp: 12, heightDp: 46);
-            var again = ui.Btn("Walcz ponownie", () => { }, controls, sp: 13, heightDp: 46);
+            again = ui.Btn("Walcz ponownie", () => { }, controls, sp: 13, heightDp: 46);
             again.Visibility = ViewStates.Gone;
             ui.Btn("Wyjdź", () => Run(origin.Back), controls, secondary: true, sp: 12, heightDp: 46);
             Func<Task> againRun = null;
