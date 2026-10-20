@@ -13,6 +13,9 @@ public interface IAccountRepository
     Task AddAsync(IUnitOfWork uow, Account account, CancellationToken ct);
     Task UpdateAsync(IUnitOfWork uow, Account account, CancellationToken ct);
 
+    /// <summary>Erasure (2.5): replaces the e-mail and password so the account can never sign in again.</summary>
+    Task AnonymizeAsync(IUnitOfWork uow, AccountId id, string email, string passwordHash, CancellationToken ct);
+
     /// <summary>Hash of the account's one-time recovery code (2.0), or null.</summary>
     Task<string?> FindRecoveryHashAsync(IUnitOfWork uow, AccountId id, CancellationToken ct);
 

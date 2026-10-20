@@ -79,6 +79,9 @@ public interface ISocialRepository
     Task<int> CountReportsSinceAsync(IUnitOfWork uow, CharacterId reporter, DateTimeOffset since, CancellationToken ct);
     Task<IReadOnlyList<PlayerReport>> OpenReportsAsync(IUnitOfWork uow, int limit, CancellationToken ct);
 
+    /// <summary>Account erasure (2.5): friendships, messages, unclaimed-or-not letters and blocks of a character disappear.</summary>
+    Task EraseAsync(IUnitOfWork uow, CharacterId c, CancellationToken ct);
+
     /// <summary>Jianghu news (2.3): false when this source was already reported.</summary>
     Task<bool> TryAddNewsAsync(IUnitOfWork uow, NewsItem item, CancellationToken ct);
     Task<IReadOnlyList<NewsItem>> NewsAsync(IUnitOfWork uow, int limit, CancellationToken ct);
@@ -523,6 +526,18 @@ internal sealed class InMemorySocialRepository : ISocialRepository
     public Task<int> CountReportsSinceAsync(IUnitOfWork uow, CharacterId reporter, DateTimeOffset since, CancellationToken ct) =>
         Task.FromResult(U(uow).Table<Guid, PlayerReport>(Reports).Values.Count(r => r.Reporter == reporter && r.CreatedAt >= since));
 
+    public Task EraseAsync(IUnitOfWork uow, CharacterId c, CancellationToken ct)
+    {
+        var u = U(uow);
+        u.SetTable(Links, u.Table<string, FriendLink>(Links).RemoveRange(u.Table<string, FriendLink>(Links).Where(kv => kv.Value.CharacterId == c || kv.Value.OtherId == c).Select(kv => kv.Key)));
+        u.SetTable(Messages, u.Table<Guid, DirectMessage>(Messages).RemoveRange(u.Table<Guid, DirectMessage>(Messages).Values.Where(m => m.FromId == c || m.ToId == c).Select(m => m.Id)));
+        u.SetTable(Mails, u.Table<Guid, Mail>(Mails).RemoveRange(u.Table<Guid, Mail>(Mails).Values.Where(m => m.FromId == c || m.ToId == c).Select(m => m.Id)));
+        var prefix = c.Value + ":";
+        var suffix = ":" + c.Value;
+        u.SetTable(Blocks, u.Table<string, DateTimeOffset>(Blocks).RemoveRange(u.Table<string, DateTimeOffset>(Blocks).Keys.Where(k => k.StartsWith(prefix, StringComparison.Ordinal) || k.EndsWith(suffix, StringComparison.Ordinal))));
+        return Task.CompletedTask;
+    }
+
     private const string News = "social.news";
 
     public Task<bool> TryAddNewsAsync(IUnitOfWork uow, NewsItem item, CancellationToken ct)
@@ -644,6 +659,16 @@ internal sealed class PostgresSocialRepository : ISocialRepository
     public async Task<int> CountReportsSinceAsync(IUnitOfWork uow, CharacterId reporter, DateTimeOffset since, CancellationToken ct) =>
         (await P(uow).QueryAsync("SELECT count(*)::int FROM social.reports WHERE reporter_id = $1 AND created_at >= $2", r => r.GetInt32(0), ct, reporter.Value, since))[0];
 
+    public async Task EraseAsync(IUnitOfWork uow, CharacterId c, CancellationToken ct)
+    {
+        var pg = P(uow);
+        await pg.ExecuteAsync("DELETE FROM social.friends WHERE character_id = $1 OR other_id = $1", ct, c.Value);
+        await pg.ExecuteAsync("DELETE FROM social.messages WHERE from_id = $1 OR to_id = $1", ct, c.Value);
+        await pg.ExecuteAsync("DELETE FROM social.mail WHERE from_id = $1 OR to_id = $1", ct, c.Value);
+        await pg.ExecuteAsync("DELETE FROM social.blocks WHERE blocker_id = $1 OR blocked_id = $1", ct, c.Value);
+        await pg.ExecuteAsync("DELETE FROM social.news WHERE character_id = $1", ct, c.Value);
+    }
+
     public async Task<bool> TryAddNewsAsync(IUnitOfWork uow, NewsItem n, CancellationToken ct) =>
         await P(uow).ExecuteAsync("INSERT INTO social.news (id, source_id, kind, character_id, text, created_at) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (source_id) DO NOTHING",
             ct, n.Id, n.SourceId, n.Kind, n.CharacterId, n.TextPl, n.At) == 1;
@@ -737,5 +762,19 @@ public static class NewsEndpoints
             return Results.Ok(new { items = items.Select(n => new { n.Id, n.Kind, n.CharacterId, n.TextPl, n.At }) });
         }).WithTags("Social").RequireAuthorization();
         return app;
+    }
+}
+
+/// <summary>Account erasure (2.5): the account's notifications and its characters' social traces are deleted.</summary>
+internal sealed class AccountErasureHandler(ISocialRepository social, INotificationRepository notifications, ICharacterDirectory characters) : IOutboxHandler
+{
+    public string EventType => JianghuGo.Modules.Identity.Domain.IdentityEvents.AccountDeleted;
+
+    public async Task HandleAsync(IUnitOfWork uow, OutboxMessage message, CancellationToken ct)
+    {
+        var e = message.Payload<JianghuGo.Modules.Identity.Domain.IdentityEvents.AccountDeletedV1>();
+        var account = new AccountId(e.AccountId);
+        foreach (var c in await characters.ListByAccountAsync(uow, account, ct)) await social.EraseAsync(uow, c.Id, ct);
+        await notifications.DeleteForAccountAsync(uow, account, ct);
     }
 }

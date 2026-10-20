@@ -18,6 +18,9 @@ public interface ICharacterRepository
     Task<bool> NameExistsAsync(IUnitOfWork uow, string normalizedName, CancellationToken ct);
     Task<CharacterId?> FindIdByNameAsync(IUnitOfWork uow, string normalizedName, CancellationToken ct);
 
+    /// <summary>Account erasure (2.5): the character keeps its progress for the world's consistency but loses its name.</summary>
+    Task RenameAsync(IUnitOfWork uow, CharacterId id, string name, string normalizedName, CancellationToken ct);
+
     /// <summary>Throws <see cref="DuplicateKeyException"/> on name collision.</summary>
     Task AddCharacterAsync(IUnitOfWork uow, Character character, CancellationToken ct);
 }

@@ -15,6 +15,10 @@ public interface ICharacterDirectory
     /// <summary>Any character (e.g. a PvP opponent). Character builds are public information in the game.</summary>
     Task<CharacterSummary?> FindAsync(IUnitOfWork uow, Guid characterId, CancellationToken ct);
 
+    /// <summary>All characters of an account (account erasure, data export).</summary>
+    Task<IReadOnlyList<CharacterSummary>> ListByAccountAsync(IUnitOfWork uow, AccountId accountId, CancellationToken ct) =>
+        Task.FromResult<IReadOnlyList<CharacterSummary>>([]);
+
     /// <summary>Exact name lookup (case-insensitive), e.g. to add a friend (1.9).</summary>
     Task<CharacterSummary?> FindByNameAsync(IUnitOfWork uow, string name, CancellationToken ct) => Task.FromResult<CharacterSummary?>(null);
 }
@@ -91,10 +95,31 @@ internal sealed class CharacterDirectory(ICharacterRepository repo) : ICharacter
         return c is null ? null : new CharacterSummary(c.Id, c.AccountId, c.Name, c.Path, c.Stats.ToDictionary(s => s.Key, s => s.Value));
     }
 
+    public async Task<IReadOnlyList<CharacterSummary>> ListByAccountAsync(IUnitOfWork uow, AccountId accountId, CancellationToken ct) =>
+        [.. (await repo.ListCharactersAsync(uow, accountId, ct)).Select(c => new CharacterSummary(c.Id, c.AccountId, c.Name, c.Path, c.Stats.ToDictionary(s => s.Key, s => s.Value)))];
+
     public async Task<CharacterSummary?> FindByNameAsync(IUnitOfWork uow, string name, CancellationToken ct)
     {
         if (string.IsNullOrWhiteSpace(name) || name.Length > 64) return null;
         var id = await repo.FindIdByNameAsync(uow, name.Trim().Normalize(System.Text.NormalizationForm.FormC).ToUpperInvariant(), ct);
         return id is null ? null : await FindAsync(uow, id.Value.Value, ct);
+    }
+}
+
+/// <summary>Account erasure (2.5): every character of the account becomes "Zapomniany …" (forgotten); names are freed.</summary>
+internal sealed class AccountDeletedRenamer(ICharacterRepository repo) : IOutboxHandler
+{
+    public string EventType => JianghuGo.Modules.Identity.Domain.IdentityEvents.AccountDeleted;
+
+    public async Task HandleAsync(IUnitOfWork uow, OutboxMessage message, CancellationToken ct)
+    {
+        var e = message.Payload<JianghuGo.Modules.Identity.Domain.IdentityEvents.AccountDeletedV1>();
+        foreach (var c in await repo.ListCharactersAsync(uow, new AccountId(e.AccountId), ct))
+        {
+            var suffix = c.Id.Value.ToString("N")[..8].ToUpperInvariant();
+            var name = "Zapomniany " + string.Concat(suffix.Select(ch => char.IsDigit(ch) ? (char)('A' + (ch - '0')) : ch));
+            if (c.Name == name) continue;
+            await repo.RenameAsync(uow, c.Id, name, name.ToUpperInvariant(), ct);
+        }
     }
 }

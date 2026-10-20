@@ -116,6 +116,7 @@ public static class JianghuApi
         app.MapArtsEndpoints();
         app.MapEstateEndpoints();
         app.MapOpsEndpoints();
+        app.MapDataExportEndpoints();
         return app;
     }
 

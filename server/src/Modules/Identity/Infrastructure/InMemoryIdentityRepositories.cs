@@ -38,6 +38,16 @@ internal sealed class InMemoryAccountRepository : IAccountRepository
         return Task.CompletedTask;
     }
 
+    public Task AnonymizeAsync(IUnitOfWork uow, AccountId id, string email, string passwordHash, CancellationToken ct)
+    {
+        var u = InMemoryUnitOfWork.From(uow);
+        var all = u.Table<AccountId, Account>(Accounts);
+        var a = all.GetValueOrDefault(id) ?? throw new InvalidOperationException("Account not found.");
+        u.SetTable(ByEmail, u.Table<string, AccountId>(ByEmail).Remove(a.Email).Add(email, id));
+        u.SetTable(Accounts, all.SetItem(id, a with { Email = email, PasswordHash = passwordHash, FailedLoginCount = 0, LockedUntil = null }));
+        return Task.CompletedTask;
+    }
+
     private const string Recovery = "identity.recovery_codes";
 
     public Task<string?> FindRecoveryHashAsync(IUnitOfWork uow, AccountId id, CancellationToken ct) =>

@@ -29,6 +29,7 @@ public interface INotificationRepository
     Task AddAsync(IUnitOfWork uow, Notification n, CancellationToken ct);
     Task<IReadOnlyList<Notification>> ListAsync(IUnitOfWork uow, AccountId accountId, bool unreadOnly, Guid? before, int limit, CancellationToken ct);
     Task<bool> MarkReadAsync(IUnitOfWork uow, AccountId accountId, Guid id, DateTimeOffset now, CancellationToken ct);
+    Task DeleteForAccountAsync(IUnitOfWork uow, AccountId accountId, CancellationToken ct);
 }
 
 public static class NotificationTypes
@@ -187,6 +188,14 @@ internal sealed class InMemoryNotificationRepository : INotificationRepository
         return Task.FromResult(list);
     }
 
+    public Task DeleteForAccountAsync(IUnitOfWork uow, AccountId accountId, CancellationToken ct)
+    {
+        var u = InMemoryUnitOfWork.From(uow);
+        var t = u.Table<Guid, Notification>(TableName);
+        u.SetTable(TableName, t.RemoveRange(t.Values.Where(n => n.AccountId == accountId).Select(n => n.Id)));
+        return Task.CompletedTask;
+    }
+
     public Task<bool> MarkReadAsync(IUnitOfWork uow, AccountId accountId, Guid id, DateTimeOffset now, CancellationToken ct)
     {
         var u = InMemoryUnitOfWork.From(uow);
@@ -216,6 +225,9 @@ internal sealed class PostgresNotificationRepository : INotificationRepository
             "SELECT id, account_id, type, payload::text, source_message_id, created_at, read_at FROM notifications.notifications " +
             "WHERE account_id = $1 AND ($2 = false OR read_at IS NULL) AND ($3::uuid IS NULL OR id < $3::uuid) ORDER BY id DESC LIMIT $4",
             Map, ct, accountId.Value, unreadOnly, before, limit);
+
+    public Task DeleteForAccountAsync(IUnitOfWork uow, AccountId accountId, CancellationToken ct) =>
+        PostgresUnitOfWork.From(uow).ExecuteAsync("DELETE FROM notifications.notifications WHERE account_id = $1", ct, accountId.Value);
 
     public async Task<bool> MarkReadAsync(IUnitOfWork uow, AccountId accountId, Guid id, DateTimeOffset now, CancellationToken ct)
     {
@@ -252,6 +264,7 @@ public static class NotificationsModule
         services.AddSingleton<SocialService>();
         services.AddSingleton<IOpsMetric, OpenReportsMetric>();
         services.AddSingleton<IOutboxHandler, RealmNewsHandler>();
+        services.AddSingleton<IOutboxHandler, AccountErasureHandler>();
 
         services.AddSingleton<IOutboxHandler, CharacterCreatedHandler>();
         services.AddSingleton<IOutboxHandler, ChallengeReceivedHandler>();

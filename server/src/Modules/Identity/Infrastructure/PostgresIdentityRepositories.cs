@@ -26,6 +26,10 @@ internal sealed class PostgresAccountRepository : IAccountRepository
             $"INSERT INTO identity.accounts ({Columns}) VALUES ($1, $2, $3, $4, $5, $6)",
             ct, a.Id.Value, a.Email, a.PasswordHash, a.CreatedAt, a.FailedLoginCount, a.LockedUntil);
 
+    public Task AnonymizeAsync(IUnitOfWork uow, AccountId id, string email, string passwordHash, CancellationToken ct) =>
+        PostgresUnitOfWork.From(uow).ExecuteAsync("UPDATE identity.accounts SET email = $2, password_hash = $3, failed_login_count = 0, locked_until = NULL WHERE id = $1",
+            ct, id.Value, email, passwordHash);
+
     public async Task<string?> FindRecoveryHashAsync(IUnitOfWork uow, AccountId id, CancellationToken ct) =>
         (await PostgresUnitOfWork.From(uow).QueryAsync("SELECT code_hash FROM identity.recovery_codes WHERE account_id = $1", r => r.GetString(0), ct, id.Value)).FirstOrDefault();
 

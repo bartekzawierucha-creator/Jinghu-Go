@@ -15,6 +15,8 @@ public sealed record ResetPasswordRequest(string? Email, string? RecoveryCode, s
 
 public sealed record ChangePasswordRequest(string? CurrentPassword, string? NewPassword);
 
+public sealed record DeleteAccountRequest(string? Password);
+
 public static class IdentityEndpoints
 {
     public const string AuthRateLimitPolicy = "auth";
@@ -50,6 +52,10 @@ public static class IdentityEndpoints
         auth.MapPost("/reset-password", async (ResetPasswordRequest body, IdentityService svc, CancellationToken ct) =>
                 ApiResults.From(await svc.ResetPasswordAsync(body.Email, body.RecoveryCode, body.NewPassword, ct), _ => Results.NoContent()))
             .RequireRateLimiting(AuthRateLimitPolicy);
+
+        auth.MapPost("/delete-account", async (DeleteAccountRequest body, HttpContext http, IdentityService svc, CancellationToken ct) =>
+                ApiResults.From(await svc.DeleteAccountAsync(http.User.GetAccountId(), body.Password, ct), _ => Results.NoContent()))
+            .RequireAuthorization().RequireRateLimiting(AuthRateLimitPolicy);
 
         auth.MapPost("/change-password", async (ChangePasswordRequest body, HttpContext http, IdentityService svc, CancellationToken ct) =>
                 ApiResults.From(await svc.ChangePasswordAsync(http.User.GetAccountId(), http.User.GetSessionId(), body.CurrentPassword, body.NewPassword, ct), _ => Results.NoContent()))

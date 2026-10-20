@@ -24,7 +24,8 @@ public sealed class IdentityService(
     ICorrelationContext correlation,
     IPasswordHasher<Account> hasher,
     TimeProvider clock,
-    IOptions<IdentityModuleOptions> options)
+    IOptions<IdentityModuleOptions> options,
+    IOutbox outbox)
 {
     private static readonly Error InvalidCredentials = Error.Unauthorized("invalid_credentials", "Invalid e-mail or password.");
     private static readonly Error InvalidRefreshToken = Error.Unauthorized("invalid_refresh_token", "Refresh token is invalid, expired or revoked.");
@@ -237,6 +238,31 @@ public sealed class IdentityService(
             foreach (var s in await sessions.ListActiveForAccountAsync(uow, accountId, ct))
                 if (s.FamilyId != keep) await sessions.UpdateAsync(uow, s with { RevokedAt = now, RevokeReason = SessionRevokeReason.Logout }, ct);
             await AuditAsync(uow, accountId, "account.password_changed", "account", accountId.ToString(), new { }, now, ct);
+            await uow.CommitAsync(ct);
+            return true;
+        }, ct);
+    }
+
+    /// <summary>
+    /// Deletes the account (2.5, right to erasure): the password confirms it; the e-mail and password are replaced so it can never
+    /// sign in again, every session ends, and the other modules anonymise characters and erase messages through the outbox.
+    /// The economy ledgers stay (anonymous) so the world's balances remain consistent.
+    /// </summary>
+    public async Task<Result<bool>> DeleteAccountAsync(AccountId accountId, string? password, CancellationToken ct)
+    {
+        var now = clock.GetUtcNow();
+        return await uowFactory.RunAsync<Result<bool>>(async uow =>
+        {
+            var account = await accounts.FindByIdAsync(uow, accountId, ct);
+            if (account is null) return Error.NotFound("account_not_found", "Account not found.");
+            if (string.IsNullOrEmpty(password) || hasher.VerifyHashedPassword(account, account.PasswordHash, password) == PasswordVerificationResult.Failed)
+                return Error.Unauthorized("invalid_credentials", "Password is wrong.");
+            var email = "deleted+" + accountId.Value.ToString("N") + "@deleted.invalid";
+            await accounts.AnonymizeAsync(uow, accountId, email, hasher.HashPassword(account, Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(32))), ct);
+            await accounts.SetRecoveryHashAsync(uow, accountId, null, now, ct);
+            await RevokeAllAsync(uow, accountId, now, ct);
+            await outbox.EnqueueAsync(uow, OutboxMessage.Create(IdentityEvents.AccountDeleted, new IdentityEvents.AccountDeletedV1(accountId.Value), now, correlation.CorrelationId), ct);
+            await AuditAsync(uow, accountId, "account.deleted", "account", accountId.ToString(), new { }, now, ct);
             await uow.CommitAsync(ct);
             return true;
         }, ct);

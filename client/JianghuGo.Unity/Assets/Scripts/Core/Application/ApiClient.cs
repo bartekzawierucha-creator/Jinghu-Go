@@ -71,6 +71,23 @@ namespace JianghuGo.Client.Application
         public Task ResetPasswordAsync(string email, string recoveryCode, string newPassword, CancellationToken ct) =>
             SendAsync<object>("POST", "/api/v1/auth/reset-password", new { email, recoveryCode, newPassword }, false, null, ct);
 
+        public Task DeleteAccountAsync(string password, CancellationToken ct) =>
+            SendAsync<object>("POST", "/api/v1/auth/delete-account", new { password }, true, null, ct);
+
+        /// <summary>The account's data as raw JSON text (GDPR export).</summary>
+        public async Task<string> ExportAsync(CancellationToken ct)
+        {
+            for (var attempt = 0; attempt < 2; attempt++)
+            {
+                var result = await SendWithNetworkRetryAsync("GET", "/api/v1/auth/export", null, _accessToken, null, ct).ConfigureAwait(false);
+                if (result.StatusCode == 401 && attempt == 0 && await RefreshAsync(_accessToken, ct).ConfigureAwait(false)) continue;
+                if (!result.IsSuccess) throw ToException(result);
+                return result.Body;
+            }
+
+            throw Unauthorized();
+        }
+
         public Task ChangePasswordAsync(string currentPassword, string newPassword, CancellationToken ct) =>
             SendAsync<object>("POST", "/api/v1/auth/change-password", new { currentPassword, newPassword }, true, null, ct);
 

@@ -406,7 +406,7 @@ namespace JianghuGo.Android
         /// <summary>Sound, music and phone reminders (2.0).</summary>
         private void ShowSettingsSheet()
         {
-            var body = Sheet("Ustawienia", 0.55f, out var close, "menu_notifications");
+            var body = Sheet("Ustawienia", 0.8f, out var close, "menu_notifications");
             void Toggle(string label, bool on, System.Action flip)
             {
                 _ui.Btn(label + ": " + (on ? "włączone" : "wyłączone"), () =>
@@ -456,9 +456,55 @@ namespace JianghuGo.Android
                     SetStatus("Hasło zmienione — inne urządzenia zostały wylogowane.");
                 }), sheet, sp: 14, heightDp: 44);
             }, acct, secondary: true, sp: 12, heightDp: 40);
+            var gdpr = _ui.HRow(body, 40, 4);
+            _ui.Btn("Pobierz moje dane", () => Run(async () =>
+            {
+                var json = await _api.ExportAsync(Ct);
+                var where = SaveExport(json);
+                SetStatus("Dane zapisane: " + where);
+            }), gdpr, secondary: true, sp: 12, heightDp: 40);
+            _ui.Btn("Usuń konto", () =>
+            {
+                close();
+                var sheet = Sheet("Usuń konto", 0.5f, out var closeSheet, "menu_settings");
+                _ui.Text("Konto zostanie zamknięte na zawsze: postacie stracą imiona, wiadomości i listy znikną, nie zalogujesz się ponownie.", sheet, 12, Ui.Cinnabar, maxLines: 4);
+                var pass = _ui.Field("Hasło, aby potwierdzić", password: true, parent: sheet);
+                _ui.Box(sheet, 1f, marginDp: 0);
+                _ui.Btn("Usuń na zawsze", () => Run(async () =>
+                {
+                    await _api.DeleteAccountAsync(pass.Text, Ct);
+                    closeSheet();
+                    await _api.LogoutAsync(Ct);
+                    ShowLogin();
+                    SetStatus("Konto usunięte.");
+                }), sheet, sp: 14, heightDp: 44);
+            }, gdpr, secondary: true, sp: 12, heightDp: 40);
             _ui.Text("Przypomnienia: koniec odosobnienia, gotowe partie w kotle i kuźni, plony, powrót uczniów i koniec polowania. Nic nie opuszcza telefonu.",
                 body, 11, Ui.Muted, maxLines: 3);
             _ui.Text("Jianghu Go " + (PackageManager?.GetPackageInfo(PackageName, 0)?.VersionName ?? string.Empty), body, 10, Ui.Muted, center: true);
+        }
+
+        /// <summary>Writes the data export to Downloads (Android 10+) or the app's own files folder; returns where.</summary>
+        private string SaveExport(string json)
+        {
+            var name = "jianghu-go-dane-" + DateTime.Now.ToString("yyyyMMdd-HHmm") + ".json";
+            var bytes = System.Text.Encoding.UTF8.GetBytes(json ?? "{}");
+            if (Build.VERSION.SdkInt >= BuildVersionCodes.Q)
+            {
+                var values = new global::Android.Content.ContentValues();
+                values.Put(global::Android.Provider.MediaStore.IMediaColumns.DisplayName, name);
+                values.Put(global::Android.Provider.MediaStore.IMediaColumns.MimeType, "application/json");
+                values.Put(global::Android.Provider.MediaStore.IMediaColumns.RelativePath, global::Android.OS.Environment.DirectoryDownloads);
+                var uri = ContentResolver.Insert(global::Android.Provider.MediaStore.Downloads.ExternalContentUri, values);
+                using (var stream = ContentResolver.OpenOutputStream(uri))
+                    stream.Write(bytes, 0, bytes.Length);
+                return "Pobrane/" + name;
+            }
+
+            var dir = GetExternalFilesDir(null)?.AbsolutePath ?? FilesDir.AbsolutePath;
+            var path = System.IO.Path.Combine(dir, name);
+            System.IO.File.WriteAllBytes(path, bytes);
+            return path;
         }
 
         /// <summary>The Jianghu chronicle: notable deeds of all cultivators (2.3).</summary>

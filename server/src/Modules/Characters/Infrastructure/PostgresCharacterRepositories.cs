@@ -86,6 +86,9 @@ internal sealed class PostgresCharacterRepository : ICharacterRepository
         return rows.Count == 0 ? null : new CharacterId(rows[0]);
     }
 
+    public Task RenameAsync(IUnitOfWork uow, CharacterId id, string name, string normalizedName, CancellationToken ct) =>
+        PostgresUnitOfWork.From(uow).ExecuteAsync("UPDATE characters.characters SET name = $2, normalized_name = $3 WHERE id = $1", ct, id.Value, name, normalizedName);
+
     public Task AddCharacterAsync(IUnitOfWork uow, Character c, CancellationToken ct) =>
         PostgresUnitOfWork.From(uow).ExecuteAsync(
             $"INSERT INTO characters.characters ({CharacterColumns.Replace("stats::text", "stats", StringComparison.Ordinal)}) " +

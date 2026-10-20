@@ -33,6 +33,7 @@ public static class CharactersModule
         services.AddScoped<CharacterService>();
         services.AddSingleton<Contracts.ICharacterDirectory, Contracts.CharacterDirectory>();
         services.AddSingleton<Contracts.IDestinyTokens, Contracts.DestinyTokens>();
+        services.AddSingleton<JianghuGo.Application.IOutboxHandler, Contracts.AccountDeletedRenamer>();
         return services;
     }
 
