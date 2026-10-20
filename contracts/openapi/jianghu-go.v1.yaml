@@ -491,6 +491,30 @@ paths:
       parameters: [{ name: limit, in: query, required: false, schema: { type: integer } }]
       responses:
         "200": { description: OK }
+  /api/v1/bounties:
+    get:
+      tags: [Combat]
+      summary: Open bounties (biggest first).
+      parameters: [{ name: characterId, in: query, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK }
+    post:
+      tags: [Combat]
+      summary: Put an escrowed bounty on a cultivator; a duel or arena victory over them pays it out.
+      parameters: [{ $ref: "#/components/parameters/IdempotencyKey" }]
+      responses:
+        "200": { description: OK }
+        "400": { $ref: "#/components/responses/Problem" }
+        "404": { $ref: "#/components/responses/Problem" }
+  /api/v1/bounties/{bountyId}/withdraw:
+    post:
+      tags: [Combat]
+      summary: Withdraw your unclaimed bounty (refund minus 10 %).
+      parameters: [{ name: bountyId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
   /api/v1/combat/catalog:
     get:
       tags: [Combat]

@@ -70,4 +70,19 @@ namespace JianghuGo.Client.Application
     {
         public List<NewsDto> Items { get; set; } = new List<NewsDto>();
     }
+
+    public sealed class BountyDto
+    {
+        public Guid Id { get; set; }
+        public Guid TargetCharacterId { get; set; }
+        public string TargetName { get; set; }
+        public long Stones { get; set; }
+        public DateTimeOffset CreatedAt { get; set; }
+        public bool Mine { get; set; }
+    }
+
+    public sealed class BountyPageDto
+    {
+        public List<BountyDto> Items { get; set; } = new List<BountyDto>();
+    }
 }

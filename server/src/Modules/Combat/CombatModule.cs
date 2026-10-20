@@ -40,10 +40,17 @@ public static class CombatModule
         if (StorageProvider.From(configuration) == StorageKind.Postgres)
         {
             services.AddSingleton<ICombatRepository, PostgresCombatRepository>();
+            services.AddSingleton<IBountyRepository, PostgresBountyRepository>();
             services.AddSingleton(new JianghuGo.Application.RetentionPolicy("combat.intents", "DELETE FROM combat.intents WHERE ctid IN (SELECT ctid FROM combat.intents WHERE submitted_at < $1 - interval '7 days' AND battle_id IN (SELECT id FROM combat.battles WHERE status IN ('finished', 'declined', 'expired')) LIMIT 1000)"));
         }
         else
+        {
             services.AddSingleton<ICombatRepository, InMemoryCombatRepository>();
+            services.AddSingleton<IBountyRepository, InMemoryBountyRepository>();
+        }
+
+        services.AddScoped<BountyService>();
+        services.AddSingleton<JianghuGo.Application.IOutboxHandler, BountyClaimHandler>();
         services.AddScoped<CombatService>();
         services.AddSingleton<Contracts.INpcNames>(new NpcNames(combat));
         services.AddScoped<Contracts.ICombatEncounters>(sp => sp.GetRequiredService<CombatService>());

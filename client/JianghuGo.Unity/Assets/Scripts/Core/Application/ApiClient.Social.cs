@@ -14,6 +14,15 @@ namespace JianghuGo.Client.Application
         public Task<NewsPageDto> GetNewsAsync(CancellationToken ct) =>
             SendAsync<NewsPageDto>("GET", "/api/v1/news?limit=40", null, true, null, ct);
 
+        public Task<BountyPageDto> GetBountiesAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<BountyPageDto>("GET", "/api/v1/bounties?characterId=" + characterId, null, true, null, ct);
+
+        public Task<BountyDto> PostBountyAsync(Guid characterId, string targetName, long stones, CancellationToken ct) =>
+            SendAsync<BountyDto>("POST", "/api/v1/bounties", new { characterId, targetName, stones }, true, NewIdempotencyKey(), ct);
+
+        public Task<object> WithdrawBountyAsync(Guid characterId, Guid bountyId, CancellationToken ct) =>
+            SendAsync<object>("POST", "/api/v1/bounties/" + bountyId + "/withdraw", new { characterId }, true, null, ct);
+
         public Task<FriendsDto> GetFriendsAsync(Guid characterId, CancellationToken ct) =>
             SendAsync<FriendsDto>("GET", Social(characterId) + "/friends", null, true, null, ct);
 

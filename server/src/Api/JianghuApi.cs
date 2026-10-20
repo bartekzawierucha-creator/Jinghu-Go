@@ -99,6 +99,7 @@ public static class JianghuApi
         app.MapCharacterEndpoints();
         app.MapCultivationEndpoints();
         app.MapCombatEndpoints();
+        JianghuGo.Modules.Combat.Application.BountyEndpoints.MapBountyEndpoints(app);
         app.MapDaoLabEndpoints();
         app.MapGeolocationEndpoints();
         app.MapWorldEndpoints();

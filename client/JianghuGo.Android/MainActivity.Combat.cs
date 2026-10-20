@@ -68,6 +68,7 @@ namespace JianghuGo.Android
             else
             {
                 ui.Text("Wyzwij kultywatora w Świecie (w okolicy) albo członka sekty.", page, 12, Ui.Muted, center: true, maxLines: 2);
+                ui.Btn("📜 Listy gończe", () => Run(BountySheetAsync), page, secondary: true, sp: 12, heightDp: 34);
                 ui.Pages(page, open.Count, 1, 4, (i, cell) =>
                 {
                     var b = open[i];
@@ -94,6 +95,43 @@ namespace JianghuGo.Android
                     }), row, sp: 12, heightDp: 38).LayoutParameters = new LinearLayout.LayoutParams(Px(96), Px(38)) { Gravity = GravityFlags.CenterVertical };
                 }, empty: "Brak trwających walk.");
             }
+        }
+
+        /// <summary>Bounty board (2.3): stones on a cultivator's head, paid to whoever beats them in a duel.</summary>
+        private async Task BountySheetAsync()
+        {
+            var c = _me;
+            var list = (await _api.GetBountiesAsync(c.Id, Ct)).Items;
+            var body = Sheet("Listy gończe", 0.8f, out var close, "menu_battle");
+            var row = _ui.HRow(body, 42, 4);
+            var name = _ui.Field("Imię celu", parent: row);
+            name.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 1.4f);
+            var stones = _ui.Field("KD (100+)", number: true, parent: row);
+            stones.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 1f) { LeftMargin = Px(4) };
+            _ui.Btn("Wystaw list gończy", () => Run(async () =>
+            {
+                long.TryParse(stones.Text, out var st);
+                await _api.PostBountyAsync(c.Id, name.Text?.Trim(), st, Ct);
+                close();
+                RefreshHud();
+                SetStatus("List gończy wystawiony — kto pokona " + name.Text?.Trim() + " w pojedynku, zgarnie " + st + " KD.");
+            }), body, sp: 13, heightDp: 38);
+            _ui.Pages(body, list.Count, 1, 5, (i, cell) =>
+            {
+                var b = list[i];
+                var card = _ui.Card(cell, 1f, 6, b.Mine ? Ui.Gold : Ui.Cinnabar, 0);
+                var r = _ui.HRow(card, 36, 0);
+                _ui.Text(b.TargetName + " — " + b.Stones.ToString("N0") + " KD", r, 13, Ui.Ink, bold: true)
+                    .LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f) { Gravity = GravityFlags.CenterVertical };
+                if (b.Mine)
+                    _ui.Btn("Wycofaj", () => Run(async () =>
+                    {
+                        await _api.WithdrawBountyAsync(c.Id, b.Id, Ct);
+                        close();
+                        RefreshHud();
+                        SetStatus("List wycofany (zwrot minus 10%).");
+                    }), r, secondary: true, sp: 11, heightDp: 32).LayoutParameters = new LinearLayout.LayoutParams(Px(84), Px(32));
+            }, empty: "Nikt nie jest teraz poszukiwany.");
         }
 
         /// <summary>
