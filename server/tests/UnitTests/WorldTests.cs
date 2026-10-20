@@ -99,4 +99,40 @@ public class WorldTests
         Assert.Equal(15, WorldGenerator.NodeReward(Config, "qi_spring", null));
         Assert.Equal(30, WorldGenerator.NodeReward(Config, "qi_spring", new ActiveEvent("k", "qi_storm", "x", 2000, Now)));
     }
+
+    [Fact]
+    public void Real_world_weather_places_and_keys_map_to_the_game()
+    {
+        Assert.Equal("rain", JianghuGo.Modules.World.Application.RealWorldRules.WeatherFor(61, 12));
+        Assert.Equal("storm", JianghuGo.Modules.World.Application.RealWorldRules.WeatherFor(95, 20));
+        Assert.Equal("snow", JianghuGo.Modules.World.Application.RealWorldRules.WeatherFor(73, -3));
+        Assert.Equal("fog", JianghuGo.Modules.World.Application.RealWorldRules.WeatherFor(45, 8));
+        Assert.Equal("heat", JianghuGo.Modules.World.Application.RealWorldRules.WeatherFor(0, 31));
+        Assert.Equal("clear", JianghuGo.Modules.World.Application.RealWorldRules.WeatherFor(2, 18));
+
+        var json = System.Text.Json.JsonDocument.Parse("""
+            {"elements":[
+              {"type":"node","id":42,"lat":50.0614,"lon":19.9372,"tags":{"amenity":"place_of_worship","name":"Kościół Mariacki"}},
+              {"type":"node","id":7,"lat":50.05,"lon":19.93,"tags":{"natural":"peak","name:pl":"Kopiec"}},
+              {"type":"node","id":9,"lat":50.05,"lon":19.93,"tags":{"shop":"bakery"}}
+            ]}
+            """).RootElement;
+        var places = JianghuGo.Modules.World.Application.RealWorldRules.ParseOverpass(json);
+        Assert.Equal(2, places.Count);
+        Assert.Equal("sacred_peak", places[0].Kind);
+        Assert.Equal("Kopiec", places[0].Name);
+        Assert.Equal("sacred_shrine", places[1].Kind);
+        Assert.True(places.All(p => Config.NodeKinds.Any(k => k.Id == p.Kind && k.RealOnly || k.Id == p.Kind)));
+
+        var key = JianghuGo.Modules.World.Application.RealWorldRules.Key(20380, 665, -1669, 9_876_543_210);
+        Assert.True(JianghuGo.Modules.World.Application.RealWorldRules.TryParseKey(key, out var day, out var rx, out var ry, out var id));
+        Assert.Equal((20380L, 665L, -1669L, 9_876_543_210L), (day, rx, ry, id));
+        Assert.False(WorldGenerator.TryParseKey(key, out var epoch, out _, out _, out _) && epoch >= 0); // never a procedural key
+        Assert.False(JianghuGo.Modules.World.Application.RealWorldRules.TryParseKey("5.1.2.3", out _, out _, out _, out _));
+
+        // real-only kinds never spawn procedurally
+        foreach (var k in Config.NodeKinds.Where(k => k.RealOnly))
+            for (long x = 0; x < 50; x++)
+                Assert.True(WorldGenerator.NodesInCell(Config, Seed, 7, x, 10000).All(n => n.Kind != k.Id));
+    }
 }

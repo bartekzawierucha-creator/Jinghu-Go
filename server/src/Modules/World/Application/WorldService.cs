@@ -32,7 +32,7 @@ public sealed record FlameSiteView(string Id, string NamePl, double Lat, double 
 public sealed record EventView(string Kind, string NamePl, int RewardMultiplierPermille, DateTimeOffset EndsAt);
 
 public sealed record RegionView(string NamePl, string Terrain, string TerrainNamePl, string? Weather, string? WeatherNamePl, DateTimeOffset WeatherEndsAt, bool Night,
-    string? BossNpcId, string? BossNamePl);
+    string? BossNpcId, string? BossNamePl, bool RealWeather = false, double? TemperatureC = null);
 
 public sealed record NearbyView(bool PositionVerified, string? PositionProblem, EventView? Event, IReadOnlyList<NodeView> Nodes, FlameSiteView NearestFlameSite,
     RegionView? Region = null);
@@ -58,8 +58,40 @@ public sealed class WorldService(
     IRandomSeedSource seeds,
     TimeProvider clock,
     INpcNames npcNames,
-    IEnumerable<ICombatRealm> realms)
+    IEnumerable<ICombatRealm> realms,
+    IRealWorldSource real)
 {
+    /// <summary>The region with the real weather when it is known (2.1); otherwise the procedural weather.</summary>
+    private (Region Region, RealWeather? Real) RegionWithWeather(GeoPoint at, DateTimeOffset now)
+    {
+        var region = WorldGenerator.RegionAt(config, secret.Seed, at, now);
+        if (!real.Enabled || config.Regions is null) return (region, null);
+        var (rx, ry) = WorldGenerator.RegionCell(config, at);
+        if (real.Weather(rx, ry, config.Regions.SizeDegrees) is not { } w || config.Regions.Weathers.FirstOrDefault(x => x.Id == w.WeatherId) is not { } weather)
+            return (region, null);
+        return (region with { Weather = weather, WeatherEndsAt = w.FetchedAt.AddMinutes(30) }, w);
+    }
+
+    /// <summary>Real places around a point as world nodes (2.1): they stay where they are; each can be visited once a day.</summary>
+    private IEnumerable<WorldNode> RealNodes(GeoPoint at, DateTimeOffset now)
+    {
+        if (!real.Enabled || config.Regions is not { } r) yield break;
+        var day = RealWorldRules.Day(now);
+        var (rx, ry) = WorldGenerator.RegionCell(config, at);
+        var dayEnd = DateTimeOffset.FromUnixTimeSeconds((day + 1) * 86_400);
+        for (var x = rx - 1; x <= rx + 1; x++)
+        for (var y = ry - 1; y <= ry + 1; y++)
+            foreach (var p in real.Places(x, y, r.SizeDegrees))
+                if (config.NodeKinds.Any(k => k.Id == p.Kind) && GeoMath.DistanceM(at, p.Point) <= config.NearbyRadiusM)
+                    yield return new WorldNode(RealWorldRules.Key(day, x, y, p.OsmId), p.Kind, p.Point, -day, dayEnd);
+    }
+
+    private RealPlace? RealPlaceOf(string? key, DateTimeOffset now)
+    {
+        if (!real.Enabled || config.Regions is not { } r || !RealWorldRules.TryParseKey(key, out var day, out var rx, out var ry, out var osmId)) return null;
+        if (day != RealWorldRules.Day(now)) return null;
+        return real.Places(rx, ry, r.SizeDegrees).FirstOrDefault(p => p.OsmId == osmId);
+    }
     private static readonly Error CharacterNotFound = Error.NotFound("character_not_found", "Character not found.");
 
     public Task<Result<NearbyView>> NearbyAsync(AccountId accountId, Guid characterId, CancellationToken ct) =>
@@ -72,16 +104,21 @@ public sealed class WorldService(
             if (check.LastKnown is not { } at) return Error.Conflict("no_position", "Start exploring and send a location first.");
 
             var ev = WorldGenerator.EventAt(config, secret.Seed, at, now);
-            var region = config.Regions is null ? null : WorldGenerator.RegionAt(config, secret.Seed, at, now);
+            var (region, realWeather) = config.Regions is null ? (null, null) : RegionWithWeather(at, now);
             var reveal = config.Regions?.HiddenRevealM ?? 0;
             var nodes = WorldGenerator.Nearby(config, secret.Seed, at, now)
-                .Where(n => !config.NodeKinds.First(k => k.Id == n.Kind).Hidden || GeoMath.DistanceM(at, n.Point) <= reveal).ToList();
+                .Where(n => !config.NodeKinds.First(k => k.Id == n.Kind).Hidden || GeoMath.DistanceM(at, n.Point) <= reveal)
+                .Concat(RealNodes(at, now)).OrderBy(n => GeoMath.DistanceM(at, n.Point)).ToList();
+            var names = real.Enabled && config.Regions is not null
+                ? nodes.Where(n => n.Epoch < 0).Select(n => (n.Key, Place: RealPlaceOf(n.Key, now))).Where(x => x.Place?.Name is not null)
+                    .ToDictionary(x => x.Key, x => x.Place!.Name!)
+                : new Dictionary<string, string>();
             var claimed = await repo.ClaimedAmongAsync(uow, c.Id, [.. nodes.Select(n => n.Key)], ct);
             var views = nodes.Select(n =>
             {
                 var d = GeoMath.DistanceM(at, n.Point);
                 var kind = config.NodeKinds.First(k => k.Id == n.Kind);
-                return new NodeView(n.Key, n.Kind, kind.NamePl, n.Point.Lat, n.Point.Lon, (int)Math.Round(d), d <= config.InteractionRadiusM,
+                return new NodeView(n.Key, n.Kind, names.TryGetValue(n.Key, out var placeName) ? kind.NamePl + ": " + placeName : kind.NamePl, n.Point.Lat, n.Point.Lon, (int)Math.Round(d), d <= config.InteractionRadiusM,
                     claimed.Contains(n.Key), WorldGenerator.NodeReward(config, n.Kind, ev, region?.Weather), n.ExpiresAt,
                     kind.NpcId == "@region" ? region?.BossNpcId : kind.NpcId, kind.Hidden);
             }).ToList();
@@ -95,7 +132,8 @@ public sealed class WorldService(
                 new FlameSiteView(site.Id, site.NamePl, site.Lat, site.Lon, (long)Math.Round(siteDistance), siteDistance <= config.Flame.RadiusM,
                     available > now ? available : null),
                 region is null ? null : new RegionView(region.NamePl, region.Terrain.Id, region.Terrain.NamePl, region.Weather?.Id, region.Weather?.NamePl, region.WeatherEndsAt,
-                    WorldGenerator.IsNight(now, at.Lon), region.BossNpcId, region.BossNpcId is null ? null : npcNames.NamePl(region.BossNpcId) ?? region.BossNpcId));
+                    WorldGenerator.IsNight(now, at.Lon), region.BossNpcId, region.BossNpcId is null ? null : npcNames.NamePl(region.BossNpcId) ?? region.BossNpcId,
+                    realWeather is not null, realWeather is null ? null : Math.Round(realWeather.TemperatureC, 1)));
         }, ct);
 
     /// <summary>
@@ -114,6 +152,8 @@ public sealed class WorldService(
                 var check = await positions.CheckAsync(uow, accountId, c.Id, now, ct);
                 if (check.Verified is not { } position) return Error.Conflict(check.Problem!, $"Your position cannot be used for rewards right now ({check.Problem}).");
                 var node = WorldGenerator.Resolve(config, secret.Seed, cmd.NodeKey, now);
+                if (node is null && RealPlaceOf(cmd.NodeKey, now) is { } place)
+                    node = new WorldNode(cmd.NodeKey!, place.Kind, place.Point, -RealWorldRules.Day(now), DateTimeOffset.FromUnixTimeSeconds((RealWorldRules.Day(now) + 1) * 86_400));
                 if (node is null) return Error.NotFound("node_not_found", "This node does not exist or has already faded.");
                 if (await repo.CountClaimsSinceAsync(uow, c.Id, now.AddHours(-1), ct) >= config.InteractionsPerHour)
                     return Error.LimitReached("interaction_limit", "Too many interactions this hour; rest a little.");
@@ -135,7 +175,7 @@ public sealed class WorldService(
                 else
                 {
                     reward = WorldGenerator.NodeReward(config, node.Kind, WorldGenerator.EventAt(config, secret.Seed, node.Point, now),
-                        config.Regions is null ? null : WorldGenerator.RegionAt(config, secret.Seed, node.Point, now).Weather);
+                        config.Regions is null ? null : RegionWithWeather(node.Point, now).Region.Weather);
                     await PayAsync(uow, accountId, c.Id, reward, "node:" + node.Kind, now, ct);
                     var realm = 0;
                     foreach (var r in realms) { realm = await r.RealmAsync(uow, c.Id.Value, ct); break; }

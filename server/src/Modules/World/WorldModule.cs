@@ -6,6 +6,7 @@ using JianghuGo.Modules.World.Domain;
 using JianghuGo.Modules.World.Infrastructure;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 namespace JianghuGo.Modules.World;
 
@@ -30,6 +31,18 @@ public static class WorldModule
         else
             services.AddSingleton<IWorldRepository, InMemoryWorldRepository>();
         services.AddScoped<WorldService>();
+        // 2.1: real weather and places from open data — on when RealWorld:Enabled is true (servers and phones with internet).
+        if (configuration.GetValue("RealWorld:Enabled", false))
+        {
+            services.AddHttpClient(OpenDataWorldSource.ClientName, c =>
+            {
+                c.Timeout = TimeSpan.FromSeconds(20);
+                c.DefaultRequestHeaders.UserAgent.ParseAdd("JianghuGo/2.1 (+https://github.com/bartekzawierucha-creator/Jinghu-Go)");
+            });
+            services.TryAddSingleton<IRealWorldSource, OpenDataWorldSource>();
+        }
+        else
+            services.TryAddSingleton<IRealWorldSource, NoRealWorld>(); // tests may provide their own
         return services;
     }
 

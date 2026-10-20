@@ -30,8 +30,9 @@ public sealed record CountRange(int Min, int Max);
 /// <param name="Time">"night" / "day": spawns only then (solar time at the node); null = always.</param>
 /// <param name="Hidden">A hidden place: visible only from close by.</param>
 /// <param name="NpcId">The beast fought here; "@region" = the region's boss.</param>
+/// <param name="RealOnly">Appears only at real places (OpenStreetMap, 2.1), never as a procedural spawn.</param>
 public sealed record NodeKind(string Id, string NamePl, string NameEn, int Weight, int RewardQi, string? NpcId, IReadOnlyList<NodeYield>? Yields = null,
-    string? Time = null, bool Hidden = false);
+    string? Time = null, bool Hidden = false, bool RealOnly = false);
 
 /// <summary>Regions: named areas (a few km) with a terrain that shapes what spawns, a region boss and changing weather.</summary>
 public sealed record RegionRules(double SizeDegrees, int WeatherEpochHours, double HiddenRevealM, IReadOnlyList<string> PrefixesPl, IReadOnlyList<string> NounsPl,
@@ -157,7 +158,7 @@ public static class WorldGenerator
         var list = new List<(NodeKind, int)>();
         foreach (var k in c.NodeKinds)
         {
-            if (k.Time == "night" && !night || k.Time == "day" && night) continue;
+            if (k.RealOnly || (k.Time == "night" && !night) || (k.Time == "day" && night)) continue;
             var w = terrain is null ? k.Weight : (int)((long)k.Weight * terrain.NodeWeightPermille.GetValueOrDefault(k.Id, 1000) / 1000);
             if (w > 0) list.Add((k, w));
         }
@@ -286,6 +287,9 @@ public static class WorldGenerator
     }
 
     /// <summary>The region at a point: a stable name, terrain and boss (per region), and the weather of the current weather epoch.</summary>
+    public static (long Rx, long Ry) RegionCell(WorldConfig c, GeoPoint at) =>
+        c.Regions is { } r ? ((long)Math.Floor(at.Lon / r.SizeDegrees), (long)Math.Floor(at.Lat / r.SizeDegrees)) : (0, 0);
+
     public static Region RegionAt(WorldConfig c, ulong worldSeed, GeoPoint at, DateTimeOffset now)
     {
         var r = c.Regions ?? throw new InvalidOperationException("Regions are not configured.");

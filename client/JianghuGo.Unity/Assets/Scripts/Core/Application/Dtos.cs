@@ -393,6 +393,10 @@ namespace JianghuGo.Client.Application
         public bool Night { get; set; }
         public string BossNpcId { get; set; }
         public string BossNamePl { get; set; }
+
+        /// <summary>Real weather of the region (2.1, open data) and its temperature.</summary>
+        public bool RealWeather { get; set; }
+        public double? TemperatureC { get; set; }
     }
 
     public sealed class FlameSiteDto

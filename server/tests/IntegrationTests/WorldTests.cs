@@ -5,6 +5,7 @@ using JianghuGo.Domain;
 using JianghuGo.Modules.World.Application;
 using JianghuGo.Modules.World.Domain;
 using JianghuGo.TestKit;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace JianghuGo.IntegrationTests;
 
@@ -337,5 +338,48 @@ public class WorldTests : IAsyncLifetime
         await e.WalkToAsync(spring.Point);
         Assert.Equal(HttpStatusCode.OK, (await e.InteractAsync(spring.Key)).StatusCode);
         Assert.Equal("interaction_limit", (await ApiHost.Json(await e.InteractAsync(herb.Key))).Str("code"));
+    }
+
+    private sealed class FakeRealWorld(GeoPoint place) : IRealWorldSource
+    {
+        public bool Enabled => true;
+
+        public RealWeather? Weather(long rx, long ry, double sizeDegrees) => new("storm", 17.4, 95, DateTimeOffset.UnixEpoch.AddYears(56));
+
+        public IReadOnlyList<RealPlace> Places(long rx, long ry, double sizeDegrees) =>
+            (rx, ry) == ((long)Math.Floor(place.Lon / sizeDegrees), (long)Math.Floor(place.Lat / sizeDegrees)) ? [new RealPlace(123456789012, "sacred_shrine", "Testowa Kaplica", place)] : [];
+    }
+
+    [Fact]
+    public async Task Real_places_and_weather_appear_and_a_place_pays_once_a_day()
+    {
+        await _host.DisposeAsync();
+        var shrine = SouthOf(Warsaw, 20);
+        _host = await ApiHost.StartAsync(services: s => s.AddSingleton<IRealWorldSource>(new FakeRealWorld(shrine)));
+        var e = await ExplorerAsync();
+        var near = await e.NearbyAsync();
+        Assert.Equal("storm", near["region"]!.Str("weather"));
+        Assert.True(near["region"]!["realWeather"]!.GetValue<bool>());
+        Assert.Equal(17.4, near["region"]!["temperatureC"]!.GetValue<double>());
+        var node = near["nodes"]!.AsArray().Select(n => n!.AsObject()).Single(n => n.Str("kind") == "sacred_shrine");
+        Assert.Equal("Święte Miejsce: Testowa Kaplica", node.Str("namePl"));
+        Assert.True(node["inRange"]!.GetValue<bool>());
+
+        var first = await e.InteractAsync(node.Str("key"));
+        Assert.Equal(HttpStatusCode.OK, first.StatusCode, await first.Content.ReadAsStringAsync());
+        Assert.True((await ApiHost.Json(first)).Int("rewardQi") > 0);
+        Assert.Equal(HttpStatusCode.Conflict, (await e.InteractAsync(node.Str("key"))).StatusCode);
+
+        // a forged key (unknown place, or another day) is rejected
+        Assert.Equal(HttpStatusCode.NotFound, (await e.InteractAsync(node.Str("key").Replace("123456789012", "999", StringComparison.Ordinal))).StatusCode);
+        _host.Clock.Advance(TimeSpan.FromDays(1));
+        await e.P.RefreshAsync();
+        await e.StartAsync();
+        await e.SendAsync(Warsaw);
+        var stale = await e.InteractAsync(node.Str("key"));
+        Assert.Equal(HttpStatusCode.NotFound, stale.StatusCode, await stale.Content.ReadAsStringAsync()); // yesterday's key
+        var today = (await e.NearbyAsync())["nodes"]!.AsArray().Select(n => n!.AsObject()).Single(n => n.Str("kind") == "sacred_shrine");
+        Assert.NotEqual(node.Str("key"), today.Str("key"));
+        Assert.Equal(HttpStatusCode.OK, (await e.InteractAsync(today.Str("key"))).StatusCode);         // the place pays again the next day
     }
 }

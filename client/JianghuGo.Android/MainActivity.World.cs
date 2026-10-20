@@ -119,7 +119,7 @@ namespace JianghuGo.Android
                 var iconName = boss ? "map_boss" : beast ? "map_beast" : node.Kind switch
                 {
                     "qi_spring" => "map_qi", "spirit_herb" => "map_herb", "lotus_pond" => "map_lotus", "bamboo_grove" => "map_bamboo",
-                    "shrine" => "map_shrine", "ore_vein" or "jade_outcrop" => "map_ore", "ancient_ruins" => "map_ruins", _ => "map_event",
+                    "shrine" or "sacred_shrine" => "map_shrine", "sacred_waterfall" => "map_lotus", "sacred_peak" => "map_ore", "ore_vein" or "jade_outcrop" => "map_ore", "ancient_ruins" => "map_ruins", _ => "map_event",
                 };
                 nodeIcon.SetImageBitmap(Ui.Art(this, ui.ArtId(iconName) != 0 ? ui.ArtId(iconName) : Resource.Drawable.map_event));
                 nodeName.Text = NodeGlyph(node.Kind) + " " + node.NamePl + (node.Harvested ? " ✓" : string.Empty);
@@ -139,7 +139,7 @@ namespace JianghuGo.Android
                 if (n?.Region is { } region)
                 {
                     regionLine.Visibility = ViewStates.Visible;
-                    regionLine.Text = (region.Night ? "🌙 " : "☀ ") + region.NamePl + " · " + region.TerrainNamePl + (region.WeatherNamePl != null ? " · " + region.WeatherNamePl : string.Empty)
+                    regionLine.Text = (region.Night ? "🌙 " : "☀ ") + region.NamePl + " · " + region.TerrainNamePl + (region.WeatherNamePl != null ? " · " + region.WeatherNamePl + (region.TemperatureC.HasValue ? " " + Math.Round(region.TemperatureC.Value) + "°C" : string.Empty) : string.Empty)
                                       + (region.BossNamePl != null ? " · władca: " + region.BossNamePl : string.Empty);
                 }
 
@@ -203,6 +203,7 @@ namespace JianghuGo.Android
                         if (ready) Interact(node);
                     }, row, secondary: !ready, sp: 12, heightDp: 36).LayoutParameters = new LinearLayout.LayoutParams(Px(92), Px(36));
                 }, empty: "Nic w pobliżu — przejdź kawałek.");
+                ui.Text("Prawdziwe miejsca: © współtwórcy OpenStreetMap · pogoda: Open-Meteo", body, 10, Ui.Muted, center: true);
             };
 
             peopleBtn.Click += (_, __) =>

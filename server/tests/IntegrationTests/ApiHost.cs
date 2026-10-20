@@ -41,7 +41,8 @@ public sealed class ApiHost : IAsyncDisposable
         bool? postgres = null,
         IRandomSeedSource? seeds = null,
         string? existingDatabase = null,
-        ManualTimeProvider? clock = null)
+        ManualTimeProvider? clock = null,
+        Action<IServiceCollection>? services = null)
     {
         var usePostgres = existingDatabase is not null || (postgres ?? TestDatabase.SuiteUsesPostgres);
         var database = existingDatabase ?? (usePostgres ? await TestDatabase.CreateAsync() : null);
@@ -67,6 +68,7 @@ public sealed class ApiHost : IAsyncDisposable
             {
                 b.Services.AddSingleton(seeds);
             }
+            services?.Invoke(b.Services);
             b.Logging.SetMinimumLevel(LogLevel.Warning);
         });
         await app.StartAsync();

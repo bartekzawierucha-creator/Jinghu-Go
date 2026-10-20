@@ -42,6 +42,8 @@ namespace JianghuGo.Android
                 ["World:Seed"] = SeedFor(context),
                 ["Logging:LogLevel:Default"] = "Warning",
                 ["RateLimiting:AuthPermitsPerMinute"] = "60",
+                // 2.1: real weather and real places from open data (only the ~3 km region is sent, never the position)
+                ["RealWorld:Enabled"] = "true",
             };
             foreach (var asset in context.Assets!.List("game-config")!)
             {
