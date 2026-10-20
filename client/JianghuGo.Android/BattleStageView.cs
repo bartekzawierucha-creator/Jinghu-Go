@@ -854,7 +854,13 @@ namespace JianghuGo.Android
                 case "corpse_puppet": return Tile(Resource.Drawable.tile_corpse_puppet, Human(Resource.Drawable.arena_swamp, 1.1f, T(140, 170, 140, 20, 30, 20), fx: "poison", speed: 0.75f));
                 case "bandit_chief": return Tile(Resource.Drawable.tile_bandit_chief, Boss(Human(Resource.Drawable.arena_bandit_fortress, 1.3f, T(255, 210, 160, 30, 15, 0), fx: "gold"), Ui.Gold));
                 case "blood_demon_lord": return Tile(Resource.Drawable.tile_blood_demon_lord, Boss(Human(Resource.Drawable.arena_blood_gate, 1.45f, T(255, 110, 110, 70, 0, 0), fx: "red"), Ui.Cinnabar));
-                case "storm_qilin": return Tile(Resource.Drawable.tile_worldboss, Boss(Beast(Resource.Drawable.arena_mountain, 1.5f, null, fx: "blue", speed: 1f), Ui.QiBlue));
+                case "storm_qilin": return Tile(Resource.Drawable.tile_storm_qilin, Boss(Beast(Resource.Drawable.arena_mountain, 1.5f, null, fx: "blue", speed: 1f), Ui.QiBlue));
+                case "flame_spirit_lesser": return Tile(Resource.Drawable.tile_flame_spirit_lesser, Human(Resource.Drawable.arena_ruins, 0.9f, T(255, 170, 90, 70, 20, 0), fx: "flame", speed: 1.2f));
+                case "flame_spirit_greater": return Tile(Resource.Drawable.tile_flame_spirit_greater, Human(Resource.Drawable.arena_ruins, 1.2f, T(255, 140, 70, 80, 20, 0), fx: "flame"));
+                case "flame_spirit_primal": return Tile(Resource.Drawable.tile_flame_spirit_primal, Boss(Beast(Resource.Drawable.arena_ruins, 1.5f, T(255, 130, 60, 90, 25, 0), fx: "flame", speed: 1.1f), Ui.Cinnabar));
+                case "heavenly_tribulation": return Tile(Resource.Drawable.tile_heavenly_tribulation, Boss(Human(Resource.Drawable.arena_mountain, 1.3f, T(200, 170, 255, 40, 20, 80), fx: "blue"), Ui.Violet));
+                case "flame_tribulation": return Tile(Resource.Drawable.tile_flame_tribulation, Boss(Human(Resource.Drawable.arena_mountain, 1.3f, T(255, 150, 80, 80, 20, 0), fx: "flame"), Ui.Cinnabar));
+                case "heart_demon_tribulation": return Tile(Resource.Drawable.tile_heart_demon_tribulation, Boss(Human(Resource.Drawable.arena_mountain, 1.15f, T(120, 100, 130, 40, 0, 20), fx: "red"), Ui.Violet));
                 case "stone_golem": return Tile(Resource.Drawable.tile_stone_golem, new Look { Base = "dummy", Scale = 1.4f, Tint = T(150, 150, 160, 20, 20, 25), Arena = Resource.Drawable.arena_temple, TileArt = Resource.Drawable.tile_dummy, AttackFx = "slash" });
             }
 

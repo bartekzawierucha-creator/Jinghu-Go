@@ -59,6 +59,28 @@ def rounded(size: int, radius: int) -> Image.Image:
     return m.resize((size, size), Image.LANCZOS)
 
 
+def auto_item(src: Image.Image, dest: Path) -> None:
+    import numpy as np
+
+    a = np.asarray(src.filter(ImageFilter.GaussianBlur(3))).astype(int)
+    border = np.concatenate([a[:8].reshape(-1, 3), a[-8:].reshape(-1, 3), a[:, :8].reshape(-1, 3), a[:, -8:].reshape(-1, 3)])
+    bg = np.median(border, axis=0)
+    mask = np.abs(a - bg).max(axis=2) > 45
+    ys, xs = np.nonzero(mask)
+    if len(xs) == 0:
+        raise ValueError(f"no object found for {dest.name}")
+    x0, x1 = np.percentile(xs, [1, 99]).astype(int)
+    y0, y1 = np.percentile(ys, [1, 99]).astype(int)
+    side = int(max(x1 - x0, y1 - y0) * 1.12)
+    cx, cy = (x0 + x1) // 2, (y0 + y1) // 2
+    box = (cx - side // 2, cy - side // 2, cx - side // 2 + side, cy - side // 2 + side)
+    canvas = Image.new("RGB", (side, side), tuple(int(v) for v in bg))
+    canvas.paste(src, (-box[0], -box[1]))
+    icon = canvas.resize((128, 128), Image.LANCZOS).convert("RGBA")
+    icon.putalpha(soft_circle(128, 2))
+    icon.save(dest, optimize=True)
+
+
 def items(sheet: Image.Image, out: Path) -> None:
     for (r, c), name in ITEMS.items():
         cx, cy, half = ITEM_COLS[c], ITEM_ROWS[r], 86
@@ -123,12 +145,31 @@ def main() -> None:
              "tile_corpse_puppet": ((0, 180, 768, 648), (396, 242)), "tile_thunder_eagle": ((0, 400, 768, 868), (396, 242)),
              "tile_frost_spider": ((0, 320, 768, 788), (396, 242)), "tile_sect_traitor": ((0, 130, 768, 598), (396, 242)),
              "tile_demonic_cultivator": ((0, 150, 768, 618), (396, 242)), "tile_stone_golem": ((0, 250, 768, 718), (396, 242)),
+             "tile_storm_qilin": ((0, 190, 768, 658), (396, 242)), "tile_flame_spirit_lesser": ((0, 130, 768, 598), (396, 242)),
+             "tile_flame_spirit_greater": ((0, 110, 768, 578), (396, 242)), "tile_flame_spirit_primal": ((0, 200, 768, 668), (396, 242)),
+             "tile_heavenly_tribulation": ((0, 100, 768, 568), (396, 242)), "tile_flame_tribulation": ((0, 250, 768, 718), (396, 242)),
+             "tile_heart_demon_tribulation": ((0, 120, 768, 588), (396, 242)),
              "portrait_poison": ((220, 170, 520, 470), (384, 384)), "portrait_flame": ((240, 150, 540, 450), (384, 384)),
              "portrait_body": ((240, 100, 540, 400), (384, 384))}
     for name, (box, size) in crops.items():
         if name in args:
             img = Image.open(args[name]).convert("RGB").crop(box).resize(size, Image.LANCZOS)
             img.save(out / (f"{name}.png" if name.startswith("tile_") else f"{name}.jpg"), **({"optimize": True} if name.startswith("tile_") else {"quality": 90}))
+    # single item paintings on a dark backdrop → round icons like the item sheet (box may run past the image: padded dark)
+    singles = {"item_breakthrough_pill_dao": (44, 350, 724, 1030), "item_ember_trace": (-196, 70, 964, 1230),
+               "item_void_mold": (24, 330, 744, 1050)}
+    for name, box in singles.items():
+        if name in args:
+            src = Image.open(args[name]).convert("RGB")
+            canvas = Image.new("RGB", (box[2] - box[0], box[3] - box[1]), src.getpixel((4, 4)))
+            canvas.paste(src, (-box[0], -box[1]))
+            icon = canvas.resize((128, 128), Image.LANCZOS).convert("RGBA")
+            icon.putalpha(soft_circle(128, 2))
+            icon.save(out / f"{name}.png", optimize=True)
+    # any other item_<id>=<painting>: the object is found automatically (pixels that differ from the backdrop)
+    for name, path in args.items():
+        if name.startswith("item_") and name not in singles:
+            auto_item(Image.open(path).convert("RGB"), out / f"{name}.png")
     if "key_art" in args:
         Image.open(args["key_art"]).convert("RGB").save(out / "key_art.jpg", quality=88)
 
