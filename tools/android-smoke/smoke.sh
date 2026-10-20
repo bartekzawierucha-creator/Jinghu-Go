@@ -50,7 +50,7 @@ $UI shot shots/03a-tutorial.png
 for i in 1 2 3 4 5 6 7; do $UI tap "Dalej" 20; sleep 1; done
 $UI tap "Ruszam w drogę" 20
 sleep 1
-$UI wait "Szansa przełomu" 60
+$UI wait "· przełom" 60
 $UI noscroll
 $UI shot shots/03-home.png
 $UI tap "Medytuj"
@@ -255,7 +255,7 @@ $UI wait "Z CAŁEGO JIANGHU" 60
 $UI shot shots/10-news.png
 adb shell input keyevent KEYCODE_BACK; sleep 2
 $UI tap "Kultywacja"
-$UI wait "Szansa przełomu" 60
+$UI wait "· przełom" 60
 
 step "restart: progress must survive"
 sleep 2
@@ -263,7 +263,7 @@ adb shell input keyevent KEYCODE_HOME
 sleep 2
 adb shell am force-stop $PKG
 adb shell monkey -p $PKG -c android.intent.category.LAUNCHER 1 >/dev/null
-$UI wait "Szansa przełomu" 90
+$UI wait "· przełom" 90
 $UI wait "Lin" 10
 $UI shot shots/08-after-restart.png
 
