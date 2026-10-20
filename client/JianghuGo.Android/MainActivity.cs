@@ -511,7 +511,15 @@ namespace JianghuGo.Android
             "movement" or "special" => "umiejętność specjalna",
             "rest" => "odpoczynek",
             "timeout" => "zwłoka",
-            _ => action,
+            "counter_stance" => "postawa kontry",
+            "stunned" => "ogłuszenie",
+            "bleed" => "krwawienie",
+            "burn" => "podpalenie",
+            "poison" => "trucizna",
+            "regen" => "regeneracja",
+            "pet" => "towarzysz",
+            "defend_stance" => "garda",
+            _ => action?.Replace('_', ' '),
         };
 
         private static string ResultName(BattleDto b) => b.Result switch
