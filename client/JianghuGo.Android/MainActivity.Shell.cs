@@ -347,6 +347,7 @@ namespace JianghuGo.Android
             {
                 await RefreshHudAsync(true);
                 MaybeShowTutorial(c);
+                await SendPendingCrashAsync();
             });
         }
 

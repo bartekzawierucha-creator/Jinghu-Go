@@ -38,6 +38,21 @@ paths:
       responses:
         "200": { description: OK }
         "404": { description: Disabled or wrong key }
+  /api/v1/telemetry/crash:
+    post:
+      tags: [Operations]
+      summary: Anonymous crash report (exception type, cleaned stack frames, app version, Android SDK).
+      responses:
+        "204": { description: Stored }
+        "400": { description: Invalid }
+  /ops/crashes:
+    get:
+      tags: [Operations]
+      summary: Latest crash reports (X-Ops-Key).
+      security: []
+      responses:
+        "200": { description: OK }
+        "404": { description: Disabled or wrong key }
   /ops/reports:
     get:
       tags: [Operations]

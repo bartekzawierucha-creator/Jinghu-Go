@@ -68,6 +68,9 @@ namespace JianghuGo.Android
             _compass = new Compass(this);
             Sfx.Init(this, _prefs);
             Music.Init(this, _prefs);
+            // Crash reports (2.5): remember the crash; it is sent anonymously after the next sign-in.
+            global::Android.Runtime.AndroidEnvironment.UnhandledExceptionRaiser += (_, e) => RememberCrash(e.Exception);
+            AppDomain.CurrentDomain.UnhandledException += (_, e) => RememberCrash(e.ExceptionObject as Exception);
             Ui.LoadFonts(this);
             BuildShell();
 
@@ -183,6 +186,46 @@ namespace JianghuGo.Android
             ShowLogin();
             SetStatus("Sesja wygasła — zaloguj się ponownie.");
         });
+        private void RememberCrash(Exception e)
+        {
+            if (e == null) return;
+            try
+            {
+                using (var edit = _prefs.Edit())
+                {
+                    edit.PutString("jianghu.crash.type", e.GetType().FullName);
+                    edit.PutString("jianghu.crash.stack", e.StackTrace ?? string.Empty);
+                    edit.Commit();
+                }
+            }
+            catch (Exception)
+            {
+                // never crash while recording a crash
+            }
+        }
+
+        private async Task SendPendingCrashAsync()
+        {
+            var type = _prefs.GetString("jianghu.crash.type", null);
+            if (type == null) return;
+            try
+            {
+                var version = PackageManager?.GetPackageInfo(PackageName, 0)?.VersionName ?? "0";
+                await _api.ReportCrashAsync(version, (int)Build.VERSION.SdkInt, type, _prefs.GetString("jianghu.crash.stack", string.Empty), Ct);
+            }
+            catch (Exception)
+            {
+                // try again next time... unless it was rejected
+            }
+
+            using (var edit = _prefs.Edit())
+            {
+                edit.Remove("jianghu.crash.type");
+                edit.Remove("jianghu.crash.stack");
+                edit.Apply();
+            }
+        }
+
         private DateTimeOffset? _sessionStarted;
         private int _restReminders;
 

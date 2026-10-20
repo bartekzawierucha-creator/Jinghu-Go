@@ -35,6 +35,13 @@ public static class OpsEndpoints
             return Results.Ok(new { at = now, values });
         });
 
+        g.MapGet("/crashes", async (HttpContext http, IConfiguration cfg, IUnitOfWorkFactory db, ICrashRepository repo, CancellationToken ct) =>
+        {
+            if (!Authorized(http, cfg)) return Results.NotFound();
+            var items = await db.RunAsync(uow => repo.LatestAsync(uow, 100, ct), ct);
+            return Results.Ok(new { items });
+        });
+
         g.MapGet("/reports", async (HttpContext http, IConfiguration cfg, IUnitOfWorkFactory db, ISocialRepository repo, CancellationToken ct) =>
         {
             if (!Authorized(http, cfg)) return Results.NotFound();

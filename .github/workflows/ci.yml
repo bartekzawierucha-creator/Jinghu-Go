@@ -56,6 +56,12 @@ jobs:
           dotnet server/src/Api/bin/Release/net10.0/JianghuGo.Api.dll --urls http://127.0.0.1:8080 > api.log 2>&1 &
           for i in $(seq 1 60); do curl -fs http://127.0.0.1:8080/health/ready && break; sleep 1; done
           dotnet run --project tools/load-test -c Release --no-build -- --url http://127.0.0.1:8080 --users 20 --seconds 30 --think-ms 500 --max-error-rate 0.01 --max-p95-ms 3000
+      - name: Balance report (tribulation odds per path; informative, does not fail the build)
+        continue-on-error: true
+        run: |
+          dotnet run --project server/tools/BalanceSim -c Release -- trib | tee balance-trib.txt
+          echo "### Balance (tribulations)" >> "$GITHUB_STEP_SUMMARY"
+          tail -n 40 balance-trib.txt >> "$GITHUB_STEP_SUMMARY"
       - name: Vulnerable dependency check
         run: dotnet list server/JianghuGo.sln package --vulnerable --include-transitive 2>&1 | tee vuln.txt && ! grep -q "has the following vulnerable packages" vuln.txt
 

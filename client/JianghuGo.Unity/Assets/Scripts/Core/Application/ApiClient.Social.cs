@@ -38,6 +38,9 @@ namespace JianghuGo.Client.Application
         public Task<object> CancelCraftOrderAsync(Guid characterId, Guid orderId, CancellationToken ct) =>
             SendAsync<object>("POST", "/api/v1/market/orders/" + orderId + "/cancel", new { characterId }, true, null, ct);
 
+        public Task<object> ReportCrashAsync(string appVersion, int androidSdk, string exceptionType, string stack, CancellationToken ct) =>
+            SendAsync<object>("POST", "/api/v1/telemetry/crash", new { appVersion, androidSdk, exceptionType, stack }, true, null, ct);
+
         public Task<FriendsDto> GetFriendsAsync(Guid characterId, CancellationToken ct) =>
             SendAsync<FriendsDto>("GET", Social(characterId) + "/friends", null, true, null, ct);
 
