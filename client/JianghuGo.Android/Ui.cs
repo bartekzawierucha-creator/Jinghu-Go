@@ -483,9 +483,10 @@ namespace JianghuGo.Android
                 (top, bottom) = (bottom, top);
             }
 
-            _fill.SetShader(new LinearGradient(0, b.Top, 0, b.Bottom, top.ToArgb(), bottom.ToArgb(), Shader.TileMode.Clamp));
+            // int[] overloads only: the two-colour overload taking ints binds to Java's packed @ColorLong one and crashes
+            _fill.SetShader(new LinearGradient(0, b.Top, 0, b.Bottom, new int[] { top.ToArgb(), bottom.ToArgb() }, null, Shader.TileMode.Clamp));
             _gloss.SetShader(new LinearGradient(0, b.Top, 0, b.Top + (b.Height() * 0.55f),
-                Color.Argb(_pressed ? 10 : 46, 255, 255, 255).ToArgb(), Color.Argb(0, 255, 255, 255).ToArgb(), Shader.TileMode.Clamp));
+                new int[] { Color.Argb(_pressed ? 10 : 46, 255, 255, 255).ToArgb(), Color.Argb(0, 255, 255, 255).ToArgb() }, null, Shader.TileMode.Clamp));
         }
 
         public override void Draw(Canvas canvas)

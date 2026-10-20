@@ -118,6 +118,11 @@ def main() -> None:
             Image.open(args[name]).convert("RGB").crop(box).save(out / f"{name}.jpg", quality=88)
     # enemy tiles (landscape 1.64:1) and hero avatars (square, around the face)
     crops = {"tile_bamboo_viper": ((0, 280, 768, 748), (396, 242)), "tile_fire_fox": ((0, 560, 768, 1028), (396, 242)),
+             "tile_blood_demon_lord": ((0, 190, 768, 658), (396, 242)), "tile_jiao_dragon": ((0, 240, 768, 708), (396, 242)),
+             "tile_ancient_tortoise": ((0, 420, 768, 888), (396, 242)), "tile_bandit_chief": ((0, 200, 768, 668), (396, 242)),
+             "tile_corpse_puppet": ((0, 180, 768, 648), (396, 242)), "tile_thunder_eagle": ((0, 400, 768, 868), (396, 242)),
+             "tile_frost_spider": ((0, 320, 768, 788), (396, 242)), "tile_sect_traitor": ((0, 130, 768, 598), (396, 242)),
+             "tile_demonic_cultivator": ((0, 150, 768, 618), (396, 242)), "tile_stone_golem": ((0, 250, 768, 718), (396, 242)),
              "portrait_poison": ((220, 170, 520, 470), (384, 384)), "portrait_flame": ((240, 150, 540, 450), (384, 384)),
              "portrait_body": ((240, 100, 540, 400), (384, 384))}
     for name, (box, size) in crops.items():

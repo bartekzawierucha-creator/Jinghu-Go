@@ -59,7 +59,9 @@ public class ClientEconomyTests : IAsyncLifetime
         var crafted = await flow.CraftAsync(recipe.Id, 1, default);
         var sword = Assert.NotNull(flow.Inventory.Find(crafted.CreatedItems.Single()));
         Assert.True(await flow.ToggleEquipAsync(sword, default));
-        Assert.Equal(2, flow.Inventory.Bonuses["strength"]);
+        // +2 strength scaled by the instance's quality, plus any rolled strength affix (both derived from the instance id)
+        var expectedStrength = (2 * ItemQuality.Of(sword.Id).StatPermille / 1000) + sword.Affixes.Where(x => x.Stat == "strength").Sum(x => x.Value);
+        Assert.Equal(expectedStrength, flow.Inventory.Bonuses.GetValueOrDefault("strength"));
 
         var stale = sword;                                            // version from before equipping
         Assert.False(await flow.ToggleEquipAsync(stale, default), "stale version reloads instead of failing");
