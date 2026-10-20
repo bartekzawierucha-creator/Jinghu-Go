@@ -85,4 +85,15 @@ namespace JianghuGo.Client.Application
     {
         public List<BountyDto> Items { get; set; } = new List<BountyDto>();
     }
+
+    public sealed class CodexEntryDto
+    {
+        public string NpcId { get; set; }
+        public long Victories { get; set; }
+    }
+
+    public sealed class CodexPageDto
+    {
+        public List<CodexEntryDto> Items { get; set; } = new List<CodexEntryDto>();
+    }
 }

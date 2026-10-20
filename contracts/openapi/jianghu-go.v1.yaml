@@ -515,6 +515,13 @@ paths:
         "200": { description: OK }
         "404": { $ref: "#/components/responses/Problem" }
         "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/quests/codex:
+    get:
+      tags: [Quests]
+      summary: Codex — species defeated with lifetime victories.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
   /api/v1/combat/catalog:
     get:
       tags: [Combat]

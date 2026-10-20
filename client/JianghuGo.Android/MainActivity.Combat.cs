@@ -60,6 +60,7 @@ namespace JianghuGo.Android
                     }, pixelArt: true, accent: Ui.Cinnabar, titleSp: 13, badge: "BOSS");
                 });
                 ui.Text("Bossowie legowisk walczą tylko w świecie — szukaj 👹 na mapie.", page, 11, Ui.Muted, center: true);
+                ui.Btn("📖 Kodeks bestii", () => Run(CodexSheetAsync), page, secondary: true, sp: 12, heightDp: 34);
             }
             else if (tab == 5)
             {
@@ -95,6 +96,23 @@ namespace JianghuGo.Android
                     }), row, sp: 12, heightDp: 38).LayoutParameters = new LinearLayout.LayoutParams(Px(96), Px(38)) { Gravity = GravityFlags.CenterVertical };
                 }, empty: "Brak trwających walk.");
             }
+        }
+
+        /// <summary>Codex (2.3): every species, revealed once defeated, with the number of victories.</summary>
+        private async Task CodexSheetAsync()
+        {
+            var seen = (await _api.GetCodexAsync(_me.Id, Ct)).Items.ToDictionary(x => x.NpcId, x => x.Victories);
+            var all = _catalog.Npcs.OrderBy(n => n.Tier).ThenBy(n => n.RewardQi).ToList();
+            var body = Sheet("Kodeks bestii (" + all.Count(n => seen.ContainsKey(n.Id)) + "/" + all.Count + ")", 0.85f, out _, "menu_battle");
+            _ui.Pages(body, all.Count, 2, 3, (i, cell) =>
+            {
+                var n = all[i];
+                var known = seen.TryGetValue(n.Id, out var wins);
+                var card = _ui.Card(cell, 1f, 6, known ? (n.Boss ? Ui.Cinnabar : Ui.Jade) : (Color?)null, 0);
+                _ui.Text(known ? n.NamePl : "???", card, 13, known ? Ui.Ink : Ui.Muted, bold: true);
+                _ui.Text(new string('★', Math.Clamp(n.Tier, 1, 5)) + (n.Boss ? " · BOSS" : string.Empty) + (n.Tameable ? " · 🐾" : string.Empty), card, 11, Ui.Gold);
+                _ui.Text(known ? "Pokonano " + wins + "×" : n.WorldOnly ? "Spotkasz w świecie" : "Czeka na treningu", card, 10, Ui.Muted);
+            });
         }
 
         /// <summary>Bounty board (2.3): stones on a cultivator's head, paid to whoever beats them in a duel.</summary>

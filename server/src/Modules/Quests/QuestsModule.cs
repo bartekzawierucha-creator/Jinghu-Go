@@ -74,6 +74,8 @@ public static class QuestsModule
             await Guard(async () => ApiResults.From(await svc.ClaimAsync(http.User.GetAccountId(), characterId, questId, ct), Results.Ok)));
         g.MapPost("/checkin", async (Guid characterId, HttpContext http, QuestService svc, CancellationToken ct) =>
             await Guard(async () => ApiResults.From(await svc.CheckinAsync(http.User.GetAccountId(), characterId, ct), Results.Ok)));
+        g.MapGet("/codex", async (Guid characterId, HttpContext http, QuestService svc, CancellationToken ct) =>
+            ApiResults.From(await svc.CodexAsync(http.User.GetAccountId(), characterId, ct), list => Results.Ok(new { items = list })));
         g.MapGet("/titles", async (Guid characterId, HttpContext http, QuestService svc, CancellationToken ct) =>
             ApiResults.From(await svc.TitlesAsync(http.User.GetAccountId(), characterId, ct), list => Results.Ok(new { items = list })));
         g.MapPut("/titles/selected", async (Guid characterId, SelectTitleCommand cmd, HttpContext http, QuestService svc, CancellationToken ct) =>
@@ -116,7 +118,8 @@ internal sealed class BattleCounter(IQuestRepository repo, ICharacterDirectory c
             }
 
             var pvp = e.Kind == "pvp";
-            await QuestCounter.CountAsync(repo, characters, config, uow, message, p.CharacterId, ct,
+            // Codex (2.3): every beast defeated is remembered (lifetime count per species), counted with the rest exactly once.
+            await QuestCounter.CountAsync(repo, characters, config, uow, message, p.CharacterId, pvp ? null : e.NpcId, ct,
                 (Metrics.BattlesWon, 1), (Metrics.PvpWon, pvp ? 1 : 0), (Metrics.BossesWon, !pvp && e.Boss ? 1 : 0),
                 (Metrics.ArenaWon, e.Kind == "arena" ? 1 : 0), (Metrics.TowerWon, e.Kind == "tower" ? 1 : 0), (Metrics.Tribulations, e.Kind == "tribulation" ? 1 : 0),
                 (Metrics.SpiritsWon, e.Kind == "spirit" ? 1 : 0), (Metrics.NightWins, night ? 1 : 0), (Metrics.FullMoonWins, moon ? 1 : 0),

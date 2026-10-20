@@ -23,6 +23,9 @@ namespace JianghuGo.Client.Application
         public Task<object> WithdrawBountyAsync(Guid characterId, Guid bountyId, CancellationToken ct) =>
             SendAsync<object>("POST", "/api/v1/bounties/" + bountyId + "/withdraw", new { characterId }, true, null, ct);
 
+        public Task<CodexPageDto> GetCodexAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<CodexPageDto>("GET", "/api/v1/characters/" + characterId + "/quests/codex", null, true, null, ct);
+
         public Task<FriendsDto> GetFriendsAsync(Guid characterId, CancellationToken ct) =>
             SendAsync<FriendsDto>("GET", Social(characterId) + "/friends", null, true, null, ct);
 

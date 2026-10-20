@@ -12,6 +12,8 @@ public sealed record QuestView(string Id, string NamePl, string DescriptionPl, s
 public sealed record StoryView(int Chapter, int Chapters, string Id, string TitlePl, string TextPl, string GoalPl, string Metric, long Target, long Progress, long Stones,
     string? Item, string? ItemNamePl, int ItemQuantity, bool Completed, bool Finished);
 
+public sealed record CodexEntry(string NpcId, long Victories);
+
 public sealed record ChallengeTierView(int Tier, long Threshold, long Stones, bool Reached, bool Claimed);
 
 /// <summary>This week's world event: a personal goal and the community challenge everyone pushes together (1.9).</summary>
@@ -207,6 +209,16 @@ public sealed class QuestService(
         return new ClaimResult(questId, stones, balance, after);
     }
 
+    /// <summary>The codex (2.3): species defeated, with lifetime victories.</summary>
+    public Task<Result<IReadOnlyList<CodexEntry>>> CodexAsync(AccountId accountId, Guid characterId, CancellationToken ct) =>
+        uowFactory.RunAsync<Result<IReadOnlyList<CodexEntry>>>(async uow =>
+        {
+            var c = await characters.FindOwnedAsync(uow, accountId, characterId, ct);
+            if (c is null) return CharacterNotFound;
+            var rows = await repo.ListAsync(uow, c.Id, QuestRules.Life, ct);
+            return Result<IReadOnlyList<CodexEntry>>.Success([.. rows.Where(r => r.Key.StartsWith("k_", StringComparison.Ordinal)).Select(r => new CodexEntry(r.Key[2..], r.Progress))]);
+        }, ct);
+
     /// <summary>All titles the character has earned (achievements, seasons, arena leagues, realms, arts) and the one shown.</summary>
     public Task<Result<IReadOnlyList<TitleView>>> TitlesAsync(AccountId accountId, Guid characterId, CancellationToken ct) =>
         uowFactory.RunAsync<Result<IReadOnlyList<TitleView>>>(async uow =>
@@ -381,8 +393,12 @@ public sealed class QuestService(
 /// <summary>Counts one event for one character exactly once (today's counter and the lifetime counter).</summary>
 internal static class QuestCounter
 {
+    public static Task CountAsync(IQuestRepository repo, ICharacterDirectory characters, QuestsConfig config, IUnitOfWork uow, OutboxMessage message,
+        Guid characterId, CancellationToken ct, params (string Metric, long Amount)[] increments) =>
+        CountAsync(repo, characters, config, uow, message, characterId, null, ct, increments);
+
     public static async Task CountAsync(IQuestRepository repo, ICharacterDirectory characters, QuestsConfig config, IUnitOfWork uow, OutboxMessage message,
-        Guid characterId, CancellationToken ct, params (string Metric, long Amount)[] increments)
+        Guid characterId, string? codexNpcId, CancellationToken ct, params (string Metric, long Amount)[] increments)
     {
         var items = increments.Where(i => i.Amount > 0).ToList();
         if (items.Count == 0) return;
@@ -393,6 +409,8 @@ internal static class QuestCounter
         var day = QuestRules.Period(date);
         var season = config.SeasonalList.Any(q => QuestRules.SeasonActive(q, date)) ? QuestRules.SeasonPeriod(date) : null;
         var weekly = QuestRules.WeeklyFor(config, date);
+        if (codexNpcId is { Length: > 0 and <= 60 } && System.Text.RegularExpressions.Regex.IsMatch(codexNpcId, "^[a-z0-9_]+$"))
+            await repo.AddProgressAsync(uow, c.Id, QuestRules.Life, "k_" + codexNpcId, 1, ct);
         var quarter = config.Pass is null ? null : QuestRules.QuarterPeriod(date);
         foreach (var (metric, amount) in items)
         {
