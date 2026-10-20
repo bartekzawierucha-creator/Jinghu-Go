@@ -115,4 +115,20 @@ namespace JianghuGo.Client.Application
     {
         public List<CraftOrderDto> Items { get; set; } = new List<CraftOrderDto>();
     }
+
+    public sealed class MentorDto
+    {
+        public Guid CharacterId { get; set; }
+        public string Name { get; set; }
+        public int Realm { get; set; }
+        public DateTimeOffset Since { get; set; }
+    }
+
+    public sealed class MentorshipDto
+    {
+        public MentorDto Master { get; set; }
+        public List<MentorDto> Disciples { get; set; } = new List<MentorDto>();
+        public bool CanTeach { get; set; }
+        public bool CanLearn { get; set; }
+    }
 }

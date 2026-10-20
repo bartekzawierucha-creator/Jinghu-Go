@@ -551,6 +551,30 @@ paths:
       parameters: [{ $ref: "#/components/parameters/CharacterId" }]
       responses:
         "200": { description: OK }
+  /api/v1/characters/{characterId}/social/mentorship:
+    get:
+      tags: [Social]
+      summary: Master and disciples of the character.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+  /api/v1/characters/{characterId}/social/mentorship/disciples:
+    post:
+      tags: [Social]
+      summary: Take a friend below realm 11 as a disciple (master from realm 22, at most 3).
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }]
+      responses:
+        "200": { description: OK }
+        "403": { $ref: "#/components/responses/Problem" }
+        "409": { $ref: "#/components/responses/Problem" }
+  /api/v1/characters/{characterId}/social/mentorship/{otherId}:
+    delete:
+      tags: [Social]
+      summary: End a master–disciple bond.
+      parameters: [{ $ref: "#/components/parameters/CharacterId" }, { name: otherId, in: path, required: true, schema: { type: string, format: uuid } }]
+      responses:
+        "200": { description: OK }
+        "404": { $ref: "#/components/responses/Problem" }
   /api/v1/combat/catalog:
     get:
       tags: [Combat]

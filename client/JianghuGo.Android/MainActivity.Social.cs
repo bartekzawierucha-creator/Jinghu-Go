@@ -12,10 +12,13 @@ namespace JianghuGo.Android
     // 1.9: friends, direct messages and letters with gifts. The server decides limits and fees; the screen only asks.
     public sealed partial class MainActivity
     {
+        private MentorshipDto _mentorship;
+
         private async Task ShowFriendsAsync()
         {
             var c = _me;
             var f = await _api.GetFriendsAsync(c.Id, Ct);
+            _mentorship = await _api.GetMentorshipAsync(c.Id, Ct);
             var ui = NewScreen("Przyjaciele", () => Run(ShowInboxAsync), Resource.Drawable.place_altar, "ZNAJOMI · ROZMOWY · POCZTA");
             var page = ui.Content;
             var row = ui.HRow(page, 46, 6);
@@ -30,6 +33,11 @@ namespace JianghuGo.Android
                 SetStatus("Wysłano zaproszenie: " + n);
             }), row, sp: 13, heightDp: 46).LayoutParameters = new LinearLayout.LayoutParams(Px(92), ViewGroup.LayoutParams.MatchParent) { LeftMargin = Px(6) };
 
+            var ms = _mentorship;
+            if (ms.Master != null || ms.Disciples.Count > 0)
+                ui.Text((ms.Master != null ? "Mistrz: " + ms.Master.Name + " (+5% obrażeń i gardy)" : string.Empty)
+                    + (ms.Disciples.Count > 0 ? (ms.Master != null ? " · " : string.Empty) + "Uczniowie: " + string.Join(", ", ms.Disciples.Select(d => d.Name + " (" + (d.Realm + 1) + ")")) : string.Empty),
+                    page, 11, Ui.Jade, center: true, maxLines: 2);
             ui.Btn(f.UnreadMail > 0 ? "✉ Poczta (" + f.UnreadMail + " z darami)" : "✉ Poczta", () => Run(ShowMailAsync), page, secondary: f.UnreadMail == 0, sp: 13, heightDp: 38);
 
             var entries = f.Incoming.Concat(f.Friends).Concat(f.Outgoing).ToList();
@@ -96,6 +104,17 @@ namespace JianghuGo.Android
                         SetStatus("Zgłoszenie wysłane do moderatorów. Dziękujemy.");
                     }), sheet, secondary: true, sp: 13, heightDp: 40);
             }, mod, secondary: true, sp: 11, heightDp: 30);
+            var ms = _mentorship;
+            var isDisciple = ms?.Disciples.Any(d => d.CharacterId == friend.CharacterId) == true;
+            var isMaster = ms?.Master?.CharacterId == friend.CharacterId;
+            if (isDisciple || isMaster || ms?.CanTeach == true)
+                _ui.Btn(isDisciple ? "Zwolnij ucznia" : isMaster ? "Odejdź od mistrza" : "Weź na ucznia", () => Run(async () =>
+                {
+                    _mentorship = isDisciple || isMaster ? await _api.EndMentorshipAsync(c.Id, friend.CharacterId, Ct) : await _api.TakeDiscipleAsync(c.Id, friend.CharacterId, Ct);
+                    close();
+                    await ShowFriendsAsync();
+                    SetStatus(isDisciple || isMaster ? "Więź mistrza i ucznia zakończona." : friend.Name + " jest teraz twoim uczniem — za każde jego nowe królestwo dostaniesz 300 KD.");
+                }), mod, secondary: true, sp: 11, heightDp: 30);
             _ui.Btn("Zablokuj", () => Run(async () =>
             {
                 await _api.BlockAsync(c.Id, friend.CharacterId, true, Ct);

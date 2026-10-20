@@ -41,6 +41,15 @@ namespace JianghuGo.Client.Application
         public Task<object> ReportCrashAsync(string appVersion, int androidSdk, string exceptionType, string stack, CancellationToken ct) =>
             SendAsync<object>("POST", "/api/v1/telemetry/crash", new { appVersion, androidSdk, exceptionType, stack }, true, null, ct);
 
+        public Task<MentorshipDto> GetMentorshipAsync(Guid characterId, CancellationToken ct) =>
+            SendAsync<MentorshipDto>("GET", Social(characterId) + "/mentorship", null, true, null, ct);
+
+        public Task<MentorshipDto> TakeDiscipleAsync(Guid characterId, Guid discipleCharacterId, CancellationToken ct) =>
+            SendAsync<MentorshipDto>("POST", Social(characterId) + "/mentorship/disciples", new { discipleCharacterId }, true, null, ct);
+
+        public Task<MentorshipDto> EndMentorshipAsync(Guid characterId, Guid otherId, CancellationToken ct) =>
+            SendAsync<MentorshipDto>("DELETE", Social(characterId) + "/mentorship/" + otherId, null, true, null, ct);
+
         public Task<FriendsDto> GetFriendsAsync(Guid characterId, CancellationToken ct) =>
             SendAsync<FriendsDto>("GET", Social(characterId) + "/friends", null, true, null, ct);
 

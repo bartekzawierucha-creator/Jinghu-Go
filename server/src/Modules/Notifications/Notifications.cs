@@ -250,6 +250,7 @@ public static class NotificationsModule
             services.AddSingleton<INotificationRepository, PostgresNotificationRepository>();
             services.AddSingleton<ISocialRepository, PostgresSocialRepository>();
             services.AddSingleton<ICrashRepository, PostgresCrashRepository>();
+            services.AddSingleton<IMentorRepository, PostgresMentorRepository>();
             services.AddSingleton(new JianghuGo.Application.RetentionPolicy("social.crash_reports", "DELETE FROM social.crash_reports WHERE ctid IN (SELECT ctid FROM social.crash_reports WHERE created_at < $1 - interval '30 days' LIMIT 1000)"));
             services.AddSingleton(new JianghuGo.Application.RetentionPolicy("social.messages", "DELETE FROM social.messages WHERE ctid IN (SELECT ctid FROM social.messages WHERE created_at < $1 - interval '90 days' LIMIT 1000)"));
             services.AddSingleton(new JianghuGo.Application.RetentionPolicy("social.news", "DELETE FROM social.news WHERE ctid IN (SELECT ctid FROM social.news WHERE created_at < $1 - interval '30 days' LIMIT 1000)"));
@@ -262,11 +263,15 @@ public static class NotificationsModule
             services.AddSingleton<INotificationRepository, InMemoryNotificationRepository>();
             services.AddSingleton<ISocialRepository, InMemorySocialRepository>();
             services.AddSingleton<ICrashRepository, InMemoryCrashRepository>();
+            services.AddSingleton<IMentorRepository, InMemoryMentorRepository>();
         }
 
         services.AddSingleton<SocialService>();
         services.AddSingleton<IOpsMetric, OpenReportsMetric>();
         services.AddSingleton<IOpsMetric, CrashesMetric>();
+        services.AddSingleton<MentorService>();
+        services.AddSingleton<JianghuGo.Modules.Combat.Contracts.ICombatPerkBonuses, DiscipleCombatPerks>();
+        services.AddSingleton<IOutboxHandler, DiscipleBreakthroughHandler>();
         services.AddSingleton<IOutboxHandler, RealmNewsHandler>();
         services.AddSingleton<IOutboxHandler, AccountErasureHandler>();
 
