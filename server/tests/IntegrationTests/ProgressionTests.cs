@@ -310,7 +310,7 @@ public class ProgressionTests : IAsyncLifetime
         Assert.True(hunt["finished"]!.GetValue<bool>());
         var wins = hunt.Int("wins");
         Assert.True(wins > 0 && wins + hunt.Int("losses") <= 48, hunt.Compact());
-        Assert.True(hunt.Int("qi") <= 20 * 5, "idle wins share the daily rewarded-wins cap");
+        Assert.True(hunt.Int("qi") <= 20 * 15, "idle wins share the daily rewarded-wins cap (tier 1: 15 % of a 100 Qi stage)");
 
         var final = (await Ok(await p.PostAsync(url + "/claim")))["hunt"]!.AsObject();
         Assert.Equal(48, final.Int("battles"));

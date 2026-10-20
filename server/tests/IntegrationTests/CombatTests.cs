@@ -253,15 +253,15 @@ public class CombatTests : IAsyncLifetime
         var battle = await Ok(await StartPve(p, c, "training_dummy"), HttpStatusCode.Created);
         var end = await FightToTheEndAsync(p, battle);
         Assert.Equal("won", end.Str("result"));
-        Assert.Equal(4, end.Int("rewardQi"));                         // 1.7: tier 1 pays 4 % of the stage's Qi (100) → 4
+        Assert.Equal(15, end.Int("rewardQi"));                        // 2.2: tier 1 pays 15 % of the stage's Qi (100) → 15
 
         var cultivation = $"/api/v1/characters/{c.Str("id")}/cultivation";
         Assert.Equal(0, (await Ok(await p.GetAsync(cultivation))).Int("qi"), "reward arrives via the worker, not inline");
         await _host.DrainOutboxAsync();
-        Assert.Equal(4, (await Ok(await p.GetAsync(cultivation))).Int("qi"));
+        Assert.Equal(15, (await Ok(await p.GetAsync(cultivation))).Int("qi"));
         Assert.Equal(0, await _host.DrainOutboxAsync());
         var notifications = (await Ok(await p.GetAsync("/api/v1/notifications")))["items"]!.AsArray();
-        Assert.True(notifications.Any(n => n is not null && n.Str("type") == "battle_won" && n["payload"].Int("rewardQi") == 4));
+        Assert.True(notifications.Any(n => n is not null && n.Str("type") == "battle_won" && n["payload"].Int("rewardQi") == 15));
 
         var loadout = await Ok(await p.GetAsync($"/api/v1/characters/{c.Str("id")}/combat/loadout"));
         var trained = loadout["known"]!.AsArray().Where(k => k!.Int("xp") > 0 || k.Int("level") > 1).ToList();
@@ -373,12 +373,12 @@ public class CombatTests : IAsyncLifetime
         var second = await FightToTheEndAsync(p, await Ok(await StartPve(p, c), HttpStatusCode.Created));
         Assert.Equal("won", first.Str("result"));
         Assert.Equal("won", second.Str("result"));
-        Assert.Equal(4, first.Int("rewardQi"));
+        Assert.Equal(15, first.Int("rewardQi"));
         Assert.Equal(0, second.Int("rewardQi"), "second win in 24 h exceeds the configured limit of 1");
 
         _host.Clock.Advance(TimeSpan.FromHours(25));
         await p.RefreshAsync();
         var third = await FightToTheEndAsync(p, await Ok(await StartPve(p, c), HttpStatusCode.Created));
-        Assert.Equal(4, third.Int("rewardQi"));
+        Assert.Equal(15, third.Int("rewardQi"));
     }
 }
