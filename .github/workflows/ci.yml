@@ -35,11 +35,23 @@ jobs:
       - name: Unit tests
         run: dotnet run --project server/tests/UnitTests -c Release --no-build
       - name: Integration suite on the in-memory store
-        run: dotnet run --project server/tests/IntegrationTests -c Release --no-build
+        # failures are also published as annotations (readable through the API without the full log)
+        run: |
+          set -o pipefail
+          dotnet run --project server/tests/IntegrationTests -c Release --no-build 2>&1 | tee it.txt || {
+            grep -A3 "  FAIL" it.txt | grep -v '"Timestamp"' | head -60 | while IFS= read -r line; do echo "::error title=integration (InMemory)::$line"; done
+            exit 1
+          }
         env:
           JIANGHU_TEST_STORAGE: InMemory
       - name: Integration suite on PostgreSQL (incl. migrations and worker process)
-        run: dotnet run --project server/tests/IntegrationTests -c Release --no-build
+        # failures are also published as annotations (readable through the API without the full log)
+        run: |
+          set -o pipefail
+          dotnet run --project server/tests/IntegrationTests -c Release --no-build 2>&1 | tee it.txt || {
+            grep -A3 "  FAIL" it.txt | grep -v '"Timestamp"' | head -60 | while IFS= read -r line; do echo "::error title=integration (Postgres)::$line"; done
+            exit 1
+          }
         env:
           JIANGHU_TEST_STORAGE: Postgres
       - name: Load smoke test (20 players, 30 s, 500 ms think time, real API on PostgreSQL; gate = no errors, gameplay p95 < 3 s)
