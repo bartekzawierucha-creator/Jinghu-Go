@@ -30,6 +30,51 @@ namespace JianghuGo.Android
         private TextView _titleBack;
         private FrameLayout _host;
         private LinearLayout _dock;
+        private readonly Dictionary<string, View> _dockDots = new Dictionary<string, View>();
+        private DateTime _alertsAt = DateTime.MinValue;
+
+        /// <summary>The hero's combat power (2.2), shown on the cultivation and hero screens; 0 until known.</summary>
+        private long _power;
+
+        /// <summary>
+        /// Red dots on the dock: something waits in that hub. Fetched at most every 45 s (more calls than the HUD).
+        /// Home: a quest to claim or the vessel full for a breakthrough; Combat: a finished hunt or a boss reward;
+        /// Hero: unspent meridian points.
+        /// </summary>
+        private async Task RefreshAlertsAsync(bool force)
+        {
+            if (_me == null || (!force && DateTime.UtcNow - _alertsAt < TimeSpan.FromSeconds(45))) return;
+            if (DateTime.UtcNow - _alertsAt < TimeSpan.FromSeconds(8)) return; // even forced refreshes are spaced out
+            _alertsAt = DateTime.UtcNow;
+            var home = false;
+            var combat = false;
+            var hero = false;
+            try
+            {
+                home = (_board != null && (_board.Daily.Any(q => q.Completed && !q.Claimed) || _board.Achievements.Any(q => q.Completed && !q.Claimed) || !_board.Checkin.CheckedInToday))
+                       || (_cultivation != null && _cultivation.QiRequired > 0 && _cultivation.Qi >= _cultivation.QiRequired);
+                var hunt = (await _api.GetHuntAsync(_me.Id, Ct)).Hunt;
+                var boss = await _api.GetWorldBossAsync(_me.Id, Ct);
+                combat = hunt?.Finished == true || boss.CanClaim || boss.UnclaimedCycle != null;
+                hero = (await _api.GetMeridiansAsync(_me.Id, Ct)).Free > 0;
+                _power = (await _api.GetCombatScoutAsync(_me.Id, Ct)).MyPower;
+            }
+            catch (ApiException)
+            {
+                // dots are a hint; keep the old ones
+                return;
+            }
+
+            void Dot(string tab, bool on)
+            {
+                if (_dockDots.TryGetValue(tab, out var v)) v.Visibility = on ? ViewStates.Visible : ViewStates.Gone;
+            }
+
+            Dot(TabHome, home);
+            Dot(TabCombat, combat);
+            Dot(TabHero, hero);
+        }
+
         private readonly Dictionary<string, (LinearLayout Item, TextView Label, ImageView Icon)> _dockItems = new Dictionary<string, (LinearLayout, TextView, ImageView)>();
         private string _tab = TabHome;
         private readonly List<(View View, System.Action Close)> _overlays = new List<(View, System.Action)>();
@@ -224,7 +269,9 @@ namespace JianghuGo.Android
             if (_me == null) return;
             var portrait = _ui.ArtId("portrait_" + _me.Path);
             _hudPortrait.SetImageBitmap(Ui.Art(this, portrait != 0 ? portrait : Resource.Drawable.portrait));
-            var title = _board?.Titles.Count > 0 ? "「" + _board.Titles[_board.Titles.Count - 1] + "」 " : string.Empty;
+            // the title the player chose to wear (not just the latest one earned)
+            var chosen = _board?.AllTitles?.FirstOrDefault(t => t.Selected);
+            var title = chosen != null ? "「" + chosen.NamePl + "」 " : string.Empty;
             _hudName.Text = title + _me.Name + (_cultivation != null ? " · " + _cultivation.RealmNamePl + " " + _cultivation.Stage + "/" + _cultivation.StagesInRealm : string.Empty);
             if (_cultivation != null) Ui.SetMeter(_hudQi, "Qi " + _cultivation.Qi + " / " + _cultivation.QiRequired, _cultivation.Qi, Math.Max(1, _cultivation.QiRequired));
             _hudStones.Text = _balance.ToString("N0");
@@ -249,6 +296,8 @@ namespace JianghuGo.Android
             {
                 // keep the previous values; the screen shows its own errors
             }
+
+            await RefreshAlertsAsync(force);
 
             RenderHud();
         }
@@ -276,7 +325,18 @@ namespace JianghuGo.Android
                 var icon = new ImageView(this);
                 icon.SetImageBitmap(Ui.Art(this, art));
                 icon.SetScaleType(ImageView.ScaleType.FitCenter);
-                item.AddView(icon, new LinearLayout.LayoutParams(Px(36), Px(36)));
+                // a red seal dot when something waits there (reward to claim, point to spend, hunt finished)
+                var iconFrame = new FrameLayout(this);
+                iconFrame.AddView(icon, new FrameLayout.LayoutParams(Px(36), Px(36)));
+                var dot = new View(this) { Visibility = ViewStates.Gone };
+                var dotBg = new GradientDrawable();
+                dotBg.SetShape(ShapeType.Oval);
+                dotBg.SetColor(Ui.Cinnabar);
+                dotBg.SetStroke(Px(1.5f), Color.Rgb(248, 245, 238));
+                dot.Background = dotBg;
+                iconFrame.AddView(dot, new FrameLayout.LayoutParams(Px(11), Px(11), GravityFlags.Top | GravityFlags.End));
+                _dockDots[t] = dot;
+                item.AddView(iconFrame, new LinearLayout.LayoutParams(Px(36), Px(36)));
                 var text = new TextView(this) { Text = label, Gravity = GravityFlags.Center };
                 text.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 10);
                 text.SetTypeface(Ui.Display, TypefaceStyle.Bold);
@@ -316,7 +376,7 @@ namespace JianghuGo.Android
                 if (on)
                 {
                     var glow = new GradientDrawable(GradientDrawable.Orientation.BottomTop,
-                        new int[] { Color.Argb(110, 212, 175, 96).ToArgb(), Color.Argb(0, 212, 175, 96).ToArgb() });
+                        new int[] { Color.Argb(70, 40, 38, 34).ToArgb(), Color.Argb(0, 40, 38, 34).ToArgb() });
                     glow.SetCornerRadius(Px(10));
                     item.Background = glow;
                 }

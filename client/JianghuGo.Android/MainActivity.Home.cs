@@ -32,7 +32,10 @@ namespace JianghuGo.Android
             var titles = new LinearLayout(this) { Orientation = Orientation.Vertical };
             head.AddView(titles, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f) { LeftMargin = Px(8), Gravity = GravityFlags.CenterVertical });
             var realm = ui.Text("…", titles, 16, Ui.Gold, bold: true);
-            var sub = ui.Text("Ścieżka " + PathName(c.Path) + " · " + string.Join(" · ", c.Traits.Select(t => t.NamePl)), titles, 11, Ui.Muted);
+            var pathLine = "Ścieżka " + PathName(c.Path) + " · " + string.Join(" · ", c.Traits.Select(t => t.NamePl));
+            var sub = ui.Text(pathLine, titles, 11, Ui.Muted, maxLines: 1);
+            void ShowPower() => sub.Text = (_power > 0 ? "⚔ Moc " + _power.ToString("N0") + " · " : string.Empty) + pathLine;
+            ShowPower();
 
             // the vessel and the meditating hero take what is left of the screen
             var charge = new QiChargeView(this);
@@ -141,10 +144,26 @@ namespace JianghuGo.Android
                 {
                     var card = ui.Card(daily, 1f, 6, q.Completed && !q.Claimed ? Ui.Gold : (Color?)null);
                     card.Clickable = true;
-                    card.Click += (_, __) => Run(ShowQuestsAsync);
+                    var quest = q;
+                    // done: claim right here; not yet: go straight to where it is done
+                    card.Click += (_, __) => Run(async () =>
+                    {
+                        if (quest.Completed && !quest.Claimed)
+                        {
+                            var r = await _api.ClaimQuestAsync(c.Id, quest.Id, Ct);
+                            Sfx.Play(Sfx.Coin);
+                            _board = r.Board;
+                            _balance = r.Balance;
+                            RenderHud();
+                            RenderDaily(r.Board);
+                            SetStatus(quest.NamePl + ": +" + r.Stones + " kamieni duchowych");
+                        }
+                        else if (quest.Claimed) await ShowQuestsAsync();
+                        else await GoForAsync(quest.Metric);
+                    });
                     ui.Text((q.Claimed ? "✓ " : string.Empty) + q.NamePl, card, 11, q.Completed ? Ui.Gold : Ui.Ink, bold: true);
                     ui.MeterIn(card, q.Completed ? Ui.Gold : Ui.Jade, q.Progress + "/" + q.Target, q.Progress, q.Target, 14);
-                    ui.Text(q.Completed && !q.Claimed ? "Odbierz!" : "+" + q.Stones, card, 10, q.Completed && !q.Claimed ? Ui.Cinnabar : Ui.Muted, bold: true);
+                    ui.Text(q.Completed && !q.Claimed ? "Odbierz!" : q.Claimed ? "✓" : "Idź ›  +" + q.Stones, card, 10, q.Completed && !q.Claimed ? Ui.Cinnabar : Ui.Muted, bold: true);
                 }
 
                 if (!board.Checkin.CheckedInToday)
@@ -173,6 +192,8 @@ namespace JianghuGo.Android
                 await flow.LoadAsync(Ct);
                 Render();
                 ShowOfflineSummary(flow, Render);
+                if (_power == 0) _power = (await _api.GetCombatScoutAsync(c.Id, Ct)).MyPower;
+                if (gen == _screen) ShowPower();
                 RenderDaily(await _api.GetQuestsAsync(c.Id, Ct));
             });
         }
@@ -225,6 +246,7 @@ namespace JianghuGo.Android
                 meterBox.SetGravity(GravityFlags.CenterVertical);
                 ui.MeterIn(meterBox, achievement ? Ui.Violet : Ui.Jade, q.Progress + " / " + q.Target, q.Progress, q.Target, 16);
                 if (q.Completed && !q.Claimed) ui.Btn("Odbierz", () => Run(() => Claim(q)), bottom, sp: 12, heightDp: 30);
+                else if (!q.Completed && !secretHidden && GoesSomewhere(q.Metric)) ui.Btn("Idź", () => Run(() => GoForAsync(q.Metric)), bottom, secondary: true, sp: 12, heightDp: 30);
             }
 
             if (tab == 0)
@@ -386,6 +408,70 @@ namespace JianghuGo.Android
                 ui.Text(board.Seasonal.Count > 0 ? "WYDARZENIA SEZONOWE" : "Brak wydarzeń sezonowych — zajrzyj w święta.", page, 12, Ui.Gold, bold: true, center: true);
                 var seasonal = board.Seasonal;
                 ui.Pages(page, seasonal.Count, 1, 1, (i, cell) => QuestCard(cell, seasonal[i], true));
+            }
+        }
+
+        /// <summary>Quests that point to one place in the game.</summary>
+        private static bool GoesSomewhere(string metric) => metric is "battles_won" or "bosses_won" or "tower_won" or "arena_won" or "pvp_won" or "crafts" or "upgrades"
+            or "items_gathered" or "world_qi" or "steps" or "meditation_minutes" or "breakthroughs" or "pills_used" or "world_boss_fights" or "spirits_won"
+            or "harvests" or "expeditions" or "realm" or "night_wins" or "full_moon_wins" or "market_sales";
+
+        /// <summary>Opens the screen where a quest's metric is advanced (a training list, the tower, the forge, the map...).</summary>
+        private async Task GoForAsync(string metric)
+        {
+            switch (metric)
+            {
+                case "battles_won":
+                case "night_wins":
+                case "full_moon_wins":
+                    _combatSub = 0;
+                    _tab = TabCombat;
+                    await ShowCombatTabAsync(0);
+                    break;
+                case "tower_won":
+                    _tab = TabCombat;
+                    await ShowCombatTabAsync(2);
+                    break;
+                case "bosses_won":
+                case "world_boss_fights":
+                    _tab = TabCombat;
+                    await ShowCombatTabAsync(3);
+                    break;
+                case "pvp_won":
+                    _tab = TabCombat;
+                    await ShowCombatTabAsync(4);
+                    break;
+                case "arena_won":
+                    _tab = TabCombat;
+                    await ShowCombatTabAsync(5);
+                    break;
+                case "crafts":
+                case "upgrades":
+                    await ShowBagAsync(1);
+                    break;
+                case "pills_used":
+                    await ShowBagAsync(0);
+                    break;
+                case "market_sales":
+                    await ShowBagAsync(2);
+                    break;
+                case "items_gathered":
+                case "world_qi":
+                case "steps":
+                    GoTab(TabWorld);
+                    break;
+                case "spirits_won":
+                    _tab = TabHero;
+                    await ShowArtsAsync(0);
+                    break;
+                case "harvests":
+                case "expeditions":
+                    await ShowEstateAsync(metric == "harvests" ? 0 : 2);
+                    break;
+                default:
+                    GoTab(TabHome);
+                    SetStatus(metric == "meditation_minutes" ? "Medytuj — każda minuta się liczy." : "Zbieraj Qi i spróbuj przełomu.");
+                    break;
             }
         }
 

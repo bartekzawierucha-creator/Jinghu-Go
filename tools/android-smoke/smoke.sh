@@ -202,7 +202,7 @@ $UI tap "Meridiany"
 $UI wait "Wolne punkty" 60
 $UI shot shots/07b-meridians.png
 $UI tap "Techniki"
-$UI wait "4 ataki" 60
+$UI wait "Ułóż najlepsze" 60
 $UI shot shots/07c-techniques.png
 $UI tap "Towarzysz"
 $UI wait "Nie masz jeszcze towarzysza" 60

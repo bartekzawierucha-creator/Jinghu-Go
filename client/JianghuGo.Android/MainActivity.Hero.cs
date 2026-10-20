@@ -104,6 +104,8 @@ namespace JianghuGo.Android
             foreach (var slot in HeroDollView.Slots)
                 doll.Equipped[slot] = inv.Equipped.TryGetValue(slot, out var id) ? inv.Items.FirstOrDefault(i => i.Id == id) : null;
             ui.AddWeighted(page, doll, 1f);
+            _power = (await _api.GetCombatScoutAsync(c.Id, Ct)).MyPower;
+            ui.Text("⚔ MOC BOJOWA " + _power.ToString("N0"), page, 15, Ui.Cinnabar, bold: true, center: true);
             var info = ui.HRow(page, 34, 4);
             ui.Btn("Cechy, ścieżka i tytuły", () => ShowOriginsSheet(), info, secondary: true, sp: 12, heightDp: 34, icon: "menu_hero");
             ui.Btn("Premie", () => Run(ShowBonusesSheetAsync), info, secondary: true, sp: 12, heightDp: 34);
@@ -147,18 +149,21 @@ namespace JianghuGo.Android
                     ui.Btn("Zdejmij", () => Run(async () =>
                     {
                         close();
+                        var before = _power;
                         await economy.ToggleEquipAsync(current, Ct);
                         await ShowHeroAsync();
+                        PowerDelta(before);
                     }), acts, secondary: true, sp: 12, heightDp: 40);
                     var next = economy.NextUpgrade(current);
                     if (next != null)
                         ui.Btn("⚒ +" + next.Level + " (" + next.Stones + " KD, " + next.SuccessPermille / 10 + "%)", () => Run(async () =>
                         {
+                            var before = _power;
                             var r = await economy.UpgradeAsync(current, Ct);
                             close();
                             Sfx.Play(r != null && r.Success ? Sfx.Breakthrough : Sfx.Defeat, 0.6f);
                             await ShowHeroAsync();
-                            SetStatus(r == null ? "Odświeżono." : r.Success ? "Udane! Teraz +" + r.Level : "Nieudane — poziom +" + r.Level + " zachowany.");
+                            SetStatus(r == null ? "Odświeżono." : r.Success ? "Udane! Teraz +" + r.Level + PowerText(before) : "Nieudane — poziom +" + r.Level + " zachowany.");
                             RefreshHud();
                         }), acts, sp: 12, heightDp: 40);
                 }
@@ -177,12 +182,24 @@ namespace JianghuGo.Android
                     ui.Btn("Załóż", () => Run(async () =>
                     {
                         close();
+                        var before = _power;
                         await economy.ToggleEquipAsync(item, Ct);
                         Sfx.Play(Sfx.Chime, 0.6f);
                         await ShowHeroAsync();
+                        PowerDelta(before);
                     }), r, sp: 12, heightDp: 38).LayoutParameters = new LinearLayout.LayoutParams(Px(84), Px(38)) { Gravity = GravityFlags.CenterVertical };
                 }, empty: "Brak przedmiotów na ten slot — wykuj je w Kuźni lub kup na targu.");
             };
+        }
+
+        /// <summary>" · moc +120" after a change that moved the combat power (empty when it did not).</summary>
+        private string PowerText(long before) =>
+            before <= 0 || _power == before ? string.Empty : " · moc " + (_power > before ? "+" : "−") + Math.Abs(_power - before).ToString("N0");
+
+        private void PowerDelta(long before)
+        {
+            var t = PowerText(before);
+            if (t.Length > 0) SetStatus("⚔ Moc " + _power.ToString("N0") + " (" + t.Substring(3) + ")");
         }
 
         // ---- Meridiany ----------------------------------------------------------------------------------------

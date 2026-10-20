@@ -31,13 +31,13 @@ namespace JianghuGo.Android
             _text.TextSize = 11 * _d;
             _text.SetTypeface(Ui.Display);
             _text.TextAlign = Paint.Align.Center;
-            _text.SetShadowLayer(4, 0, 1, Color.Black);
+            _text.SetShadowLayer(4, 0, 1, Color.Argb(200, 250, 247, 240)); // paper halo under ink labels
             _lotus = Ui.Art(context, Resource.Drawable.place_lotus);
             _grove = Ui.Art(context, Resource.Drawable.place_grove);
             _wolf = Ui.Art(context, Resource.Drawable.sprite_wolf);
             _brazier = Ui.Art(context, Resource.Drawable.place_brazier);
-            var hour = DateTime.Now.Hour; // night map from dusk to dawn (local time)
-            _texture = Ui.Art(context, hour >= 20 || hour < 6 ? Resource.Drawable.map_texture_night : Resource.Drawable.map_texture);
+            // 2.2 paper theme: the painted map washed out to ink on rice paper (day and night alike)
+            _texture = Ui.Art(context, Resource.Drawable.map_texture);
             _playerToken = Scaled(Ui.Art(context, Resource.Drawable.map_player), 44);
         }
 
@@ -172,7 +172,7 @@ namespace JianghuGo.Android
         private void DrawFog(Canvas canvas, float scale)
         {
             if (_fog == null || _fog.Width != Width || _fog.Height != Height) _fog = Bitmap.CreateBitmap(Width, Height, Bitmap.Config.Argb8888);
-            _fog.EraseColor(Color.Argb(165, 4, 6, 9).ToArgb());
+            _fog.EraseColor(Color.Argb(150, 236, 231, 220).ToArgb()); // unexplored land is blank paper
             var c = new Canvas(_fog);
             _clear.SetXfermode(new PorterDuffXfermode(PorterDuff.Mode.DstOut));
             void Hole(float x, float y, float r)
@@ -235,7 +235,7 @@ namespace JianghuGo.Android
             var c = new Canvas(_terrain);
             var p = new Paint(PaintFlags.AntiAlias);
             p.SetShader(new RadialGradient(Width / 2f, Height / 2f, Math.Max(Width, Height) * 0.75f,
-                new int[] { Color.Rgb(28, 40, 44).ToArgb(), Color.Rgb(14, 20, 24).ToArgb(), Color.Rgb(6, 8, 10).ToArgb() }, new float[] { 0f, 0.55f, 1f }, Shader.TileMode.Clamp));
+                new int[] { Color.Rgb(244, 240, 231).ToArgb(), Color.Rgb(232, 226, 213).ToArgb(), Color.Rgb(214, 206, 190).ToArgb() }, new float[] { 0f, 0.6f, 1f }, Shader.TileMode.Clamp));
             c.DrawRect(0, 0, Width, Height, p);
             p.SetShader(null);
             // painted ink map, cover-cropped, under the vignette
@@ -244,7 +244,12 @@ namespace JianghuGo.Android
             var sh = (int)(Height / scale);
             var tx = (_texture.Width - sw) / 2;
             var ty = (_texture.Height - sh) / 2;
-            c.DrawBitmap(_texture, new Rect(tx, ty, tx + sw, ty + sh), new Rect(0, 0, Width, Height), new Paint(PaintFlags.FilterBitmap) { Alpha = 235 });
+            var wash = new ColorMatrix();
+            wash.SetSaturation(0.1f);
+            var texPaint = new Paint(PaintFlags.FilterBitmap) { Alpha = 120 };
+            texPaint.SetColorFilter(new ColorMatrixColorFilter(wash));
+            texPaint.SetXfermode(new PorterDuffXfermode(PorterDuff.Mode.Multiply));
+            c.DrawBitmap(_texture, new Rect(tx, ty, tx + sw, ty + sh), new Rect(0, 0, Width, Height), texPaint);
             var rnd = new Random(7);
             p.Color = Color.Argb(26, 120, 170, 160);
             p.StrokeWidth = 1;
@@ -253,7 +258,7 @@ namespace JianghuGo.Android
             for (var i = 0; i < 26; i++)
             {
                 p.SetShader(new RadialGradient((float)rnd.NextDouble() * Width, (float)rnd.NextDouble() * Height, (30 + (float)rnd.NextDouble() * 60) * _d,
-                    Color.Argb(28, 110, 160, 150), Color.Transparent, Shader.TileMode.Clamp));
+                    Color.Argb(40, 250, 247, 240), Color.Transparent, Shader.TileMode.Clamp));
                 c.DrawRect(0, 0, Width, Height, p);
             }
 
@@ -300,12 +305,12 @@ namespace JianghuGo.Android
             // scale rings
             _p.SetStyle(Paint.Style.Stroke);
             _p.StrokeWidth = 1f * _d;
-            _p.Color = Color.Argb(70, 212, 175, 96);
+            _p.Color = Color.Argb(70, 40, 38, 34);
             _p.SetPathEffect(new DashPathEffect(new[] { 4 * _d, 6 * _d }, 0));
             canvas.DrawCircle(cx, cy, half, _p);
             canvas.DrawCircle(cx, cy, half / 2, _p);
             _p.SetPathEffect(null);
-            _text.Color = Color.Argb(160, 212, 175, 96);
+            _text.Color = Color.Argb(160, 70, 66, 60);
             _text.TextAlign = Paint.Align.Left;
             canvas.DrawText((int)RadiusM + " m", cx + 4 * _d, cy - half - 4 * _d, _text);
             _text.TextAlign = Paint.Align.Center;
@@ -344,7 +349,7 @@ namespace JianghuGo.Android
                     var m = Icon("site_" + site.Id, siteRes != 0 ? siteRes : Resource.Drawable.map_flame);
                     var sz = inside ? 1f : 0.7f;
                     canvas.DrawBitmap(m, null, new RectF(ax - m.Width * sz / 2, ay - m.Height * sz / 2, ax + m.Width * sz / 2, ay + m.Height * sz / 2), _art);
-                    _text.Color = Color.Rgb(214, 170, 250);
+                    _text.Color = Ui.Violet;
                     canvas.DrawText(site.NamePl, ax, ay + (ay < cy ? 34 : -28) * _d, _text);
                 }
 
@@ -358,7 +363,7 @@ namespace JianghuGo.Android
                     var s = active ? 1f + 0.06f * pulse : 0.86f;
                     canvas.DrawBitmap(art, null, new RectF(x - art.Width * s / 2, y - art.Height * s / 2, x + art.Width * s / 2, y + art.Height * s / 2), _art);
                     _art.Alpha = 255;
-                    _text.Color = n.Harvested ? Color.Argb(120, 232, 220, 192) : active ? Ui.Gold : Ui.Ink;
+                    _text.Color = n.Harvested ? Ui.Muted : active ? Ui.Gold : Ui.Ink;
                     canvas.DrawText(n.NamePl + (n.Harvested ? " ✓" : string.Empty), x, y - art.Height * s / 2 - 4 * _d, _text);
                 }
             }

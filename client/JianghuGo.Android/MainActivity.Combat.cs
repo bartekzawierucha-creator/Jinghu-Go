@@ -371,6 +371,7 @@ namespace JianghuGo.Android
         private sealed record BattleOrigin(Func<Task> Back, Func<BattleDto, (string Label, Func<Task> Run)?> Again = null);
 
         private const string SpeedPref = "jianghu.battle_speed";
+        private const string ClimbPref = "jianghu.tower_climb";
 
         /// <summary>Default origin by battle kind, for fights started from the combat tabs.</summary>
         private BattleOrigin OriginFor(BattleDto b) => b.Kind switch
@@ -415,6 +416,7 @@ namespace JianghuGo.Android
             var controls = ui.HRow(page, 46, 6);
             Button speed = null;
             Button again = null; // assigned below; Render (captured earlier) only runs after that
+            var climb = false;
             speed = ui.Btn("Prędkość ×" + (int)BattleClock.Speed, () =>
             {
                 var next = (int)BattleClock.Speed % 3 + 1;
@@ -441,6 +443,20 @@ namespace JianghuGo.Android
                     if (gen == _screen) Render();
                 });
             }, controls, secondary: true, sp: 12, heightDp: 46);
+            // tower: keep climbing on its own — every won floor starts the next one until a loss (or the toggle is off)
+            climb = combat.Battle.Kind == "tower" && _prefs.GetBoolean(ClimbPref, false);
+            if (combat.Battle.Kind == "tower")
+            {
+                Button climbBtn = null;
+                climbBtn = ui.Btn(climb ? "Wspinaczka: włączona" : "Wspinaczka: wyłączona", () =>
+                {
+                    climb = !climb;
+                    _prefs.Edit().PutBoolean(ClimbPref, climb).Apply();
+                    climbBtn.Text = climb ? "Wspinaczka: włączona" : "Wspinaczka: wyłączona";
+                    Sfx.Play(Sfx.Click);
+                }, page, secondary: !climb, sp: 12, heightDp: 34);
+            }
+
             again = ui.Btn("Walcz ponownie", () => { }, controls, sp: 13, heightDp: 46);
             again.Visibility = ViewStates.Gone;
             ui.Btn("Wyjdź", () => Run(origin.Back), controls, secondary: true, sp: 12, heightDp: 46);
@@ -515,6 +531,19 @@ namespace JianghuGo.Android
                     var won = b.Result == "won";
                     var shownGen = _screen;
                     var next = origin.Again?.Invoke(b);
+                    if (climb && won && b.Kind == "tower")
+                    {
+                        // no popup in the way: a line, then straight up to the next floor
+                        _frame.PostDelayed(() =>
+                        {
+                            if (shownGen != _screen || !climb) return;
+                            SetStatus("Piętro zdobyte" + (b.RewardQi > 0 ? " (+" + b.RewardQi + " Qi)" : string.Empty) + " — wspinasz się wyżej…");
+                            RefreshHud();
+                            Run(StartTowerAsync);
+                        }, BattleClock.Real(b.LastTurnEvents.Count * stepMs + 900));
+                        return;
+                    }
+
                     _frame.PostDelayed(() =>
                     {
                         if (shownGen != _screen) return;
