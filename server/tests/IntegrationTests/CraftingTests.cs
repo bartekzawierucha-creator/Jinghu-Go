@@ -190,7 +190,7 @@ public class CraftingTests : IAsyncLifetime
         Assert.Equal(1100 - 20 - 120 - 120, balance);
         Assert.Equal(1, stacks["refining_stone"]);
         Assert.Equal(6, items.Single()!.Int("upgradeLevel"));
-        Assert.Equal(3, items.Single()!["stats"]!.Int("strength"), "2 × (1 + 6 × 10 %) = 3.2 → 3");
+        Assert.Equal(3 * ItemQuality.Of(sword.Id).StatPermille / 1000, items.Single()!["stats"]!.Int("strength"), "2 × (1 + 6 × 10 %) = 3.2 → 3, scaled by quality");
 
         var at15 = await InUowAsync(async (uow, inv) => (await inv.SetUpgradeLevelAsync(uow, sword.Id, ok.Int("version"), 15, "test", CancellationToken.None)).Value);
         await Problem(await Upgrade(p, c, sword.Id, at15.Version), (HttpStatusCode)422, "max_upgrade_level");
