@@ -29,11 +29,23 @@ namespace JianghuGo.Android
                 return;
             }
 
-            var ui = NewScreen(null, art: Resource.Drawable.bg_sect, tab: TabSect);
-            var page = ui.Content;
+            // 2.2: the sect is one screen with icons; members and territories open as their own screens
             var mine = flow.Mine;
-            ui.Tabs(page, new[] { "Sekta", "Członkowie", "Terytoria", "Ranking", "Rozwój" }, tab, i => Run(() => ShowSectTabAsync(i)),
-                badges: new[] { mine?.PendingApplications?.Count ?? 0, 0, flow.Territories?.Wars?.Count ?? 0, 0, 0 });
+            var ui = tab == 0
+                ? NewScreen(null, art: Resource.Drawable.bg_sect, tab: TabSect)
+                : NewScreen(tab == 1 ? "Członkowie" : "Terytoria", () => Run(() => ShowSectTabAsync(0)), Resource.Drawable.bg_sect, tab == 1 ? "TWOJA SEKTA" : "ZIEMIE I WOJNY", tab: TabSect);
+            var page = ui.Content;
+            if (tab == 0)
+            {
+                var needSect = mine == null ? "w sekcie" : null;
+                ui.IconRow(page, new List<(string, string, System.Action, bool, string)>
+                {
+                    ("Członkowie", "ink_nav_social", () => Run(() => ShowSectTabAsync(1)), (mine?.PendingApplications?.Count ?? 0) > 0, needSect),
+                    ("Terytoria", "ink_ico_place", () => Run(() => ShowSectTabAsync(2)), (flow.Territories?.Wars?.Count ?? 0) > 0, null),
+                    ("Ranking", "ink_ico_ranking", () => Run(() => ShowSectTabAsync(3)), false, null),
+                    ("Rozwój", "ink_nav_sect", () => Run(() => ShowSectTabAsync(4)), false, needSect),
+                }, 58);
+            }
 
             async Task Reload(int t, string message = null)
             {
@@ -362,9 +374,9 @@ namespace JianghuGo.Android
                 if (mineRow.Name != null) me = (mineRow.Rank, mineRow.Value);
             }
 
-            var ui = NewScreen(null, art: Resource.Drawable.tile_menu_ranking, tab: TabSect);
+            var ui = NewScreen("Ranking", () => Run(() => ShowSectTabAsync(0)), Resource.Drawable.tile_menu_ranking, "NAJLEPSI W JIANGHU", tab: TabSect);
             var page = ui.Content;
-            ui.Tabs(page, new[] { "Sekta", "Członkowie", "Terytoria", "Ranking", "Rozwój" }, 3, i => Run(() => ShowSectTabAsync(i)));
+
             var metrics = new[] { ((string)null, "Kultywacja"), ("pvp_won", "Pojedynki"), ("bosses_won", "Bossowie"), ("battles_won", "Zwycięstwa") };
             ui.Tabs(page, metrics.Select(m => m.Item2).ToArray(), Array.FindIndex(metrics, m => m.Item1 == metric), i => Run(() => ShowSectTabAsync(3, metrics[i].Item1)), 30);
 

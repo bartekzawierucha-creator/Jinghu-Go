@@ -782,9 +782,8 @@ namespace JianghuGo.Android
         private async Task ShowSectDevelopmentAsync(SectFlow flow)
         {
             var c = _me;
-            var ui = NewScreen(null, art: Resource.Drawable.bg_sect, tab: TabSect);
+            var ui = NewScreen("Rozwój sekty", () => Run(() => ShowSectTabAsync(0)), Resource.Drawable.bg_sect, "PAWILONY · MISJE · BOSS", tab: TabSect);
             var page = ui.Content;
-            ui.Tabs(page, new[] { "Sekta", "Członkowie", "Terytoria", "Ranking", "Rozwój" }, 4, i => Run(() => ShowSectTabAsync(i)));
             if (flow.Mine == null)
             {
                 ui.Box(page, 1f);
