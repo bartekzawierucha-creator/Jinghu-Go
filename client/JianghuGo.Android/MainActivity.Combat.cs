@@ -591,8 +591,11 @@ namespace JianghuGo.Android
                     : "Tura " + b.Turn + " · " + string.Join("  ·  ", b.LastTurnEvents.Select(e =>
                         (b.IsMine(e) ? "Ty" : "Wróg") + ": " + ActionName(e.Action) + (e.Hit == true ? " " + e.Damage : e.Hit == false ? " pudło" : string.Empty)
                         + (e.Healed > 0 ? " +" + e.Healed + " HP" : string.Empty)));
+                // buttons keep their places when the fight ends (a tap meant for "Poddaj" must not land on "Wyjdź"):
+                // the speed slot stays as empty space and "Walcz ponownie" takes the forfeit's slot
                 forfeit.Visibility = b.IsActive ? ViewStates.Visible : ViewStates.Gone;
-                speed.Visibility = b.IsActive || b.Status == "pending_acceptance" ? ViewStates.Visible : ViewStates.Gone;
+                speed.Visibility = b.IsActive || b.Status == "pending_acceptance" ? ViewStates.Visible : ViewStates.Invisible;
+                if (!b.IsActive && again.Visibility != ViewStates.Visible) again.Visibility = ViewStates.Invisible;
 
                 if (!rewardShown && !b.IsActive && b.Status == "finished")
                 {
