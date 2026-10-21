@@ -31,7 +31,10 @@ namespace JianghuGo.Android
             var emblem = ui.Icon(head, "emblem_qi_condensation", 36);
             var titles = new LinearLayout(this) { Orientation = Orientation.Vertical };
             head.AddView(titles, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f) { LeftMargin = Px(8), Gravity = GravityFlags.CenterVertical });
-            var realm = ui.Text("…", titles, 16, Ui.Gold, bold: true);
+            var realm = ui.Text("…", titles, 16, Ui.Gold, bold: true, maxLines: 1);
+            // one line on every phone: the realm name shrinks instead of wrapping out of the header
+            realm.SetAutoSizeTextTypeUniformWithConfiguration(11, 16, 1, (int)global::Android.Util.ComplexUnitType.Sp);
+            realm.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, Px(24));
             var pathLine = "Ścieżka " + PathName(c.Path) + " · " + string.Join(" · ", c.Traits.Select(t => t.NamePl));
             var sub = ui.Text(pathLine, titles, 11, Ui.Muted, maxLines: 1);
             void ShowPower() => sub.Text = (_power > 0 ? "⚔ Moc " + _power.ToString("N0") + " · " : string.Empty) + pathLine;
