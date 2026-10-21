@@ -31,7 +31,7 @@ namespace JianghuGo.Android
                     await ShowDaoLabAsync();
                     return;
                 case 5:
-                    await ShowArtsAsync(0);
+                    await ShowArtsAsync(ArtsOrder(_me.Path)[0]); // open on the hero's own path art
                     return;
                 default:
                     await ShowHeroAsync();

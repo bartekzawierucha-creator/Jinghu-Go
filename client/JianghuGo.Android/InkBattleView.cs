@@ -275,6 +275,27 @@ namespace JianghuGo.Android
         private void Text(long at, Fighter over, string text, bool big = false, bool soft = false) =>
             _floaters.Add(new Floater { Text = text, X = over == _me ? -1 : 1, At = at, Big = big, Soft = soft });
 
+        /// <summary>
+        /// Where a fighter's body is, in hero heights: its scale (a wolf is small, a golem tall) and how high it hovers.
+        /// Hit effects use it, so a burst sits on the creature's chest and never swallows a big one whole.
+        /// </summary>
+        private static (float Scale, float Raise) BodyOf(Fighter f) =>
+            !f.Hero && Beasts.TryGetValue(f.Set, out var b) ? b : (1f, 0f);
+
+        /// <summary>Height of a fighter's chest (for hits) in hero heights.</summary>
+        private static float Chest(Fighter f, float share = 0.55f)
+        {
+            var (k, r) = BodyOf(f);
+            return share * k + r;
+        }
+
+        /// <summary>An effect's size for a fighter: grows a little with big creatures, shrinks with small ones, never covers them.</summary>
+        private static float Fit(Fighter f, float size)
+        {
+            var (k, _) = BodyOf(f);
+            return size * Math.Clamp(k, 0.7f, 1.05f);
+        }
+
         private Fx Effect(string name, long at, long dur, float x, float y, float size, float rot = 0, bool flip = false, float x1 = float.NaN, float y1 = float.NaN, float grow = 0.15f, float alpha = 0.9f, bool fadeIn = false, float spin = 0)
         {
             var bmp = Art("duel_" + name);
@@ -443,14 +464,14 @@ namespace JianghuGo.Android
                         K(d, impact + 520, "stance", d.Home);
                         var slash = a.Set == "body" ? "ink_fist_impact" : (variant % 4) switch { 0 => "ink_slash_double", 1 => "ink_slash_triple", 2 => "ink_thrust", _ => "ink_slash_upper" };
                         if (ranged) slash = null;
-                        if (slash != null) Effect(slash, impact, 260, d.Home - dir * 0.03f, 0.55f, 0.95f, flip: !mine);
+                        if (slash != null) Effect(slash, impact, 260, d.Home - dir * 0.03f, Chest(d), Fit(d, 0.95f), flip: !mine);
                         var burst = Burst(ranged || a.Set != "qi" && a.Set != "rival" ? element : "x");
-                        if (burst != null) Effect(burst, impact, 320, d.Home, 0.55f, crit ? 1.5f : 1.1f, alpha: 0.85f);
-                        Effect("ink_drops", impact, 300, d.Home + dir * 0.03f, 0.6f, 0.7f, alpha: 0.75f);
+                        if (burst != null) Effect(burst, impact, 320, d.Home, Chest(d), Fit(d, crit ? 1.3f : 0.95f), alpha: 0.7f);
+                        Effect("ink_drops", impact, 300, d.Home + dir * 0.03f, Chest(d, 0.6f), Fit(d, 0.7f), alpha: 0.75f);
                         if (crit)
                         {
-                            Effect("ink_cross", impact, 380, d.Home, 0.55f, 0.85f);
-                            Effect("ink_crack", impact, 1600, d.Home, 0.0f, 1.4f, grow: 0, alpha: 0.7f);
+                            Effect("ink_cross", impact, 380, d.Home, Chest(d), Fit(d, 0.85f));
+                            Effect("ink_crack", impact, 1600, d.Home, 0.0f, Fit(d, 1.4f), grow: 0, alpha: 0.7f);
                             Text(impact + 40, d, "KRYTYK");
                         }
 
@@ -467,7 +488,7 @@ namespace JianghuGo.Android
                         K(d, impact + 80, "jump", d.Home + dir * 0.09f, 0.2f);
                         K(d, impact + 240, "stance", d.Home + dir * 0.06f);
                         K(d, impact + 560, "stance", d.Home);
-                        if (!ranged) Effect("ink_slash_circle", impact, 260, d.Home - dir * 0.02f, 0.5f, 0.85f, flip: !mine, alpha: 0.7f);
+                        if (!ranged) Effect("ink_slash_circle", impact, 260, d.Home - dir * 0.02f, Chest(d, 0.5f), Fit(d, 0.85f), flip: !mine, alpha: 0.7f);
                         Text(impact, d, "Unik", soft: true);
                     }
 
@@ -526,8 +547,8 @@ namespace JianghuGo.Android
                             K(d, impact + 700, "stance", d.Home);
                             var burst = Burst(element) ?? "glow_qi_burst";
                             Effect(burst, impact, 420, d.Home, 0.55f, 1.6f, alpha: 0.9f);
-                            Effect("ink_cross", impact, 400, d.Home, 0.55f, 0.85f);
-                            Effect("ink_crack", impact, 1800, d.Home, 0.0f, 1.4f, grow: 0, alpha: 0.7f);
+                            Effect("ink_cross", impact, 400, d.Home, Chest(d), Fit(d, 0.85f));
+                            Effect("ink_crack", impact, 1800, d.Home, 0.0f, Fit(d, 1.4f), grow: 0, alpha: 0.7f);
                             Text(impact, d, e.Damage.ToString("N0"), big: true);
                             Shake(impact, 1.4f);
                             Sound(impact, mine ? Sfx.Hit : Sfx.Hurt);
@@ -558,20 +579,20 @@ namespace JianghuGo.Android
                 }
                 case "stunned":
                     Text(t, a, "Ogłuszenie", soft: true);
-                    Effect("st_stun", t, 700, a.Home, 1.25f, 0.35f, grow: 0, alpha: 0.85f);
+                    Effect("st_stun", t, 700, a.Home, Chest(a, 1.25f), 0.35f, grow: 0, alpha: 0.85f);
                     return t + 500;
                 case "bleed":
                     Text(t, a, "-" + e.Damage, soft: true);
-                    Effect("st_bleed", t, 600, a.Home, 1.25f, 0.3f, grow: 0);
+                    Effect("st_bleed", t, 600, a.Home, Chest(a, 1.25f), 0.3f, grow: 0);
                     return t + 450;
                 case "burn":
                     Text(t, a, "-" + e.Damage, soft: true);
-                    Effect("st_burn", t, 600, a.Home, 1.25f, 0.3f, grow: 0);
-                    Effect("glow_fire_burst", t, 400, a.Home, 0.5f, 0.6f, alpha: 0.6f);
+                    Effect("st_burn", t, 600, a.Home, Chest(a, 1.25f), 0.3f, grow: 0);
+                    Effect("glow_fire_burst", t, 400, a.Home, Chest(a, 0.5f), Fit(a, 0.6f), alpha: 0.6f);
                     return t + 450;
                 case "poison":
                     Text(t, a, "-" + e.Damage, soft: true);
-                    Effect("st_poison", t, 600, a.Home, 1.25f, 0.3f, grow: 0);
+                    Effect("st_poison", t, 600, a.Home, Chest(a, 1.25f), 0.3f, grow: 0);
                     Effect("ink_ground_cloud", t, 900, a.Home, 0.1f, 1.2f, grow: 0.05f, alpha: 0.55f);
                     return t + 450;
                 default:

@@ -213,13 +213,22 @@ namespace JianghuGo.Android
 
         // ---- path arts ----------------------------------------------------------------------------------------
 
+        /// <summary>The arts tabs with the path's own art(s) first: Qi → Sword, Flame → Flames, Poison → Venoms and Gu, Body → Body.</summary>
+        private static int[] ArtsOrder(string path)
+        {
+            var own = path switch { "qi" => new[] { 4 }, "flame" => new[] { 0 }, "poison" => new[] { 1, 2 }, "body" => new[] { 3 }, _ => new int[0] };
+            return own.Concat(Enumerable.Range(0, ArtsTabs.Length).Where(i => !own.Contains(i))).ToArray();
+        }
+
         private async Task ShowArtsAsync(int sub)
         {
             var c = _me;
             var arts = await _api.GetArtsAsync(c.Id, Ct);
             var ui = HeroScreen(5, Resource.Drawable.bg_hero);
             var page = ui.Content;
-            ui.Tabs(page, ArtsTabs, sub, i => Run(() => ShowArtsAsync(i)), 30);
+            // the hero's own path art comes first (2.2); the others follow in their usual order
+            var order = ArtsOrder(c.Path);
+            ui.Tabs(page, order.Select(i => ArtsTabs[i]).ToArray(), Array.IndexOf(order, sub), i => Run(() => ShowArtsAsync(order[i])), 30);
 
             if (arts.Notices.Count > 0)
             {

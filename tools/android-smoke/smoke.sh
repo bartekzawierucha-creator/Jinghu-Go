@@ -225,10 +225,10 @@ $UI shot shots/07e-dao.png
 adb shell input keyevent KEYCODE_BACK; sleep 1
 $UI wait "MOC BOJOWA" 30
 $UI tap "Sztuki"
-$UI wait "Płomienie:" 60
+$UI wait "Intencja Miecza" 60   # the Qi path's own art (Sword) opens first
 $UI noscroll
-$UI shot shots/07g-arts-flames.png
-for t in "Trucizny:Ciało Toksyn" "Gu:Gniazdo Gu" "Ciało:KĄPIELE" "Miecz:Intencja Miecza" "Gałąź:Gałąź ścieżki"; do
+$UI shot shots/07g-arts-sword.png
+for t in "Płomienie:Płomienie:" "Trucizny:Ciało Toksyn" "Gu:Gniazdo Gu" "Ciało:KĄPIELE" "Gałąź:Gałąź ścieżki"; do
   $UI tap "${t%%:*}" 20
   $UI wait "${t#*:}" 30
   $UI noscroll

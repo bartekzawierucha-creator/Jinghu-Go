@@ -588,14 +588,44 @@ namespace JianghuGo.Android
                 }
             }
 
+            // the fight's tally (2.2), shown with the result: turns, damage both ways, crits and dodges
+            int dealt = 0, taken = 0, crits = 0, dodges = 0, tallied = -1;
+
+            void Tally(BattleDto b)
+            {
+                if (b.Turn == tallied || b.LastTurnEvents.Count == 0) return;
+                tallied = b.Turn;
+                foreach (var e in b.LastTurnEvents)
+                {
+                    var mine = b.IsMine(e);
+                    if (e.Hit == true)
+                    {
+                        // reflected damage hurts the attacker
+                        if (mine) { dealt += e.Damage; taken += e.Reflected; }
+                        else { taken += e.Damage; dealt += e.Reflected; }
+                        if (mine && e.Crit) crits++;
+                    }
+                    else if (e.Hit == false && !mine) dodges++;
+                    else if (e.Hit == null && e.Damage > 0 && e.Action is "bleed" or "burn" or "poison")
+                    {
+                        // damage over time: the event's actor is the one who suffers it
+                        if (mine) taken += e.Damage;
+                        else dealt += e.Damage;
+                    }
+                }
+            }
+
             void Render()
             {
                 var b = combat.Battle;
+                Tally(b);
                 if (ink != null) ink.Show(b);
                 else classic.Show(b);
                 ticker.Text = b.Status == "pending_acceptance" ? "Czekasz, aż przeciwnik przyjmie wyzwanie…"
                     : b.Status == "declined" ? "Przeciwnik odrzucił wyzwanie." : b.Status == "expired" ? "Wyzwanie wygasło."
                     : !b.IsActive ? "WYNIK: " + ResultName(b) + (b.RewardQi > 0 ? "  (+" + b.RewardQi + " Qi)" : string.Empty)
+                        + "\n" + b.Turn + " tur · zadane " + dealt.ToString("N0") + " · otrzymane " + taken.ToString("N0")
+                        + (crits > 0 ? " · krytyki " + crits : string.Empty) + (dodges > 0 ? " · uniki " + dodges : string.Empty)
                     : b.LastTurnEvents.Count == 0 ? "Tura " + b.Turn + " · przeciwnicy mierzą się wzrokiem…"
                     : "Tura " + b.Turn + " · " + string.Join("  ·  ", b.LastTurnEvents.Select(e =>
                         (b.IsMine(e) ? "Ty" : "Wróg") + ": " + ActionName(e.Action) + (e.Hit == true ? " " + e.Damage : e.Hit == false ? " pudło" : string.Empty)
