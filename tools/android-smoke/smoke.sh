@@ -87,6 +87,8 @@ $UI tap "Tytuły"
 $UI wait "Nad postacią" 30
 $UI noscroll
 $UI shot shots/04d-titles.png
+adb shell input keyevent KEYCODE_BACK; sleep 1
+$UI wait "Opowieść" 30
 $UI tap "Opowieść"
 $UI wait "ROZDZIAŁ 1" 30
 $UI noscroll
@@ -159,6 +161,8 @@ $UI shot shots/06i2-tower-next.png
 $UI tap "Wyjdź"
 $UI wait "WIEŻA PRÓB" 30
 $UI wait "Piętro 1 z 330" 30
+adb shell input keyevent KEYCODE_BACK; sleep 1
+$UI wait "Trening" 30
 $UI tap "Bossy"
 $UI wait "legowisk" 30
 $UI noscroll
@@ -172,6 +176,8 @@ $UI tap "Na pewno?" 20
 $UI wait "PORAŻKA" 30
 $UI tap "Dalej" 20
 $UI tap "Wyjdź"
+$UI wait "legowisk" 30
+adb shell input keyevent KEYCODE_BACK; sleep 1
 $UI wait "Trening" 30
 $UI tap "Łowy"
 $UI wait "Wybierz przeciwnika" 30
@@ -184,6 +190,8 @@ $UI shot shots/06g-hunt.png
 $UI tap "Zakończ i odbierz"
 $UI wait "POLOWANIE" 30
 $UI tap "Dalej" 20
+adb shell input keyevent KEYCODE_BACK; sleep 1
+$UI wait "Trening" 30
 $UI tap "Arena"
 $UI wait "ARENA" 30
 $UI noscroll
@@ -201,15 +209,23 @@ adb shell input keyevent KEYCODE_BACK; sleep 1
 $UI tap "Meridiany"
 $UI wait "Wolne punkty" 60
 $UI shot shots/07b-meridians.png
+adb shell input keyevent KEYCODE_BACK; sleep 1
+$UI wait "MOC BOJOWA" 30
 $UI tap "Techniki"
 $UI wait "Ułóż najlepsze" 60
 $UI shot shots/07c-techniques.png
+adb shell input keyevent KEYCODE_BACK; sleep 1
+$UI wait "MOC BOJOWA" 30
 $UI tap "Towarzysz"
 $UI wait "Nie masz jeszcze towarzysza" 60
 $UI shot shots/07d-pet.png
+adb shell input keyevent KEYCODE_BACK; sleep 1
+$UI wait "MOC BOJOWA" 30
 $UI tap "Dao"
 $UI wait "Ułóż własną" 60
 $UI shot shots/07e-dao.png
+adb shell input keyevent KEYCODE_BACK; sleep 1
+$UI wait "MOC BOJOWA" 30
 $UI tap "Sztuki"
 $UI wait "Płomienie:" 60
 $UI noscroll

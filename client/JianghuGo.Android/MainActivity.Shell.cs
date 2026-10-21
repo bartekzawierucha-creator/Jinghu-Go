@@ -391,6 +391,13 @@ namespace JianghuGo.Android
         private void GoTab(string tab)
         {
             if (_me == null) return;
+            if (tab == TabSect && _board != null && !Unlocked("battles_won"))
+            {
+                // progressive unlock: sects open after the first won fight (the screen stays where it was)
+                SetStatus("🔒 Sekty otworzą się po pierwszej wygranej walce — zacznij od Treningu w zakładce Walka.");
+                return;
+            }
+
             _tab = tab;
             switch (tab)
             {
@@ -398,7 +405,7 @@ namespace JianghuGo.Android
                     Run(ShowWorldTabAsync);
                     break;
                 case TabCombat:
-                    Run(() => ShowCombatTabAsync(_combatSub));
+                    Run(() => ShowCombatTabAsync(0)); // the dock always opens the combat hub
                     break;
                 case TabHero:
                     Run(() => ShowHeroTabAsync(0));

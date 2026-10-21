@@ -15,36 +15,101 @@ namespace JianghuGo.Android
         private CombatCatalogDto _catalog;
         private int _combatSub;
 
+        /// <summary>
+        /// Combat (2.2): one screen instead of six tabs — the tower as the main road up, the training list, and a row of
+        /// icons for the rest (hunt, bosses, arena, duels). Each of those opens its own screen with a way back here.
+        /// </summary>
         private async Task ShowCombatTabAsync(int tab)
         {
             var c = _me;
             _combatSub = tab;
             _catalog ??= await _api.GetCombatCatalogAsync(Ct);
+            if (tab != 0)
+            {
+                await ShowCombatSubAsync(tab);
+                return;
+            }
+
+            var tower = await _api.GetTowerAsync(c.Id, Ct);
+            var scout = await _api.GetCombatScoutAsync(c.Id, Ct);
+            HuntDto hunt = null;
+            try
+            {
+                hunt = (await _api.GetHuntAsync(c.Id, Ct)).Hunt;
+            }
+            catch (ApiException)
+            {
+                // the dot is only a hint
+            }
+
+            _power = scout.MyPower;
+            var ui = NewScreen(null, art: Resource.Drawable.arena_courtyard, tab: TabCombat);
+            var page = ui.Content;
+
+            _board = await _api.GetQuestsAsync(c.Id, Ct); // fresh: a fight just won may unlock things
+            var afterWin = Unlocked("battles_won") ? null : "1. wygrana";
+
+            // the tower: the main road up, one tap to the next floor (shown once the first fight is won)
+            if (afterWin == null)
+            {
+                var tc = ui.Card(page, 0f, 8, Ui.Gold);
+                tc.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, Px(78)) { TopMargin = Px(2) };
+                tc.Clickable = true;
+                tc.Click += (_, __) => Run(() => ShowCombatTabAsync(2));
+                var trow = ui.HRow(tc, 58, 0);
+                ui.Icon(trow, "ink_ico_tower", 48);
+                var tcol = ui.Box(trow, 1f, marginDp: 6);
+                ui.Text("Wieża Prób · piętro " + tower.BestFloor + " / " + tower.Floors, tcol, 14, Ui.Ink, bold: true, maxLines: 1);
+                ui.Text(tower.Next is { } nf ? "Dalej: " + nf.NamePl + (nf.Guardian ? " · STRAŻNIK" : string.Empty) + " · +" + nf.Qi + " Qi" : "Wieża zdobyta!", tcol, 11, Ui.Muted, maxLines: 1);
+                if (tower.Next is { } next)
+                    ui.Btn("Wejdź na piętro " + next.Floor, () => Run(StartTowerAsync), trow, sp: 12, heightDp: 44).LayoutParameters = new LinearLayout.LayoutParams(Px(132), Px(44)) { Gravity = GravityFlags.CenterVertical };
+            }
+
+            // training: foes scaled to the hero's realm, weakest first
+            ui.Text("Trening · twoja moc " + scout.MyPower.ToString("N0"), page, 12, Ui.Ink, bold: true, center: true);
+            var npcs = TrainingFoes(scout);
+            ui.Pages(page, npcs.Count, 2, 2, (i, cell) =>
+            {
+                var n = npcs[i];
+                var (line, color) = FoeLine(n, scout);
+                ui.TileIn(cell, n.NamePl, line + (n.Tameable ? "  🐾" : string.Empty),
+                    NpcLooks.For(n.Id).TileArt, () => Run(() => StartTrainingAsync(n.Id)), pixelArt: true, accent: color, titleSp: 13);
+            });
+
+            // everything else: one row of icons, opening step by step (first win → tower, hunt, bosses; first floor → arena, duels)
+            var afterFloor = tower.BestFloor > 0 ? null : "1. piętro";
+            ui.IconRow(page, new List<(string, string, System.Action, bool, string)>
+            {
+                ("Wieża", "ink_ico_tower", () => Run(() => ShowCombatTabAsync(2)), false, afterWin),
+                ("Łowy", "ink_ico_hunt", () => Run(() => ShowCombatTabAsync(1)), hunt?.Finished == true, afterWin),
+                ("Bossy", "ink_ico_demon", () => Run(() => ShowCombatTabAsync(3)), false, afterWin),
+                ("Arena", "ink_ico_arena", () => Run(() => ShowCombatTabAsync(5)), false, afterFloor),
+                ("PvP", "ink_nav_combat", () => Run(() => ShowCombatTabAsync(4)), false, afterFloor),
+            });
+            if (afterWin != null) ui.Text("Wygraj pierwszą walkę treningową — otworzą się Wieża, Łowy i Bossy.", page, 11, Ui.Muted, center: true, maxLines: 2);
+        }
+
+        /// <summary>The secondary combat screens (hunt, tower, bosses, duels, arena), each with a back arrow to the hub.</summary>
+        private async Task ShowCombatSubAsync(int tab)
+        {
+            var c = _me;
             var open = tab == 4 ? (await _api.GetOpenBattlesAsync(c.Id, Ct)).Items : new List<BattleDto>();
             var hunt = tab == 1 ? (await _api.GetHuntAsync(c.Id, Ct)).Hunt : null;
             var tower = tab == 2 ? await _api.GetTowerAsync(c.Id, Ct) : null;
             var boss = tab == 3 ? await _api.GetWorldBossAsync(c.Id, Ct) : null;
             var arena = tab == 5 ? await _api.GetArenaAsync(c.Id, Ct) : null;
-            // 2.2: foes are shown scaled to the hero's realm (power and the real reward), so growth on both sides is visible
-            var scout = tab == 0 || (tab == 1 && hunt == null) ? await _api.GetCombatScoutAsync(c.Id, Ct) : null;
-            var ui = NewScreen(null, art: tab == 2 ? Resource.Drawable.arena_tower : Resource.Drawable.arena_courtyard, tab: TabCombat);
-            var page = ui.Content;
-            ui.Tabs(page, new[] { "Trening", "Łowy", "Wieża", "Bossy", "PvP", "Arena" }, tab, i => Run(() => ShowCombatTabAsync(i)));
-
-            if (tab == 0)
+            var scout = tab == 1 && hunt == null ? await _api.GetCombatScoutAsync(c.Id, Ct) : null;
+            var (title, sub) = tab switch
             {
-                var npcs = TrainingFoes(scout);
-                ui.Text("Twoja moc: " + scout.MyPower.ToString("N0") + "  ·  wrogowie rosną razem z tobą", page, 12, Ui.Ink, bold: true, center: true);
-                ui.Pages(page, npcs.Count, 2, 2, (i, cell) =>
-                {
-                    var n = npcs[i];
-                    var (line, color) = FoeLine(n, scout);
-                    ui.TileIn(cell, n.NamePl, line + (n.Tameable ? "  🐾" : string.Empty),
-                        NpcLooks.For(n.Id).TileArt, () => Run(() => StartTrainingAsync(n.Id)), pixelArt: true, accent: color, titleSp: 13);
-                });
-                ui.Text("Moc wroga przy twoim królestwie  ·  🐾 można oswoić", page, 11, Ui.Muted, center: true);
-            }
-            else if (tab == 1)
+                1 => ("Łowy", "WALKI SAME, GDY CIĘ NIE MA"),
+                2 => ("Wieża Prób", "PIĘTRO PO PIĘTRZE"),
+                3 => ("Bossy", "BOSS ŚWIATA I LEGOWISKA"),
+                4 => ("Pojedynki", "WYZWANIA I LISTY GOŃCZE"),
+                _ => ("Arena", "RYWALE Z CAŁEGO JIANGHU"),
+            };
+            var ui = NewScreen(title, () => Run(() => ShowCombatTabAsync(0)), tab == 2 ? Resource.Drawable.arena_tower : Resource.Drawable.arena_courtyard, sub, tab: TabCombat);
+            var page = ui.Content;
+            if (tab == 1)
             {
                 Hunt(ui, page, hunt, scout);
             }
@@ -103,6 +168,10 @@ namespace JianghuGo.Android
                 }, empty: "Brak trwających walk.");
             }
         }
+
+        /// <summary>Progressive unlocks (2.2): true once the player has done the thing at least once (from the achievements' counters).</summary>
+        private bool Unlocked(string metric) =>
+            _board != null && _board.Achievements.Concat(_board.Daily).Where(q => q.Metric == metric).Select(q => q.Progress).DefaultIfEmpty(0).Max() > 0;
 
         /// <summary>Training foes, weakest first by their power at the hero's realm.</summary>
         private List<CombatNpcDto> TrainingFoes(CombatScoutDto scout)

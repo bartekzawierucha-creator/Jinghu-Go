@@ -242,6 +242,67 @@ namespace JianghuGo.Android
             return tile;
         }
 
+        /// <summary>
+        /// A row of brush icons with a label under each (2.2: secondary features live here instead of in tab rows).
+        /// A locked item is greyed out and says from which realm it opens; a dot marks something waiting.
+        /// </summary>
+        public LinearLayout IconRow(ViewGroup parent, IList<(string Label, string Art, System.Action OnClick, bool Dot, string Locked)> items, int heightDp = 64, bool vertical = false)
+        {
+            var row = new LinearLayout(_ctx) { Orientation = vertical ? Orientation.Vertical : Orientation.Horizontal };
+            row.SetGravity(GravityFlags.Center);
+            foreach (var it in items)
+            {
+                var cell = new LinearLayout(_ctx) { Orientation = Orientation.Vertical, Clickable = true };
+                cell.SetGravity(GravityFlags.Center);
+                var frame = new FrameLayout(_ctx);
+                var img = new ImageView(_ctx);
+                var id = ArtId(it.Art);
+                if (id != 0) img.SetImageBitmap(Art(_ctx, id));
+                img.SetScaleType(ImageView.ScaleType.FitCenter);
+                frame.AddView(img, new FrameLayout.LayoutParams(Dp(40), Dp(40)));
+                if (it.Dot)
+                {
+                    var dot = new View(_ctx);
+                    var bg = new GradientDrawable();
+                    bg.SetShape(ShapeType.Oval);
+                    bg.SetColor(Cinnabar);
+                    bg.SetStroke(Dp(1), Color.Rgb(248, 245, 238));
+                    dot.Background = bg;
+                    frame.AddView(dot, new FrameLayout.LayoutParams(Dp(10), Dp(10), GravityFlags.Top | GravityFlags.End));
+                }
+
+                cell.AddView(frame, new LinearLayout.LayoutParams(Dp(40), Dp(40)));
+                var t = new TextView(_ctx) { Text = it.Locked != null ? "🔒 " + it.Locked : it.Label, Gravity = GravityFlags.Center };
+                t.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 10);
+                t.SetTypeface(Display, TypefaceStyle.Bold);
+                t.SetTextColor(it.Locked != null ? Muted : Ink);
+                t.SetMaxLines(1);
+                t.SetIncludeFontPadding(false);
+                // long labels shrink to fit the cell instead of being cut
+                t.SetAutoSizeTextTypeUniformWithConfiguration(7, 10, 1, (int)global::Android.Util.ComplexUnitType.Sp);
+                cell.AddView(t, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, Dp(14)));
+                if (it.Locked != null) img.Alpha = 0.35f;
+                var item = it;
+                cell.Click += (_, __) =>
+                {
+                    cell.PerformHapticFeedback(FeedbackConstants.VirtualKey);
+                    Sfx.Play(Sfx.Click, 0.5f);
+                    if (item.Locked != null) return;
+                    item.OnClick();
+                };
+                Juice.Press(cell);
+                row.AddView(cell, vertical
+                    ? new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0, 1f)
+                    : new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 1f));
+            }
+
+            // vertical: a side column of the given width (heightDp is its width), filling the parent's height
+            (parent ?? Content).AddView(row, vertical
+                ? new LinearLayout.LayoutParams(Dp(heightDp), ViewGroup.LayoutParams.MatchParent)
+                : new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, Dp(heightDp)) { TopMargin = Dp(4) });
+            return row;
+        }
+
         /// <summary>Small red counter bubble.</summary>
         public TextView Badge(string text)
         {

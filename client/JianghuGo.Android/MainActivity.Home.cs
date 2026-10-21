@@ -37,9 +37,28 @@ namespace JianghuGo.Android
             void ShowPower() => sub.Text = (_power > 0 ? "⚔ Moc " + _power.ToString("N0") + " · " : string.Empty) + pathLine;
             ShowPower();
 
-            // the vessel and the meditating hero take what is left of the screen
+            // 2.2: the ring in the middle, everything else as icons on both sides of it (instead of rows of buttons)
+            var mid = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            ui.AddWeighted(page, mid, 1f, 2);
+            CultivationFlow flowRef = null;
+            System.Action renderRef = null;
+            ui.IconRow(mid, new List<(string, string, System.Action, bool, string)>
+            {
+                ("Opowieść", "ink_ico_journey", () => Run(() => ShowQuestsAsync(3)), _board?.Story is { Completed: true, Finished: false }, null),
+                ("Osiągnięcia", "ink_ico_ranking", () => Run(() => ShowQuestsAsync(1)), _board?.Achievements.Any(q => q.Completed && !q.Claimed) == true, null),
+                ("Sezon", "ink_ico_achievement", () => Run(() => ShowQuestsAsync(4)), (_board?.Pass?.Claimable ?? 0) > 0, null),
+                ("Kronika", "ink_ico_event", () => Run(ShowChronicleAsync), false, null),
+            }, 62, vertical: true);
             var charge = new QiChargeView(this);
-            ui.AddWeighted(page, charge, 1f, 2);
+            mid.AddView(charge, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 1f));
+            ui.IconRow(mid, new List<(string, string, System.Action, bool, string)>
+            {
+                ("Rozwój", "ink_ico_meridian", () => { if (flowRef?.State != null) CultivationSheet(flowRef, renderRef); }, false, null),
+                ("Odosobnienie", "ink_ico_dao", () => { if (flowRef?.State != null) RetreatSheet(flowRef, renderRef); }, false, null),
+                ("Posiadłość", "ink_ico_place", () => Run(() => ShowEstateAsync(0)), false, null),
+                ("Kuźnia", "ink_ico_forge", () => Run(() => ShowBagAsync(1)), false, null),
+                ("Targ", "ink_ico_market", () => Run(() => ShowBagAsync(2)), false, null),
+            }, 62, vertical: true);
             var info = ui.Text(string.Empty, page, 11, Ui.Muted, maxLines: 1);
 
             var actions = ui.HRow(page, 52);
@@ -53,10 +72,7 @@ namespace JianghuGo.Android
                 if (_steps.Available) _steps.Start();
             }
 
-            var more = ui.HRow(page, 40);
-            ui.Btn("Odosobnienie", () => RetreatSheet(flow, Render), more, secondary: true, sp: 11, heightDp: 40);
-            ui.Btn("Rozwój", () => CultivationSheet(flow, Render), more, secondary: true, sp: 11, heightDp: 40);
-            ui.Btn("Posiadłość", () => Run(() => ShowEstateAsync(0)), more, secondary: true, sp: 11, heightDp: 40);
+            flowRef = flow;
 
             // the day: three quests and the check-in seal
             var daily = ui.HRow(page, 74);
@@ -223,6 +239,7 @@ namespace JianghuGo.Android
                 }
             }
 
+            renderRef = Render;
             RenderDaily(_board);
             Run(async () =>
             {
@@ -246,13 +263,14 @@ namespace JianghuGo.Android
             var c = _me;
             var board = await _api.GetQuestsAsync(c.Id, Ct);
             _board = board;
-            var ui = NewScreen("Zadania", BackToTab, Resource.Drawable.tile_menu_quests, "DZIEŃ " + board.Day);
+            // 2.2: three tabs; the story (with weekly and seasonal events) and the season pass open from the home icons
+            var title = tab == 3 ? "Opowieść" : tab == 4 ? "Sezon" : "Zadania";
+            var ui = NewScreen(title, BackToTab, Resource.Drawable.tile_menu_quests, tab >= 3 ? "WYDARZENIA I NAGRODY" : "DZIEŃ " + board.Day);
             var page = ui.Content;
             var claimableAch = board.Achievements.Count(a => a.Completed && !a.Claimed);
-            var storyReady = board.Story != null && board.Story.Completed && !board.Story.Finished ? 1 : 0;
-            ui.Tabs(page, new[] { "Dziś", "Osiągnięcia", "Tytuły", "Opowieść", "Sezon" }, tab, i => Run(() => ShowQuestsAsync(i)),
-                badges: new[] { board.Daily.Count(q => q.Completed && !q.Claimed) + (board.Checkin.CheckedInToday ? 0 : 1), claimableAch,
-                    0, storyReady + board.Seasonal.Count(q => q.Completed && !q.Claimed) + WeeklyClaimable(board.Weekly), board.Pass?.Claimable ?? 0 });
+            if (tab <= 2)
+                ui.Tabs(page, new[] { "Dziś", "Osiągnięcia", "Tytuły" }, tab, i => Run(() => ShowQuestsAsync(i)),
+                    badges: new[] { board.Daily.Count(q => q.Completed && !q.Claimed) + (board.Checkin.CheckedInToday ? 0 : 1), claimableAch, 0 });
 
             Pager listPager = null;
             async Task Claim(QuestDto q)

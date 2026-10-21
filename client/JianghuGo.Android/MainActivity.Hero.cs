@@ -39,11 +39,22 @@ namespace JianghuGo.Android
             }
         }
 
+        /// <summary>
+        /// 2.2: the hero is one screen (the figure, gear and stats) with icons for the rest; meridians, techniques, the
+        /// companion, Dao and the path arts open as their own screens with a back arrow to the hero.
+        /// </summary>
         private Ui HeroScreen(int tab, int art)
         {
-            var ui = NewScreen(null, art: art, tab: TabHero);
-            ui.Tabs(ui.Content, HeroTabs, tab, i => Run(() => ShowHeroTabAsync(i)));
-            return ui;
+            if (tab == 0) return NewScreen(null, art: art, tab: TabHero);
+            var sub = tab switch
+            {
+                1 => "PUNKT ZA KAŻDY ETAP",
+                2 => "WALKA TOCZY SIĘ SAMA",
+                3 => "DUCHOWA BESTIA U BOKU",
+                4 => "TWOJE WŁASNE TECHNIKI",
+                _ => "MOC TWOJEJ ŚCIEŻKI",
+            };
+            return NewScreen(HeroTabs[tab], () => Run(() => ShowHeroTabAsync(0)), art, sub, tab: TabHero);
         }
 
         /// <summary>Where the stats come from: the three traits with their modifiers, the path's perks and the titles' bonuses.</summary>
@@ -105,7 +116,16 @@ namespace JianghuGo.Android
                 doll.Equipped[slot] = inv.Equipped.TryGetValue(slot, out var id) ? inv.Items.FirstOrDefault(i => i.Id == id) : null;
             ui.AddWeighted(page, doll, 1f);
             _power = (await _api.GetCombatScoutAsync(c.Id, Ct)).MyPower;
+            _board ??= await _api.GetQuestsAsync(c.Id, Ct);
             ui.Text("⚔ MOC BOJOWA " + _power.ToString("N0"), page, 15, Ui.Cinnabar, bold: true, center: true);
+            ui.IconRow(page, new List<(string, string, System.Action, bool, string)>
+            {
+                ("Meridiany", "ink_ico_meridian", () => Run(() => ShowHeroTabAsync(1)), meridians != null && meridians.Free > 0, null),
+                ("Techniki", "ink_nav_combat", () => Run(() => ShowHeroTabAsync(2)), false, null),
+                ("Towarzysz", "ink_ico_beast", () => Run(() => ShowHeroTabAsync(3)), false, null),
+                ("Dao", "ink_ico_dao", () => Run(() => ShowHeroTabAsync(4)), false, Unlocked("battles_won") ? null : "1. wygrana"),
+                ("Sztuki", "ink_ico_alchemy", () => Run(() => ShowHeroTabAsync(5)), false, Unlocked("battles_won") ? null : "1. wygrana"),
+            }, 58);
             var info = ui.HRow(page, 34, 4);
             ui.Btn("Cechy, ścieżka i tytuły", () => ShowOriginsSheet(), info, secondary: true, sp: 12, heightDp: 34, icon: "menu_hero");
             ui.Btn("Premie", () => Run(ShowBonusesSheetAsync), info, secondary: true, sp: 12, heightDp: 34);
