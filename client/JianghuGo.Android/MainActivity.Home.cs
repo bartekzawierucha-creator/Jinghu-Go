@@ -85,6 +85,11 @@ namespace JianghuGo.Android
             // 2.8: what no other cultivation game has — the real world around you, one tap from the map
             var world = ui.HRow(page, 30, 2);
             world.Clickable = true;
+            var chip = new global::Android.Graphics.Drawables.GradientDrawable();
+            chip.SetColor(Color.Argb(215, 244, 240, 231));
+            chip.SetCornerRadius(Px(15));
+            world.Background = chip;
+            world.SetPadding(Px(6), 0, Px(8), 0);
             world.Click += (_, __) => GoTab(TabWorld);
             ui.Icon(world, "map_qi", 24);
             var worldText = ui.Text("Świat wokół ciebie — sprawdź, co jest blisko", world, 12, Ui.Jade, bold: true, maxLines: 1);
@@ -107,8 +112,10 @@ namespace JianghuGo.Android
             next.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Px(4) };
             next.Clickable = true;
             var nextRow = ui.HRow(next, 36, 0);
+            nextRow.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent); // two lines when the goal is long
+            nextRow.SetMinimumHeight(Px(36));
             var nextIcon = ui.Icon(nextRow, "ink_ico_journey", 30);
-            var nextText = ui.Text(string.Empty, nextRow, 14, Ui.Ink, bold: true, maxLines: 2);
+            var nextText = ui.Text(string.Empty, nextRow, 13, Ui.Ink, bold: true, maxLines: 2);
             nextText.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f) { LeftMargin = Px(8), Gravity = GravityFlags.CenterVertical };
             var nextGo = ui.Text("›", nextRow, 22, Ui.Cinnabar, bold: true);
             nextGo.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent) { Gravity = GravityFlags.CenterVertical };
