@@ -23,7 +23,42 @@ namespace JianghuGo.Android
         {
             public float Height;
             public float Anchor = 0.5f;
+            public float Raise;   // fighter heights above the ground (fliers, the sky in a tribulation)
         }
+
+        /// <summary>
+        /// Beasts, spirits and tribulations (2.2 pose sheets): six poses each — stance, windup, attack, skill, hurt, fall —
+        /// with their size against the hero's stance height and how high above the ground they hover.
+        /// </summary>
+        private static readonly Dictionary<string, (float Scale, float Raise)> Beasts = new Dictionary<string, (float, float)>
+        {
+            ["training_dummy"] = (0.95f, 0f), ["grey_wolf"] = (0.62f, 0f), ["wild_boar"] = (0.7f, 0f), ["bamboo_viper"] = (0.6f, 0f),
+            ["fire_fox"] = (0.6f, 0f), ["stone_golem"] = (1.3f, 0f), ["frost_spider"] = (0.7f, 0f), ["thunder_eagle"] = (0.9f, 0.45f),
+            ["ancient_tortoise"] = (1.05f, 0f), ["jiao_dragon"] = (1.2f, 0.15f), ["storm_qilin"] = (1.05f, 0f),
+            ["flame_spirit_lesser"] = (0.75f, 0.1f), ["flame_spirit_greater"] = (1.05f, 0.1f), ["flame_spirit_primal"] = (1.3f, 0.1f),
+            ["heavenly_tribulation"] = (1.35f, 0.9f), ["flame_tribulation"] = (1.35f, 0.9f),
+        };
+
+        private static Dictionary<string, PoseInfo> BeastTable(string set)
+        {
+            var (k, raise) = Beasts[set];
+            PoseInfo P(float h) => new PoseInfo { Height = k * h, Anchor = 0.5f, Raise = raise };
+            return new Dictionary<string, PoseInfo>
+            {
+                ["stance"] = P(1f), ["windup"] = P(0.92f), ["attack"] = P(0.9f), ["skill"] = P(1.05f), ["hurt"] = P(0.95f),
+                ["fall"] = new PoseInfo { Height = k * 0.55f, Anchor = 0.5f, Raise = 0 },
+            };
+        }
+
+        /// <summary>The duel's moves on a six-pose creature.</summary>
+        private static string BeastPose(string pose) => pose switch
+        {
+            "dash" or "strike" or "thrust" or "air_slash" => "attack",
+            "cast" => "skill",
+            "jump" or "block" => "windup",
+            "victory" => "stance",
+            _ => pose,
+        };
 
         private static readonly Dictionary<string, Dictionary<string, PoseInfo>> Poses = new Dictionary<string, Dictionary<string, PoseInfo>>
         {
@@ -45,7 +80,7 @@ namespace JianghuGo.Android
         /// <summary>Foes drawn in the ink duel (people); beasts and spirits keep the classic stage until they have ink poses.</summary>
         public static bool Supports(string npcId, string kind) =>
             kind == "pvp" || npcId == null || npcId == "pvp" || npcId is "mountain_bandit" or "sect_traitor" or "demonic_cultivator" or "bandit_chief"
-                or "corpse_puppet" or "blood_demon_lord" or "heart_demon_tribulation";
+                or "corpse_puppet" or "blood_demon_lord" or "heart_demon_tribulation" || Beasts.ContainsKey(npcId);
 
         // ---- keyframed fighters ------------------------------------------------------------------------------------
         private struct Key
@@ -120,7 +155,7 @@ namespace JianghuGo.Android
             _d = ctx.Resources.DisplayMetrics.Density;
             _path = HeroArt.Normalize(heroPath);
             _me = new Fighter { Set = _path, Hero = true, Home = 0.25f };
-            _foe = new Fighter { Set = "rival", Hero = false, Home = 0.75f };
+            _foe = new Fighter { Set = npcId != null && Beasts.ContainsKey(npcId) ? npcId : "rival", Hero = false, Home = 0.75f };
             var bgName = (npcId ?? "pvp") switch
             {
                 "mountain_bandit" or "bandit_chief" => "duel_bg_cliff",
@@ -131,7 +166,7 @@ namespace JianghuGo.Android
             _bg = Art(bgName);
             _stroke = Art("duel_ink_brush_stroke") ?? Art("duel_ink_slash_double");
             _avatarMe = Art("duel_avatar_" + _path);
-            _avatarFoe = Art("duel_avatar_rival");
+            _avatarFoe = _foe.Set == "rival" ? Art("duel_avatar_rival") : RoundAvatar(Art("duel_pose_" + _foe.Set + "_stance"));
             _cutIn = Art("duel_cutin_" + _path);
             _flash.SetColorFilter(new LightingColorFilter(Color.Rgb(255, 255, 255).ToArgb(), Color.Rgb(170, 170, 170).ToArgb()));
             _text.SetTypeface(Ui.Display);
@@ -153,13 +188,43 @@ namespace JianghuGo.Android
             return b;
         }
 
+        private static Dictionary<string, PoseInfo> TableOf(string set)
+        {
+            if (Poses.TryGetValue(set, out var t)) return t;
+            t = BeastTable(set);
+            Poses[set] = t;
+            return t;
+        }
+
+        /// <summary>A creature's stance fitted into a round paper medallion for the HUD.</summary>
+        private Bitmap RoundAvatar(Bitmap src)
+        {
+            if (src == null) return Art("duel_avatar_rival");
+            const int size = 160;
+            var bmp = Bitmap.CreateBitmap(size, size, Bitmap.Config.Argb8888);
+            var c = new Canvas(bmp);
+            var p = new Paint(PaintFlags.AntiAlias | PaintFlags.FilterBitmap) { Color = Color.Rgb(244, 240, 231) };
+            c.DrawCircle(size / 2f, size / 2f, size / 2f, p);
+            var clip = new Path();
+            clip.AddCircle(size / 2f, size / 2f, size / 2f, Path.Direction.Cw);
+            c.ClipPath(clip);
+            var scale = Math.Min(size * 0.92f / src.Width, size * 0.92f / src.Height) * 1.25f; // a little closer than "fit"
+            var dw = src.Width * scale;
+            var dh = src.Height * scale;
+            c.DrawBitmap(src, null, new RectF((size - dw) / 2, (size - dh) / 2 + size * 0.06f, (size + dw) / 2, (size + dh) / 2 + size * 0.06f), p);
+            return bmp;
+        }
+
         private Bitmap PoseBitmap(Fighter f, string pose)
         {
-            var table = Poses[f.Set];
-            if (!table.ContainsKey(pose)) pose = pose switch { "block" => "windup", "fall" => "hurt", "victory" => "stance", "cast" => "windup", _ => "stance" };
+            var table = TableOf(f.Set);
+            if (!f.Hero && Beasts.ContainsKey(f.Set)) pose = BeastPose(pose);
+            if (!table.ContainsKey(pose)) pose = pose switch { "block" => "windup", "fall" => "hurt", "victory" => "stance", "cast" => "windup", "windup" or "attack" or "skill" => "stance", _ => "stance" };
             if (!f.Bitmaps.TryGetValue(pose, out var bmp))
             {
                 bmp = Art("duel_pose_" + f.Set + "_" + pose);
+                // a creature with fewer poses (the dummy: stance, hurt, fall) shows its stance instead
+                if (bmp == null && pose != "stance") bmp = PoseBitmap(f, "stance");
                 f.Bitmaps[pose] = bmp;
             }
 
@@ -629,8 +694,10 @@ namespace JianghuGo.Android
         {
             var bmp = PoseBitmap(f, pose);
             if (bmp == null) return;
-            var table = Poses[f.Set];
+            var table = TableOf(f.Set);
+            if (!f.Hero && Beasts.ContainsKey(f.Set)) pose = BeastPose(pose);
             var info = table.TryGetValue(pose, out var p) ? p : table["stance"];
+            foot -= info.Raise * ch;
             var ph = ch * info.Height;
             var pw = ph * bmp.Width / bmp.Height;
             var left = x - info.Anchor * pw;

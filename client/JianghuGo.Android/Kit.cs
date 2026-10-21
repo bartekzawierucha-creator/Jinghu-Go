@@ -139,7 +139,7 @@ namespace JianghuGo.Android
                 var img = new ImageView(_ctx);
                 var bmp = Art(_ctx, artRes);
                 var drawable = new BitmapDrawable(_ctx.Resources, bmp);
-                drawable.SetFilterBitmap(!pixelArt || bmp.Width > 256); // painted tiles stay smooth in pixel-art lists
+                drawable.SetFilterBitmap(!pixelArt || bmp.Width > 128); // painted tiles and ink poses stay smooth in pixel-art lists
                 img.SetImageDrawable(drawable);
                 img.SetScaleType(pixelArt ? ImageView.ScaleType.FitCenter : ImageView.ScaleType.CenterCrop);
                 var ilp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.MatchParent);

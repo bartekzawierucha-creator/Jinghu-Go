@@ -73,7 +73,7 @@ namespace JianghuGo.Android
                 var n = npcs[i];
                 var (line, color) = FoeLine(n, scout);
                 ui.TileIn(cell, n.NamePl, line + (n.Tameable ? "  🐾" : string.Empty),
-                    NpcLooks.For(n.Id).TileArt, () => Run(() => StartTrainingAsync(n.Id)), pixelArt: true, accent: color, titleSp: 13);
+                    FoeArt(n.Id), () => Run(() => StartTrainingAsync(n.Id)), pixelArt: true, accent: color, titleSp: 13);
             });
 
             // everything else: one row of icons, opening step by step (first win → tower, hunt, bosses; first floor → arena, duels)
@@ -173,6 +173,15 @@ namespace JianghuGo.Android
         private bool Unlocked(string metric) =>
             _board != null && _board.Achievements.Concat(_board.Daily).Where(q => q.Metric == metric).Select(q => q.Progress).DefaultIfEmpty(0).Max() > 0;
 
+        /// <summary>A foe's card art: its ink stance (2.2) when it has one, people share the rival's; else the old painted tile.</summary>
+        private int FoeArt(string npcId)
+        {
+            var ink = _ui.ArtId("duel_pose_" + npcId + "_stance");
+            if (ink != 0) return ink;
+            if (InkBattleView.Supports(npcId, "pve")) return Resource.Drawable.duel_pose_rival_stance;
+            return NpcLooks.For(npcId).TileArt;
+        }
+
         /// <summary>Training foes, weakest first by their power at the hero's realm.</summary>
         private List<CombatNpcDto> TrainingFoes(CombatScoutDto scout)
         {
@@ -259,7 +268,7 @@ namespace JianghuGo.Android
                 {
                     var n = npcs[i];
                     var (line, color) = FoeLine(n, scout);
-                    ui.TileIn(cell, n.NamePl, line, NpcLooks.For(n.Id).TileArt, () => Run(async () =>
+                    ui.TileIn(cell, n.NamePl, line, FoeArt(n.Id), () => Run(async () =>
                     {
                         await _api.StartHuntAsync(c.Id, n.Id, Ct);
                         Sfx.Play(Sfx.Chime);
@@ -272,8 +281,8 @@ namespace JianghuGo.Android
 
             var card = ui.Card(page, 1f, 10, Ui.Jade);
             var art = new ImageView(this);
-            var bmp = new global::Android.Graphics.Drawables.BitmapDrawable(Resources, Ui.Art(this, NpcLooks.For(hunt.NpcId).TileArt));
-            bmp.SetFilterBitmap(false);
+            var bmp = new global::Android.Graphics.Drawables.BitmapDrawable(Resources, Ui.Art(this, FoeArt(hunt.NpcId)));
+            bmp.SetFilterBitmap(true);
             art.SetImageDrawable(bmp);
             art.SetScaleType(ImageView.ScaleType.FitCenter);
             card.AddView(art, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, 0, 1f));
