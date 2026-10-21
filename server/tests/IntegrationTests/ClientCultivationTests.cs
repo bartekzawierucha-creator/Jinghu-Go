@@ -106,4 +106,37 @@ public class ClientCultivationTests : IAsyncLifetime
         Assert.Null(await phone.BreakthroughAsync(default));
         Assert.Equal(2, phone.State!.Stage);
     }
+
+    [Fact]
+    public async Task Breakthrough_survives_a_version_bump_that_did_not_change_the_stage()
+    {
+        // the bug players saw: the state's version moved on in the background (a meditation, rewards, a refresh)
+        // and the breakthrough failed with "changed on another device" although nothing relevant changed
+        var api = new ApiClient(new HttpClientTransport(_host.NewClient()), new StjSerializer(), new InMemoryTokenStore());
+        await api.RegisterAsync("tlo@test.dev", ApiHost.Password, default);
+        await api.LoginAsync("tlo@test.dev", ApiHost.Password, default);
+        var creation = new CharacterCreationFlow(api);
+        await creation.StartAsync(default);
+        var character = await creation.FinalizeAsync("Wytrwały", "qi", default);
+
+        var screen = new CultivationFlow(api, character.Id);
+        await screen.LoadAsync(default);
+        await screen.StartMeditationAsync(default);
+        _host.Clock.Advance(TimeSpan.FromMinutes(60));
+        await screen.FinishMeditationAsync(default);
+        var stale = screen.State!.Version;
+
+        // something else touches the state (same stage): a short meditation from the background
+        var other = new CultivationFlow(api, character.Id);
+        await other.LoadAsync(default);
+        await other.StartMeditationAsync(default);
+        _host.Clock.Advance(TimeSpan.FromMinutes(2));
+        await other.FinishMeditationAsync(default);
+        Assert.True(other.State!.Version != stale, "the version moved on");
+
+        _seeds.Enqueue(QueuedSeedSource.Find(success: true, other.State.BreakthroughChance));
+        var result = await screen.BreakthroughAsync(default);
+        Assert.True(Assert.NotNull(result).Success);
+        Assert.Equal(2, screen.State!.Stage);
+    }
 }

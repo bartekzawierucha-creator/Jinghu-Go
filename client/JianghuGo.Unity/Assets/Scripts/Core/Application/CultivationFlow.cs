@@ -34,18 +34,29 @@ namespace JianghuGo.Client.Application
         }
 
         /// <summary>Returns null (after reloading) when the state changed elsewhere first.</summary>
+        /// <remarks>
+        /// The state's version moves on its own (passive Qi settled by a refresh, battle and hunt rewards credited in the
+        /// background), so a conflict usually means "the Qi number changed", not "someone broke through elsewhere".
+        /// The attempt is repeated on the fresh state as long as it is still the same realm and stage; only a real
+        /// change of stage (done on another device) returns null.
+        /// </remarks>
         public async Task<BreakthroughResultDto> BreakthroughAsync(CancellationToken ct)
         {
-            try
+            for (var attempt = 0; ; attempt++)
             {
-                var result = await _api.BreakthroughAsync(State, ct).ConfigureAwait(false);
-                Set(result.State);
-                return result;
-            }
-            catch (ApiException e) when (e.Code == "version_conflict")
-            {
-                await LoadAsync(ct).ConfigureAwait(false);
-                return null;
+                var realm = State.RealmIndex;
+                var stage = State.Stage;
+                try
+                {
+                    var result = await _api.BreakthroughAsync(State, ct).ConfigureAwait(false);
+                    Set(result.State);
+                    return result;
+                }
+                catch (ApiException e) when (e.Code == "version_conflict")
+                {
+                    await LoadAsync(ct).ConfigureAwait(false);
+                    if (attempt >= 2 || State.RealmIndex != realm || State.Stage != stage) return null;
+                }
             }
         }
 
