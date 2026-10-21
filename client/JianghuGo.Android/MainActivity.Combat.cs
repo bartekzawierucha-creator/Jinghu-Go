@@ -495,6 +495,8 @@ namespace JianghuGo.Android
             Button speed = null;
             Button again = null; // assigned below; Render (captured earlier) only runs after that
             var climb = false;
+            // the fight's tally (2.2), shown with the result: turns, damage both ways, crits and dodges
+            int dealt = 0, taken = 0, crits = 0, dodges = 0, tallied = -1;
             speed = ui.Btn("Prędkość ×" + (int)BattleClock.Speed, () =>
             {
                 var next = (int)BattleClock.Speed % 3 + 1;
@@ -588,8 +590,6 @@ namespace JianghuGo.Android
                 }
             }
 
-            // the fight's tally (2.2), shown with the result: turns, damage both ways, crits and dodges
-            int dealt = 0, taken = 0, crits = 0, dodges = 0, tallied = -1;
 
             void Tally(BattleDto b)
             {
