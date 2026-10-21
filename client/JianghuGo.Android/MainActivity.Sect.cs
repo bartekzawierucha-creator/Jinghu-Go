@@ -68,6 +68,20 @@ namespace JianghuGo.Android
                     Sfx.Play(Sfx.Breakthrough, 0.6f);
                     await Reload(0, "Sekta założona.");
                 }), page, sp: 14, heightDp: 44, icon: "gi_pagoda");
+
+                // what joining gives, so the screen says why it matters instead of standing empty
+                var why = ui.Card(page, 0f, 10, null);
+                ui.Text("Co daje sekta", why, 14, Ui.Ink, bold: true);
+                foreach (var line in new[]
+                {
+                    "Bossy sekty — wspólna walka i nagrody dla wszystkich",
+                    "Terytoria — zajmujcie miejsca mocy i toczcie wojny",
+                    "Rozwój — budynki sekty dają premie każdemu członkowi",
+                })
+                {
+                    ui.Text("·  " + line, why, 12, Ui.Muted, maxLines: 2);
+                }
+
                 var sects = (await flow.BrowseAsync(Ct)).Items;
                 var pending = (await _api.MyApplicationsAsync(c.Id, Ct)).Items;
                 ui.Pages(page, sects.Count, 1, 4, (i, cell) =>
