@@ -121,7 +121,7 @@ $UI wait "Trening" 60
 $UI noscroll
 $UI shot shots/06-combat.png
 $UI tap "Drewniany Manekin"
-$UI wait "Prędkość" 60
+$UI wait "Wyjdź" 60   # the duel screen (the fight against the dummy may already be over)
 $UI noscroll
 $UI shot shots/06b-battle.png
 # auto battles are fast: no taps during the fight (buttons move when it ends)
@@ -152,7 +152,7 @@ $UI wait "WIEŻA PRÓB" 30
 $UI noscroll
 $UI shot shots/06h-tower.png
 $UI tap "Wejdź na piętro 1"
-$UI wait "Poddaj" 60
+$UI wait "Wyjdź" 60
 sleep 2
 $UI shot shots/06i-tower-battle.png
 $UI wait "WYNIK" 180
