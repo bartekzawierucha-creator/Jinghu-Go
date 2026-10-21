@@ -133,11 +133,10 @@ namespace JianghuGo.Android
             var row = new LinearLayout(_ctx) { Orientation = Orientation.Horizontal };
             row.SetGravity(GravityFlags.CenterVertical);
             row.AddView(Rule(), new LinearLayout.LayoutParams(0, Dp(1), 1f));
-            var t = new TextView(_ctx) { Text = text.ToUpperInvariant() };
-            t.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 13);
+            var t = new TextView(_ctx) { Text = text };
+            t.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 15);
             t.SetTextColor(Gold);
             t.SetTypeface(Display, TypefaceStyle.Bold);
-            t.LetterSpacing = 0.18f;
             t.SetPadding(Dp(10), 0, Dp(10), 0);
             row.AddView(t);
             row.AddView(Rule(), new LinearLayout.LayoutParams(0, Dp(1), 1f));
@@ -629,11 +628,9 @@ namespace JianghuGo.Android
             var body = new RectF(r.Left + (4 * _d), r.Top + (3 * _d), r.Right - (4 * _d), r.Bottom - (3 * _d));
             if (_secondary)
             {
+                // clean paper and a fine ink line: a wash here read as a smudge, not a button
                 _fill.Alpha = 255;
                 canvas.DrawRoundRect(body, 4 * _d, 4 * _d, _fill);
-                _stroke.SetColorFilter(new PorterDuffColorFilter(Color.Rgb(40, 38, 34), PorterDuff.Mode.SrcIn));
-                _stroke.Alpha = _pressed ? 90 : 45;
-                canvas.DrawBitmap(InkArt.Stroke, null, r, _stroke);
                 _rim.Color = Color.Argb(_pressed ? 170 : 110, 40, 38, 34);
                 _rim.StrokeWidth = 1f * _d;
                 canvas.DrawRoundRect(body, 4 * _d, 4 * _d, _rim);
@@ -731,7 +728,28 @@ namespace JianghuGo.Android
             _p.StrokeWidth = 1.2f * _d;
             _p.Color = Ui.GoldDim;
             canvas.DrawRoundRect(new RectF(_d * 0.6f, _d * 0.6f, w - _d * 0.6f, h - _d * 0.6f), r, r, _p);
-            if (!string.IsNullOrEmpty(Text)) canvas.DrawText(Text, w / 2f, h / 2f - (_text.Descent() + _text.Ascent()) / 2, _text);
+            if (!string.IsNullOrEmpty(Text))
+            {
+                // ink over empty paper, paper over the filled colour: the caption stays readable wherever the fill ends
+                var y = h / 2f - (_text.Descent() + _text.Ascent()) / 2;
+                var split = inset + (w - 2 * inset) * _shown;
+                var save = canvas.Save();
+                canvas.ClipRect(split, 0, w, h);
+                _text.Color = Ui.Ink;
+                _text.SetShadowLayer(3, 0, 1, Color.Argb(170, 250, 247, 240));
+                canvas.DrawText(Text, w / 2f, y, _text);
+                canvas.RestoreToCount(save);
+                if (_shown > 0.001f)
+                {
+                    save = canvas.Save();
+                    canvas.ClipRect(0, 0, split, h);
+                    _text.Color = Color.Rgb(252, 248, 240);
+                    _text.SetShadowLayer(2, 0, 1, Color.Argb(140, 0, 0, 0));
+                    canvas.DrawText(Text, w / 2f, y, _text);
+                    canvas.RestoreToCount(save);
+                }
+            }
+
             if (_shown != _target || _ghost > _shown) PostInvalidateOnAnimation();
         }
     }

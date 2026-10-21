@@ -326,7 +326,7 @@ namespace JianghuGo.Android
             art.SetScaleType(ImageView.ScaleType.CenterCrop);
             top.AddView(art, new LinearLayout.LayoutParams(Px(72), ViewGroup.LayoutParams.MatchParent) { RightMargin = Px(8) });
             var info = ui.Box(top, 1f, marginDp: 0);
-            ui.Text("WIEŻA PRÓB", info, 16, Ui.Gold, bold: true);
+            ui.Text("Wieża Prób", info, 16, Ui.Gold, bold: true);
             ui.Text("Piętro " + t.BestFloor + " z " + t.Floors + (t.Me != null ? "  ·  #" + t.Me.Rank + " w rankingu" : string.Empty), info, 13, Ui.Ink);
             ui.MeterIn(info, Ui.Gold, t.BestFloor + " / " + t.Floors, t.BestFloor, t.Floors, 14);
             if (t.NextMilestone is { } m)
@@ -346,7 +346,7 @@ namespace JianghuGo.Android
             }
 
             var board = ui.Card(page, 1.1f, 8);
-            ui.Text("NAJWYŻEJ W WIEŻY", board, 12, Ui.GoldDim, bold: true);
+            ui.Text("Najwyżej w wieży", board, 12, Ui.GoldDim, bold: true);
             if (t.Top.Count == 0) ui.Text("Nikt jeszcze nie wszedł. Bądź pierwszy.", board, 12, Ui.Muted);
             foreach (var r in t.Top.Take(5))
                 ui.Text("#" + r.Rank + "  " + r.Name + "  ·  piętro " + r.Value, board, 12, r.CharacterId == c.Id ? Ui.Gold : Ui.Ink);
@@ -368,7 +368,7 @@ namespace JianghuGo.Android
             art.SetScaleType(ImageView.ScaleType.CenterCrop);
             top.AddView(art, new LinearLayout.LayoutParams(Px(84), ViewGroup.LayoutParams.MatchParent) { RightMargin = Px(8) });
             var info = ui.Box(top, 1f, marginDp: 0);
-            ui.Text("BOSS ŚWIATA: " + b.NamePl.ToUpperInvariant(), info, 14, Ui.Gold, bold: true);
+            ui.Text("Boss świata: " + b.NamePl, info, 14, Ui.Gold, bold: true);
             ui.MeterIn(info, b.Defeated ? Ui.Jade : Ui.Cinnabar, b.Defeated ? "POKONANY" : b.HpLeft + " / " + b.PoolHp + " HP", b.HpLeft, b.PoolHp, 18);
             var days = Math.Max(0, (int)Math.Ceiling((b.EndsAt - DateTimeOffset.UtcNow).TotalDays));
             ui.Text("Wspólne HP wszystkich graczy  ·  nowy boss za " + days + " d", info, 11, Ui.Muted);
@@ -477,7 +477,7 @@ namespace JianghuGo.Android
             var c = _me;
             origin ??= OriginFor(combat.Battle);
             var title = combat.Battle.Kind == "tower" ? "Wieża Prób" : combat.Battle.Kind == "boss" ? "Boss Świata" : "Pojedynek";
-            var ui = NewScreen(title, () => Run(origin.Back), subtitle: combat.Battle.Opponent.Name.ToUpperInvariant(), chrome: false);
+            var ui = NewScreen(title, () => Run(origin.Back), subtitle: combat.Battle.Opponent.Name, chrome: false);
             var page = ui.Content;
             var gen = _screen;
             var npc = combat.Battle.Kind == "pvp" ? "pvp" : combat.Battle.NpcId;

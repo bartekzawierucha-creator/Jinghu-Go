@@ -150,9 +150,9 @@ namespace JianghuGo.Android
             _titleText.Ellipsize = global::Android.Text.TextUtils.TruncateAt.End;
             titles.AddView(_titleText);
             _titleSub = new TextView(this);
-            _titleSub.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 10);
+            _titleSub.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 12);
             _titleSub.SetTextColor(Ui.Muted);
-            _titleSub.LetterSpacing = 0.14f;
+            _titleSub.SetTypeface(Ui.Body, TypefaceStyle.Italic);
             _titleSub.SetMaxLines(1);
             titles.AddView(_titleSub);
             _titleRow.AddView(titles, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
@@ -443,6 +443,21 @@ namespace JianghuGo.Android
         /// Starts a screen. <paramref name="chrome"/>: HUD and dock visible (in-game hubs and their sub-screens).
         /// <paramref name="title"/> null hides the title row (hub roots). The returned Ui builds into a fixed page.
         /// </summary>
+        /// <summary>
+        /// Screen captions read as a quiet line, not a shouted label: a list of the tabs below ("A · B · C") or the date
+        /// repeats what the screen already shows and is dropped; the rest is set in sentence case.
+        /// </summary>
+        private static string Caption(string subtitle)
+        {
+            if (string.IsNullOrWhiteSpace(subtitle)) return null;
+            if (subtitle != subtitle.ToUpperInvariant()) return subtitle;
+            if (subtitle.StartsWith("DZIEŃ ", StringComparison.Ordinal)) return null;
+            if (subtitle.Contains(" · ") && !subtitle.StartsWith("KROK ", StringComparison.Ordinal)) return null;
+            var s = subtitle.ToLowerInvariant();
+            s = s.Replace("jianghu", "Jianghu");
+            return char.ToUpperInvariant(s[0]) + s.Substring(1);
+        }
+
         private Ui NewScreen(string title, System.Action back = null, int art = 0, string subtitle = null, bool chrome = true, string tab = null)
         {
             _screen++;
@@ -474,6 +489,7 @@ namespace JianghuGo.Android
             _dock.Visibility = inGame ? ViewStates.Visible : ViewStates.Gone;
             _titleRow.Visibility = title == null ? ViewStates.Gone : ViewStates.Visible;
             _titleText.Text = title ?? string.Empty;
+            subtitle = Caption(subtitle);
             _titleSub.Text = subtitle ?? string.Empty;
             _titleSub.Visibility = string.IsNullOrEmpty(subtitle) ? ViewStates.Gone : ViewStates.Visible;
             _titleBack.Visibility = back == null ? ViewStates.Invisible : ViewStates.Visible;

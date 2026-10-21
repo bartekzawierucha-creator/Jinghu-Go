@@ -386,7 +386,7 @@ namespace JianghuGo.Android
                 {
                     var head = ui.Card(page, 0f, 8, pass.Claimable > 0 ? Ui.Gold : Ui.Jade);
                     head.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, Px(118)) { TopMargin = Px(6) };
-                    ui.Text("SEZON " + pass.Season + " · do " + pass.EndsOn + " · Żetony Losu: " + board.DestinyTokens, head, 12, Ui.Gold, bold: true);
+                    ui.Text("Sezon " + pass.Season + " · do " + pass.EndsOn + " · Żetony Losu: " + board.DestinyTokens, head, 12, Ui.Gold, bold: true);
                     var inLevel = pass.Level >= pass.Levels ? pass.XpPerLevel : pass.Xp % pass.XpPerLevel;
                     ui.MeterIn(head, Ui.Gold, "Poziom " + pass.Level + " / " + pass.Levels + " · " + inLevel + " / " + pass.XpPerLevel + " PD", inLevel, pass.XpPerLevel, 16);
                     ui.Text("PD za: walki, medytację, rzemiosło, zbiory, wieżę, wyprawy, przełomy, kroki i meldunki. Sezon zeruje się co kwartał.", head, 10, Ui.Muted, maxLines: 2);
@@ -416,7 +416,7 @@ namespace JianghuGo.Android
                 if (board.Story is { } st)
                 {
                     var story = ui.Card(page, 1.4f, 10, st.Completed && !st.Finished ? Ui.Gold : Ui.GoldDim);
-                    ui.Text("ROZDZIAŁ " + st.Chapter + " / " + st.Chapters + " — " + st.TitlePl.ToUpperInvariant(), story, 14, Ui.Gold, bold: true);
+                    ui.Text("Rozdział " + st.Chapter + " z " + st.Chapters + ": " + st.TitlePl, story, 14, Ui.Gold, bold: true);
                     ui.Text(st.TextPl, story, 12, Ui.Ink, maxLines: 5);
                     ui.Box(story, 1f, marginDp: 0);
                     ui.Text("Cel: " + st.GoalPl + "  ·  nagroda: " + st.Stones + " KD" + (st.ItemNamePl != null ? " + " + st.ItemQuantity + "× " + st.ItemNamePl : string.Empty), story, 11, Ui.Jade, maxLines: 2);
@@ -439,7 +439,7 @@ namespace JianghuGo.Android
                 if (board.Weekly is { } wk && wk.Personal != null)
                 {
                     var card = ui.Card(page, 1.2f, 8, WeeklyClaimable(wk) > 0 ? Ui.Gold : Ui.Jade);
-                    ui.Text("WYDARZENIE TYGODNIA — " + wk.NamePl.ToUpperInvariant() + " (do " + wk.Until.Substring(5) + ")", card, 12, Ui.Gold, bold: true);
+                    ui.Text("Wydarzenie tygodnia: " + wk.NamePl + " (do " + wk.Until.Substring(5) + ")", card, 12, Ui.Gold, bold: true);
                     ui.Text(wk.DescriptionPl, card, 11, Ui.Ink, maxLines: 2);
                     var prow = ui.HRow(card, 30, 2);
                     var pb = ui.Box(prow, 1.4f, marginDp: 0);

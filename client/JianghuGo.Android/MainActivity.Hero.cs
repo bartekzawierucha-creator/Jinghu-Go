@@ -67,13 +67,13 @@ namespace JianghuGo.Android
             foreach (var t in c.Traits)
             {
                 var card = _ui.Card(body, 1f, 8, Ui.RarityOf(t.Rarity).Color);
-                _ui.Text(CategoryName(t.Category).ToUpperInvariant() + " · " + t.NamePl, card, 13, Ui.Gold, bold: true);
+                _ui.Text(CategoryName(t.Category) + ": " + t.NamePl, card, 13, Ui.Gold, bold: true);
                 var mods = StatsText(t.Modifiers);
                 _ui.Text(mods.Length > 0 ? mods : "Bez premii do cech.", card, 12, Ui.Ink, maxLines: 2);
             }
 
             var path = _ui.Card(body, 1.4f, 8, Ui.QiBlue);
-            _ui.Text("ŚCIEŻKA " + PathName(c.Path).ToUpperInvariant(), path, 13, Ui.Gold, bold: true);
+            _ui.Text("Ścieżka " + PathName(c.Path), path, 13, Ui.Gold, bold: true);
             _ui.Text(_catalog.Paths != null && _catalog.Paths.TryGetValue(c.Path, out var pp) ? pp.DescriptionPl : string.Empty, path, 12, Ui.Ink, maxLines: 4);
             _ui.Btn("Droga 66 królestw — co otworzy każde", () => Run(ShowRoadSheetAsync), path, secondary: true, sp: 12, heightDp: 32);
             var titles = _ui.Card(body, 1f, 8, Ui.Violet);
@@ -83,7 +83,7 @@ namespace JianghuGo.Android
             if (_board.Zodiac is { } z)
             {
                 var zc = _ui.Card(body, 0.8f, 8, z.LuckyToday ? Ui.Gold : Ui.GoldDim);
-                _ui.Text("ZNAK URODZENIA: " + z.Hanzi + " " + z.NamePl.ToUpperInvariant(), zc, 13, Ui.Gold, bold: true);
+                _ui.Text("Znak urodzenia: " + z.Hanzi + " " + z.NamePl, zc, 13, Ui.Gold, bold: true);
                 _ui.Text(z.DescriptionPl + " +" + z.Bonus + " " + StatName(z.Stat) + (z.LuckyToday ? " — dziś twój dzień (podwójnie)!" : " · dziś dzień: " + z.TodayNamePl)
                     + (z.PhysiqueNamePl != null ? "\n✦ " + z.PhysiqueNamePl + ": " + z.PhysiqueDescriptionPl : string.Empty), zc, 12, Ui.Ink, maxLines: 3);
             }

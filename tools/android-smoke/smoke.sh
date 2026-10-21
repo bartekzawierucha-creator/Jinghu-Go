@@ -37,7 +37,7 @@ $UI shot shots/02-creation.png
 $UI tap "Losuj ponownie"
 $UI wait "Żetony Losu" 30
 $UI tap "Dalej ›"
-$UI wait "ŚCIEŻKA" 30
+$UI wait "ścieżka" 30
 $UI shot shots/02b-path.png
 $UI tap "+25% Qi · regeneracja"
 $UI wait "Rozpocznij drogę" 30
@@ -58,7 +58,7 @@ $UI wait "Medytacja ×5" 30
 sleep 2
 $UI shot shots/03b-meditating.png
 $UI tap "Rozwój" 20
-$UI wait "METODY KULTYWACJI" 30
+$UI wait "Metody kultywacji" 30
 $UI shot shots/03c-cultivation-sheet.png
 adb shell input keyevent KEYCODE_BACK; sleep 1
 $UI tap "Posiadłość"
@@ -90,7 +90,7 @@ $UI shot shots/04d-titles.png
 adb shell input keyevent KEYCODE_BACK; sleep 1
 $UI wait "Opowieść" 30
 $UI tap "Opowieść"
-$UI wait "ROZDZIAŁ 1" 30
+$UI wait "Rozdział 1" 30
 $UI noscroll
 $UI shot shots/04e-story.png
 adb shell input keyevent KEYCODE_BACK; sleep 2
@@ -146,7 +146,7 @@ for foe in "Kamienny Golem" "Zdrajca Sekty"; do
   $UI wait "Trening" 30
 done
 $UI tap "Wieża"
-$UI wait "WIEŻA PRÓB" 30
+$UI wait "Najwyżej w wieży" 30
 $UI noscroll
 $UI shot shots/06h-tower.png
 $UI tap "Wejdź na piętro 1"
@@ -158,7 +158,7 @@ $UI tap "Zabierz" 15 || $UI tap "Dalej" 15
 $UI wait "Następne piętro" 20 || $UI wait "Spróbuj ponownie" 5
 $UI shot shots/06i2-tower-next.png
 $UI tap "Wyjdź"
-$UI wait "WIEŻA PRÓB" 30
+$UI wait "Najwyżej w wieży" 30
 $UI wait "Piętro 1 z 330" 30
 adb shell input keyevent KEYCODE_BACK; sleep 1
 $UI wait "Trening" 30
@@ -201,7 +201,7 @@ $UI wait "Cechy, ścieżka i tytuły" 60
 $UI noscroll
 $UI shot shots/07-hero.png
 $UI tap "Cechy, ścieżka i tytuły"
-$UI wait "ŚCIEŻKA" 30
+$UI wait "Ścieżka " 30
 $UI shot shots/07f-origins.png
 adb shell input keyevent KEYCODE_BACK; sleep 1
 $UI tap "Meridiany"
@@ -265,7 +265,7 @@ $UI shot shots/09b-ranking.png
 
 step "news"
 $UI tap "Wieści"
-$UI wait "Z CAŁEGO JIANGHU" 60
+$UI wait "Z całego Jianghu" 60
 $UI shot shots/10-news.png
 adb shell input keyevent KEYCODE_BACK; sleep 2
 $UI tap "Kultywacja"

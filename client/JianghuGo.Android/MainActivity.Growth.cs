@@ -159,7 +159,7 @@ namespace JianghuGo.Android
 
             // methods
             var methods = st.Methods.Where(m => m.Available || m.Known).ToList();
-            ui.Text("METODY KULTYWACJI", body, 11, Ui.GoldDim, bold: true);
+            ui.Text("Metody kultywacji", body, 11, Ui.GoldDim, bold: true);
             ui.Pages(body, methods.Count, 1, 2, (i, cell) =>
             {
                 var m = methods[i];
@@ -407,7 +407,7 @@ namespace JianghuGo.Android
                 });
             }, empty: "Brak jadów — zbieraj je z bestii, bagien i wypraw uczniów.", weight: 0.9f);
 
-            ui.Text("POWŁOKI", page, 11, Ui.GoldDim, bold: true);
+            ui.Text("Powłoki", page, 11, Ui.GoldDim, bold: true);
             ui.Pages(page, t.Coatings.Count, 1, 1, (i, cell) =>
             {
                 var co = t.Coatings[i];
@@ -457,7 +457,7 @@ namespace JianghuGo.Android
                     await reload("Gu uwolniony.");
                 }), r, secondary: true, sp: 11, heightDp: 30);
             });
-            ui.Text("WYKLUJ", page, 11, Ui.GoldDim, bold: true);
+            ui.Text("Do wyklucia", page, 11, Ui.GoldDim, bold: true);
             ui.Pages(page, g.Types.Count, 1, 2, (i, cell) =>
             {
                 var type = g.Types[i];
@@ -781,7 +781,7 @@ namespace JianghuGo.Android
                 }), row, sp: 12, heightDp: 36).LayoutParameters = new LinearLayout.LayoutParams(Px(80), Px(36)) { Gravity = GravityFlags.CenterVertical };
             }, empty: "Na arenie jeszcze pusto — wróć później.");
             var board = ui.Card(page, 0.8f, 8);
-            ui.Text("NAJLEPSI", board, 11, Ui.GoldDim, bold: true);
+            ui.Text("Najlepsi", board, 11, Ui.GoldDim, bold: true);
             foreach (var r in a.Top.Take(4))
                 ui.Text("#" + r.Rank + "  " + r.Name + "  ·  " + r.Value, board, 11, r.CharacterId == c.Id ? Ui.Gold : Ui.Ink);
         }
@@ -833,7 +833,7 @@ namespace JianghuGo.Android
                     ShowBattle(combat, new BattleOrigin(() => ShowSectDevelopmentAsync(flow)));
                 }), br, sp: 11, heightDp: 32).LayoutParameters = new LinearLayout.LayoutParams(Px(96), Px(32));
 
-            ui.Text("MISJE TYGODNIA", page, 11, Ui.GoldDim, bold: true);
+            ui.Text("Misje tygodnia", page, 11, Ui.GoldDim, bold: true);
             foreach (var m in d.Missions)
             {
                 var card = ui.Card(page, 0.7f, 6, m.Completed && !m.Claimed ? Ui.Gold : (Color?)null);
@@ -849,7 +849,7 @@ namespace JianghuGo.Android
                 ui.MeterIn(card, Ui.Jade, m.Progress + " / " + m.Target, m.Progress, m.Target, 12);
             }
 
-            ui.Text("PAWILONY" + (d.CanBuild ? string.Empty : " (buduje mistrz i starsi)"), page, 11, Ui.GoldDim, bold: true);
+            ui.Text("Pawilony" + (d.CanBuild ? string.Empty : " (buduje mistrz i starsi)"), page, 11, Ui.GoldDim, bold: true);
             ui.Pages(page, d.Buildings.Count, 2, 1, (i, cell) =>
             {
                 var b = d.Buildings[i];

@@ -484,9 +484,12 @@ namespace JianghuGo.Android
             }
             else
             {
+                // a one-column list of text cards must not blow each card up to a quarter of the screen:
+                // rows stop at a comfortable height and the paper shows below
+                var cap = _columns == 1 ? _ui.Dp(126) : 0;
                 for (var r = 0; r < _rows; r++)
                 {
-                    var row = new LinearLayout(_ui.Context) { Orientation = Orientation.Horizontal };
+                    var row = new CappedRow(_ui.Context, cap) { Orientation = Orientation.Horizontal };
                     var rlp = new LayoutParams(ViewGroup.LayoutParams.MatchParent, 0, 1f);
                     if (r > 0) rlp.TopMargin = _ui.Dp(6);
                     grid.AddView(row, rlp);
@@ -525,6 +528,24 @@ namespace JianghuGo.Android
 
             _prev.Alpha = Page > 0 ? 1f : 0.25f;
             _next.Alpha = Page < PageCount - 1 ? 1f : 0.25f;
+        }
+    }
+
+    /// <summary>A row that takes the height it is offered, up to a cap (0 = no cap).</summary>
+    public sealed class CappedRow : LinearLayout
+    {
+        private readonly int _cap;
+
+        public CappedRow(Context ctx, int cap) : base(ctx) => _cap = cap;
+
+        protected override void OnMeasure(int widthMeasureSpec, int heightMeasureSpec)
+        {
+            if (_cap > 0 && MeasureSpec.GetSize(heightMeasureSpec) > _cap)
+            {
+                heightMeasureSpec = MeasureSpec.MakeMeasureSpec(_cap, MeasureSpecMode.Exactly);
+            }
+
+            base.OnMeasure(widthMeasureSpec, heightMeasureSpec);
         }
     }
 
