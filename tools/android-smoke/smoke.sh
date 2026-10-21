@@ -286,6 +286,8 @@ step "layout audit: every screen fits without scrolling"
 adb logcat -d > shots/logcat.txt
 grep "JianghuLayout" shots/logcat.txt | grep "AUDIT" || true
 if grep -E "JianghuLayout.*(OVERFLOW|CLIPPED)" shots/logcat.txt; then
+  # each problem as its own annotation, so the screen and the element are visible without the full log
+  grep -E "JianghuLayout.*(OVERFLOW|CLIPPED)" shots/logcat.txt | sed -E 's/.*JianghuLayout[^:]*: *//' | head -10 | while read -r line; do echo "::error::LAYOUT $line"; done
   echo "::error::layout does not fit the screen ($(grep -cE 'JianghuLayout.*(OVERFLOW|CLIPPED)' shots/logcat.txt) problems)"; exit 1
 fi
 
