@@ -301,7 +301,7 @@ namespace JianghuGo.Android
                 }), actions, sp: 12, heightDp: 40);
 
             var list = f.All.Where(x => x.State != "unknown").Concat(f.All.Where(x => x.State == "unknown")).ToList();
-            ui.Pages(page, list.Count, 2, 3, (i, cell) =>
+            ui.Pages(page, list.Count, 2, FitRows(3), (i, cell) =>
             {
                 var fl = list[i];
                 var known = fl.State != "unknown";
@@ -458,7 +458,7 @@ namespace JianghuGo.Android
                 }), r, secondary: true, sp: 11, heightDp: 30);
             });
             ui.Text("Do wyklucia", page, 11, Ui.GoldDim, bold: true);
-            ui.Pages(page, g.Types.Count, 1, 2, (i, cell) =>
+            ui.Pages(page, g.Types.Count, 1, FitRows(2), (i, cell) =>
             {
                 var type = g.Types[i];
                 var card = ui.Card(cell, 1f, 6, null, 0);
@@ -494,7 +494,7 @@ namespace JianghuGo.Android
                 await reload(r.Success ? "Ciało zahartowane: " + r.State.Temper.Badge : "Nieudane — połowa hartowania przepadła.");
             }), page, secondary: !can, sp: 14, heightDp: 44);
             ui.Text(t.Bath != null ? "Kąpiel trwa: " + Until(t.BathUntil) : "KĄPIELE", page, 11, Ui.GoldDim, bold: true);
-            ui.Pages(page, t.Baths.Count, 1, 2, (i, cell) =>
+            ui.Pages(page, t.Baths.Count, 1, FitRows(2), (i, cell) =>
             {
                 var b = t.Baths[i];
                 var card = ui.Card(cell, 1f, 6, b.Affordable && t.Bath == null ? Ui.Gold : (Color?)null, 0);

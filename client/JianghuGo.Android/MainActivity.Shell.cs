@@ -447,6 +447,9 @@ namespace JianghuGo.Android
         /// Screen captions read as a quiet line, not a shouted label: a list of the tabs below ("A · B · C") or the date
         /// repeats what the screen already shows and is dropped; the rest is set in sentence case.
         /// </summary>
+        /// <summary>On short phones (under ~620 dp tall) a dense grid shows one row fewer, so the cards keep room for their text.</summary>
+        private int FitRows(int rows) => Resources.DisplayMetrics.HeightPixels / Resources.DisplayMetrics.Density < 620 ? Math.Max(1, rows - 1) : rows;
+
         private static string Caption(string subtitle)
         {
             if (string.IsNullOrWhiteSpace(subtitle)) return null;
