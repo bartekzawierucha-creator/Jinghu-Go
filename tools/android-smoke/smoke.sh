@@ -139,9 +139,8 @@ for foe in "Kamienny Golem" "Zdrajca Sekty"; do
   $UI wait "Wyjdź" 60
   sleep 2
   $UI shot "shots/06-$(echo "$foe" | tr ' ' '_').png"
-  # the automatic fight may end on its own: forfeit only while it runs (a missed tap swipes, which closes the result popup)
-  if $UI wait "Poddaj" 2; then $UI tap "Poddaj" 5 && $UI tap "Na pewno?" 5 || true; fi
-  $UI wait "WYNIK" 120
+  # automatic fights end on their own; no forfeit here (buttons move the moment a fight ends, so a tap can miss)
+  $UI wait "WYNIK" 240
   if $UI wait "Dalej" 15; then $UI tap "Dalej" 5; elif $UI wait "Zabierz" 2; then $UI tap "Zabierz" 5; fi
   $UI tap "Wyjdź"
   $UI wait "Trening" 30
