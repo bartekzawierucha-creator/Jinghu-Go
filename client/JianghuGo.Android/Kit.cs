@@ -124,7 +124,8 @@ namespace JianghuGo.Android
         {
             var p = new LinearLayout(_ctx) { Orientation = Orientation.Vertical };
             p.Background = new FrameDrawable(_density, PanelFill, rim ?? GoldDim, rim ?? Gold);
-            p.SetPadding(Dp(padDp), Dp(padDp - 2), Dp(padDp), Dp(padDp - 2));
+            // the brush rim is ~6 dp wide: keep the text clear of it
+            p.SetPadding(Dp(padDp + 4), Dp(padDp), Dp(padDp + 4), Dp(padDp));
             AddWeighted(parent, p, weight, marginDp);
             return p;
         }

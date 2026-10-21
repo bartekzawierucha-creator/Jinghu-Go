@@ -71,6 +71,7 @@ namespace JianghuGo.Android
 
                 // what joining gives, so the screen says why it matters instead of standing empty
                 var why = ui.Card(page, 0f, 10, null);
+                why.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Px(8) };
                 ui.Text("Co daje sekta", why, 14, Ui.Ink, bold: true);
                 foreach (var line in new[]
                 {
