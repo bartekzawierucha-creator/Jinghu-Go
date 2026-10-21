@@ -136,7 +136,7 @@ $UI wait "Trening" 30
 for foe in "Kamienny Golem" "Zdrajca Sekty"; do
   $UI paged "$foe" 6 0.45
   $UI tap "$foe"
-  $UI wait "Poddaj" 60
+  $UI wait "Wyjdź" 60
   sleep 2
   $UI shot "shots/06-$(echo "$foe" | tr ' ' '_').png"
   # the automatic fight may end on its own before the forfeit lands
