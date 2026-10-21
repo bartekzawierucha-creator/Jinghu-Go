@@ -499,7 +499,8 @@ namespace JianghuGo.Android
             _shadow.Color = Color.Argb(30, 0, 0, 0);
             // the brush border is ink; a rim colour that means something (rarity, "ready", a highlight) tints it
             var meaningful = rim != Ui.Gold && rim != Ui.GoldDim && (rim.R + rim.G + rim.B) > 200;
-            _border.Alpha = meaningful ? 235 : 200;
+            // a light hand: the rim frames the card, it must not compete with the text inside
+            _border.Alpha = meaningful ? 215 : 120;
             if (meaningful) _border.SetColorFilter(new PorterDuffColorFilter(rim, PorterDuff.Mode.SrcIn));
             if (rim == Ui.Gold) rim = Color.Argb(190, 46, 43, 39);
             _rim.Color = rim;
@@ -550,7 +551,8 @@ namespace JianghuGo.Android
                 canvas.RestoreToCount(save);
             }
 
-            var corner = Math.Min(20 * _d, Math.Min(r.Width() * 0.25f, r.Height() * 0.32f));
+            // the source stroke fills ~80% of its corner cell: 8 dp keeps the rim ~6 dp thick, clear of the padding
+            var corner = Math.Min(8 * _d, Math.Min(r.Width() * 0.2f, r.Height() * 0.25f));
             InkArt.NineSlice(canvas, InkArt.Frame, r, corner, _border);
         }
 
@@ -623,17 +625,31 @@ namespace JianghuGo.Android
                 return;
             }
 
-            // 2.2: a brush stroke instead of a box — cinnabar for the main action, a pale ink wash for the rest
-            _stroke.SetColorFilter(new PorterDuffColorFilter(_secondary ? Color.Rgb(40, 38, 34) : (_pressed ? Ui.CinnabarDeep : Ui.Cinnabar), PorterDuff.Mode.SrcIn));
-            _stroke.Alpha = _secondary ? (_pressed ? 95 : 55) : 255;
-            canvas.DrawBitmap(InkArt.Stroke, null, r, _stroke);
-            if (!_secondary)
+            // 2.2: a solid body keeps the label legible; brush strokes over it give the rough, painted edge
+            var body = new RectF(r.Left + (4 * _d), r.Top + (3 * _d), r.Right - (4 * _d), r.Bottom - (3 * _d));
+            if (_secondary)
             {
-                // a second, offset pass gives the stroke body and depth
-                _stroke.Alpha = _pressed ? 120 : 70;
-                _stroke.SetColorFilter(new PorterDuffColorFilter(Ui.CinnabarDeep, PorterDuff.Mode.SrcIn));
-                canvas.DrawBitmap(InkArt.Stroke, null, new RectF(r.Left + (3 * _d), r.Top + (2 * _d), r.Right - _d, r.Bottom), _stroke);
+                _fill.Alpha = 255;
+                canvas.DrawRoundRect(body, 4 * _d, 4 * _d, _fill);
+                _stroke.SetColorFilter(new PorterDuffColorFilter(Color.Rgb(40, 38, 34), PorterDuff.Mode.SrcIn));
+                _stroke.Alpha = _pressed ? 90 : 45;
+                canvas.DrawBitmap(InkArt.Stroke, null, r, _stroke);
+                _rim.Color = Color.Argb(_pressed ? 170 : 110, 40, 38, 34);
+                _rim.StrokeWidth = 1f * _d;
+                canvas.DrawRoundRect(body, 4 * _d, 4 * _d, _rim);
+                return;
             }
+
+            canvas.DrawRoundRect(body, 4 * _d, 4 * _d, _fill);
+            _stroke.SetColorFilter(new PorterDuffColorFilter(_pressed ? Ui.CinnabarDeep : Ui.Cinnabar, PorterDuff.Mode.SrcIn));
+            _stroke.Alpha = 255;
+            canvas.DrawBitmap(InkArt.Stroke, null, r, _stroke);
+            // the same stroke mirrored: both ends feather out, the middle stays solid under the text
+            var save = canvas.Save();
+            canvas.Scale(-1, 1, r.CenterX(), r.CenterY());
+            _stroke.Alpha = 200;
+            canvas.DrawBitmap(InkArt.Stroke, null, r, _stroke);
+            canvas.RestoreToCount(save);
         }
 
         public override void SetAlpha(int alpha) => _fill.Alpha = alpha;
