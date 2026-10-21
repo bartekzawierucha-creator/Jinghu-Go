@@ -48,23 +48,29 @@ namespace JianghuGo.Android
 
         private static Typeface _display, _displayMedium;
 
-        /// <summary>Cinzel (OFL, bundled) for titles, buttons and numbers; the system serif for reading text.</summary>
+        /// <summary>Cormorant Garamond (OFL, bundled) for titles, buttons and numbers; sans-serif for reading text.</summary>
+        /// <summary>Cormorant's small x-height reads smaller than the old capitals: display text is set a touch larger.</summary>
+        public const float DisplayScale = 1.1f;
+
         public static Typeface Display => _display ?? Typeface.Create(Typeface.Serif, TypefaceStyle.Bold);
         public static Typeface DisplayMedium => _displayMedium ?? Display;
-        // Body text in a clean sans-serif (readable at small sizes); the Cinzel display face is for headings and titles.
+        // Body text in a clean sans-serif (readable at small sizes); the display face is for headings and titles.
         public static Typeface Body => Typeface.Create("sans-serif", TypefaceStyle.Normal);
 
         public static void LoadFonts(Context ctx)
         {
             try
             {
-                _display = Typeface.CreateFromAsset(ctx.Assets, "fonts/Cinzel-Bold.ttf");
-                _displayMedium = Typeface.CreateFromAsset(ctx.Assets, "fonts/Cinzel-Medium.ttf");
+                // 2.2: a calligraphic serif with lower case (Cinzel set everything in Roman capitals)
+                _display = Typeface.CreateFromAsset(ctx.Assets, "fonts/CormorantGaramond-Bold.ttf");
+                _displayMedium = Typeface.CreateFromAsset(ctx.Assets, "fonts/CormorantGaramond-SemiBold.ttf");
             }
             catch (Exception)
             {
                 _display = null; // fall back to the system serif
             }
+
+            InkArt.Load(ctx);
         }
 
         /// <summary>Decoded art, cached for the process (the pixel art is small).</summary>
@@ -112,7 +118,7 @@ namespace JianghuGo.Android
         public TextView Label(string text, float sp = 15, Color? color = null, bool bold = false, ViewGroup parent = null)
         {
             var t = new TextView(_ctx) { Text = text };
-            t.SetTextSize(global::Android.Util.ComplexUnitType.Sp, sp);
+            t.SetTextSize(global::Android.Util.ComplexUnitType.Sp, bold ? sp * DisplayScale : sp);
             t.SetTextColor(color ?? Ink);
             t.SetTypeface(bold ? Display : Body, bold ? TypefaceStyle.Bold : TypefaceStyle.Normal);
             t.SetLineSpacing(0, 1.12f);
@@ -438,6 +444,40 @@ namespace JianghuGo.Android
     /// Lacquer panel (2.1 look): soft drop shadow, a lit-from-above gradient, a bevel highlight, a double gold rim and
     /// diamond corner ornaments. Everything is drawn in code, so it scales to any size and density.
     /// </summary>
+    /// <summary>Brush art shared by the frames and buttons (2.2): the ink border, a broad stroke and the paper texture.</summary>
+    public static class InkArt
+    {
+        public static Bitmap Frame;
+        public static Bitmap Stroke;
+        public static Bitmap Paper;
+
+        public static void Load(Context ctx)
+        {
+            Frame = Ui.Art(ctx, Resource.Drawable.ink_ui_panel_ink);
+            Stroke = Ui.Art(ctx, Resource.Drawable.ink_ui_hp_bar);
+            Paper = Ui.Art(ctx, Resource.Drawable.ink_ui_paper);
+        }
+
+        /// <summary>Draws a frame bitmap into a rectangle keeping its corners (the source corner is a fixed share of the image).</summary>
+        public static void NineSlice(Canvas canvas, Bitmap src, RectF dst, float corner, Paint paint)
+        {
+            int sw = src.Width, sh = src.Height;
+            var sc = (int)(Math.Min(sw, sh) * 0.2f);
+            int[] sx = { 0, sc, sw - sc, sw };
+            int[] sy = { 0, sc, sh - sc, sh };
+            float[] dx = { dst.Left, dst.Left + corner, dst.Right - corner, dst.Right };
+            float[] dy = { dst.Top, dst.Top + corner, dst.Bottom - corner, dst.Bottom };
+            for (var row = 0; row < 3; row++)
+            {
+                for (var col = 0; col < 3; col++)
+                {
+                    if (row == 1 && col == 1) continue; // the inside stays paper
+                    canvas.DrawBitmap(src, new Rect(sx[col], sy[row], sx[col + 1], sy[row + 1]), new RectF(dx[col], dy[row], dx[col + 1], dy[row + 1]), paint);
+                }
+            }
+        }
+    }
+
     public sealed class FrameDrawable : Drawable
     {
         private readonly Paint _fill = new Paint(PaintFlags.AntiAlias);
@@ -449,13 +489,18 @@ namespace JianghuGo.Android
         private readonly Paint _gem = new Paint(PaintFlags.AntiAlias);
         private readonly Color _fillColor;
         private readonly float _d;
+        private readonly Paint _paper = new Paint(PaintFlags.FilterBitmap);
+        private readonly Paint _border = new Paint(PaintFlags.FilterBitmap | PaintFlags.AntiAlias);
 
         public FrameDrawable(float density, Color fill, Color rim, Color corner)
         {
             _d = density;
             _fillColor = fill;
-            _shadow.Color = Color.Argb(36, 0, 0, 0);
-            // paper theme: frames are ink lines; the seal red is kept only for the small corner accents
+            _shadow.Color = Color.Argb(30, 0, 0, 0);
+            // the brush border is ink; a rim colour that means something (rarity, "ready", a highlight) tints it
+            var meaningful = rim != Ui.Gold && rim != Ui.GoldDim && (rim.R + rim.G + rim.B) > 200;
+            _border.Alpha = meaningful ? 235 : 200;
+            if (meaningful) _border.SetColorFilter(new PorterDuffColorFilter(rim, PorterDuff.Mode.SrcIn));
             if (rim == Ui.Gold) rim = Color.Argb(190, 46, 43, 39);
             _rim.Color = rim;
             _rim.SetStyle(Paint.Style.Stroke);
@@ -484,41 +529,29 @@ namespace JianghuGo.Android
         public override void Draw(Canvas canvas)
         {
             var b = Bounds;
-            var radius = 8 * _d;
-            var r = new RectF(b.Left + _d, b.Top + _d, b.Right - _d, b.Bottom - (2.5f * _d));
-            // drop shadow under the panel (inside our bounds)
-            canvas.DrawRoundRect(new RectF(r.Left + _d, r.Top + (2 * _d), r.Right + (0.5f * _d), r.Bottom + (2 * _d)), radius, radius, _shadow);
+            var radius = 6 * _d;
+            var r = new RectF(b.Left + _d, b.Top + _d, b.Right - _d, b.Bottom - (2 * _d));
+            if (InkArt.Frame == null)
+            {
+                canvas.DrawRoundRect(r, radius, radius, _fill);
+                canvas.DrawRoundRect(r, radius, radius, _rim);
+                return;
+            }
+
+            // 2.2: rice paper with a real brush-stroke border (nine-slice: the corners keep their shape)
+            canvas.DrawRoundRect(new RectF(r.Left + _d, r.Top + (2 * _d), r.Right, r.Bottom + (1.5f * _d)), radius, radius, _shadow);
             canvas.DrawRoundRect(r, radius, radius, _fill);
-            // bevel: a faint lit edge along the top
-            canvas.DrawLine(r.Left + radius, r.Top + (1.4f * _d), r.Right - radius, r.Top + (1.4f * _d), _bevel);
-            canvas.DrawRoundRect(r, radius, radius, _rim);
-            var i = 3.2f * _d;
-            canvas.DrawRoundRect(new RectF(r.Left + i, r.Top + i, r.Right - i, r.Bottom - i), radius - (2 * _d), radius - (2 * _d), _inner);
-
-            var len = 12 * _d;
-            var inset = 3 * _d;
-            float l = r.Left + inset, t = r.Top + inset, rr = r.Right - inset, bb = r.Bottom - inset;
-            void Corner(float x, float y, float dx, float dy)
+            if (InkArt.Paper != null)
             {
-                canvas.DrawLine(x, y + (dy * radius * 0.5f), x, y + (dy * len), _corner);
-                canvas.DrawLine(x + (dx * radius * 0.5f), y, x + (dx * len), y, _corner);
-                // a small diamond "gem" at the corner
-                var g = 2.4f * _d;
-                using var path = new Path();
-                path.MoveTo(x + (dx * g), y);
-                path.LineTo(x, y + (dy * g));
-                path.LineTo(x - (dx * g * 0.2f), y - (dy * g * 0.2f));
-                path.Close();
-                canvas.DrawPath(path, _gem);
+                var save = canvas.Save();
+                canvas.ClipRect(r);
+                _paper.Alpha = 70;
+                canvas.DrawBitmap(InkArt.Paper, null, r, _paper);
+                canvas.RestoreToCount(save);
             }
 
-            if (r.Width() > 3 * len && r.Height() > 2 * len)
-            {
-                Corner(l, t, 1, 1);
-                Corner(rr, t, -1, 1);
-                Corner(l, bb, 1, -1);
-                Corner(rr, bb, -1, -1);
-            }
+            var corner = Math.Min(20 * _d, Math.Min(r.Width() * 0.25f, r.Height() * 0.32f));
+            InkArt.NineSlice(canvas, InkArt.Frame, r, corner, _border);
         }
 
         public override void SetAlpha(int alpha) => _fill.Alpha = alpha;
@@ -544,6 +577,7 @@ namespace JianghuGo.Android
         private readonly Paint _rim = new Paint(PaintFlags.AntiAlias);
         private readonly Paint _inner = new Paint(PaintFlags.AntiAlias);
         private readonly Paint _glow = new Paint(PaintFlags.AntiAlias);
+        private readonly Paint _stroke = new Paint(PaintFlags.FilterBitmap | PaintFlags.AntiAlias);
         private readonly bool _secondary;
         private readonly bool _pressed;
         private readonly float _d;
@@ -581,14 +615,25 @@ namespace JianghuGo.Android
         public override void Draw(Canvas canvas)
         {
             var b = Bounds;
-            var radius = 8 * _d;
-            var r = new RectF(b.Left + _d, b.Top + _d, b.Right - _d, b.Bottom - _d);
-            canvas.DrawRoundRect(r, radius, radius, _fill);
-            canvas.DrawRoundRect(new RectF(r.Left + _d, r.Top + _d, r.Right - _d, r.Top + (r.Height() * 0.55f)), radius, radius, _gloss);
-            if (_pressed) canvas.DrawRoundRect(r, radius, radius, _glow);
-            canvas.DrawRoundRect(r, radius, radius, _rim);
-            var i = 2.6f * _d;
-            canvas.DrawRoundRect(new RectF(r.Left + i, r.Top + i, r.Right - i, r.Bottom - i), radius - (2 * _d), radius - (2 * _d), _inner);
+            var r = new RectF(b.Left + _d, b.Top + (2 * _d), b.Right - _d, b.Bottom - (2 * _d));
+            if (InkArt.Stroke == null)
+            {
+                canvas.DrawRoundRect(r, 8 * _d, 8 * _d, _fill);
+                canvas.DrawRoundRect(r, 8 * _d, 8 * _d, _rim);
+                return;
+            }
+
+            // 2.2: a brush stroke instead of a box — cinnabar for the main action, a pale ink wash for the rest
+            _stroke.SetColorFilter(new PorterDuffColorFilter(_secondary ? Color.Rgb(40, 38, 34) : (_pressed ? Ui.CinnabarDeep : Ui.Cinnabar), PorterDuff.Mode.SrcIn));
+            _stroke.Alpha = _secondary ? (_pressed ? 95 : 55) : 255;
+            canvas.DrawBitmap(InkArt.Stroke, null, r, _stroke);
+            if (!_secondary)
+            {
+                // a second, offset pass gives the stroke body and depth
+                _stroke.Alpha = _pressed ? 120 : 70;
+                _stroke.SetColorFilter(new PorterDuffColorFilter(Ui.CinnabarDeep, PorterDuff.Mode.SrcIn));
+                canvas.DrawBitmap(InkArt.Stroke, null, new RectF(r.Left + (3 * _d), r.Top + (2 * _d), r.Right - _d, r.Bottom), _stroke);
+            }
         }
 
         public override void SetAlpha(int alpha) => _fill.Alpha = alpha;

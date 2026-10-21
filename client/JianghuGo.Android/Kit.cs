@@ -75,10 +75,11 @@ namespace JianghuGo.Android
         {
             var b = new Button(_ctx) { Text = caption };
             b.SetAllCaps(false);
-            b.SetTextSize(global::Android.Util.ComplexUnitType.Sp, sp);
+            b.SetTextSize(global::Android.Util.ComplexUnitType.Sp, sp * DisplayScale);
             b.SetTypeface(Display, TypefaceStyle.Bold);
             b.SetTextColor(secondary ? Ink : Color.Rgb(252, 248, 240));
-            b.SetShadowLayer(2, 0, 1, Color.Argb(170, 250, 247, 240));
+            // white on the red stroke needs a dark edge; ink on the wash a paper halo
+            b.SetShadowLayer(2, 0, 1, secondary ? Color.Argb(170, 250, 247, 240) : Color.Argb(150, 90, 12, 8));
             b.Background = ButtonBackground(secondary);
             b.StateListAnimator = null;
             b.SetPadding(Dp(8), Dp(2), Dp(8), Dp(2));
@@ -104,7 +105,7 @@ namespace JianghuGo.Android
         public TextView Text(string text, ViewGroup parent, float sp = 13, Color? color = null, bool bold = false, int maxLines = 1, bool center = false)
         {
             var t = new TextView(_ctx) { Text = text };
-            t.SetTextSize(global::Android.Util.ComplexUnitType.Sp, sp);
+            t.SetTextSize(global::Android.Util.ComplexUnitType.Sp, bold ? sp * DisplayScale : sp);
             t.SetTextColor(color ?? Ink);
             t.SetTypeface(bold ? Display : Body, bold ? TypefaceStyle.Bold : TypefaceStyle.Normal);
             t.SetShadowLayer(3, 0, 1, Color.Argb(170, 250, 247, 240));

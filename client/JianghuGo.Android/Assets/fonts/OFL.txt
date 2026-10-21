@@ -1,4 +1,5 @@
-Copyright 2020 The Cinzel Project Authors (https://github.com/NDISCOVER/Cinzel)
+Copyright 2015 The Cormorant Project Authors (https://github.com/CatharsisFonts/Cormorant)
+(Cormorant Garamond, Bold and SemiBold instances, subset to Latin and Latin Extended)
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:
