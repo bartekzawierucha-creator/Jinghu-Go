@@ -42,7 +42,7 @@ namespace JianghuGo.Android
                 // the dot is only a hint
             }
 
-            _power = scout.MyPower;
+            SetPower(scout.MyPower);
             var ui = NewScreen(null, art: Resource.Drawable.arena_courtyard, tab: TabCombat);
             var page = ui.Content;
 
@@ -86,7 +86,10 @@ namespace JianghuGo.Android
                 ("Arena", "ink_ico_arena", () => Run(() => ShowCombatTabAsync(5)), false, afterFloor),
                 ("PvP", "ink_nav_combat", () => Run(() => ShowCombatTabAsync(4)), false, afterFloor),
             });
-            if (afterWin != null) ui.Text("Wygraj pierwszą walkę treningową — otworzą się Wieża, Łowy i Bossy.", page, 11, Ui.Muted, center: true, maxLines: 2);
+            if (afterWin != null) ui.Text("Wygraj pierwszą walkę treningową — otworzą się Wieża, Łowy i Bossy.", page, 12, Ui.Muted, center: true, maxLines: 2);
+            else if (afterFloor != null) ui.Text("Zdobądź 1. piętro Wieży — otworzą się Arena i Pojedynki.", page, 12, Ui.Muted, center: true, maxLines: 2);
+            AnnounceUnlock("combat_win", afterWin == null);
+            AnnounceUnlock("combat_floor", afterFloor == null);
         }
 
         /// <summary>The secondary combat screens (hunt, tower, bosses, duels, arena), each with a back arrow to the hub.</summary>
@@ -167,6 +170,17 @@ namespace JianghuGo.Android
                     }), row, sp: 12, heightDp: 38).LayoutParameters = new LinearLayout.LayoutParams(Px(96), Px(38)) { Gravity = GravityFlags.CenterVertical };
                 }, empty: "Brak trwających walk.");
             }
+        }
+
+        /// <summary>The first time a group of systems opens, the ribbon says so once (no popup in the way of the next tap).</summary>
+        private void AnnounceUnlock(string key, bool open)
+        {
+            if (!open || _me == null) return;
+            var pref = "jianghu.unlocked." + key + "." + _me.Id;
+            if (_prefs.GetBoolean(pref, false)) return;
+            _prefs.Edit().PutBoolean(pref, true).Apply();
+            Sfx.Play(Sfx.Chime, 0.7f);
+            SetStatus("✦ Nowa ścieżka otwarta — nowe ikony czekają na dole ekranu.");
         }
 
         /// <summary>Progressive unlocks (2.2): true once the player has done the thing at least once (from the achievements' counters).</summary>
@@ -345,9 +359,10 @@ namespace JianghuGo.Android
                 ui.Text("Wieża zdobyta. Jesteś na szczycie!", page, 15, Ui.Gold, bold: true, center: true);
             }
 
-            var board = ui.Card(page, 1.1f, 8);
-            ui.Text("Najwyżej w wieży", board, 12, Ui.GoldDim, bold: true);
-            if (t.Top.Count == 0) ui.Text("Nikt jeszcze nie wszedł. Bądź pierwszy.", board, 12, Ui.Muted);
+            var board = ui.Card(page, 0f, 8);
+            board.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Px(6) };
+            ui.Text("Najwyżej w wieży", board, 14, Ui.Gold, bold: true);
+            if (t.Top.Count == 0) ui.Text("Nikt jeszcze nie wszedł. Twoje imię może być pierwsze.", board, 12, Ui.Muted);
             foreach (var r in t.Top.Take(5))
                 ui.Text("#" + r.Rank + "  " + r.Name + "  ·  piętro " + r.Value, board, 12, r.CharacterId == c.Id ? Ui.Gold : Ui.Ink);
         }
@@ -668,7 +683,7 @@ namespace JianghuGo.Android
 
                         if (won && b.RewardQi == 0 && b.Kind == "pve" && b.TamedPetNpcId == null)
                             ShowBanner("ZWYCIĘSTWO", "Przeciwnik: " + b.Opponent.Name, "Dzisiejsze nagrody z treningu wyczerpane (20 wygranych) — Qi wróci jutro. Wieża i boss świata płacą dalej.", "menu_battle");
-                        else if (won) ShowLoot("Zwycięstwo!", b.RewardQi, new List<(string, long)>(), b.TamedPetNpcId);
+                        else if (won) ShowLoot("Zwycięstwo!", b.RewardQi, new List<(string, long)>(), b.TamedPetNpcId, (b.Turn, dealt, taken));
                         else ShowBanner(b.Result == "draw" ? "REMIS" : "PORAŻKA", "Przeciwnik: " + b.Opponent.Name, "Trenuj meridiany i techniki, wróć silniejszy.", "menu_battle");
                         RefreshHud();
                     }, BattleClock.Real(b.LastTurnEvents.Count * stepMs + 1200));

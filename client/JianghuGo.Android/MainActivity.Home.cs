@@ -14,6 +14,7 @@ namespace JianghuGo.Android
     public sealed partial class MainActivity
     {
         private View _homeMeditate;
+        private View _homeBreakthrough;
         private View _homeDaily;
 
         // ---- Kultywacja ---------------------------------------------------------------------------------------
@@ -45,13 +46,14 @@ namespace JianghuGo.Android
             ui.AddWeighted(page, mid, 1f, 2);
             CultivationFlow flowRef = null;
             System.Action renderRef = null;
+            // 2.8: three quiet icons a side (the genre's edge icons); the rarely used ones wait behind "Więcej"
+            var achievementsWaiting = _board?.Achievements.Any(q => q.Completed && !q.Claimed) == true;
             ui.IconRow(mid, new List<(string, string, System.Action, bool, string)>
             {
                 ("Opowieść", "ink_ico_journey", () => Run(() => ShowQuestsAsync(3)), _board?.Story is { Completed: true, Finished: false }, null),
-                ("Osiągnięcia", "ink_ico_ranking", () => Run(() => ShowQuestsAsync(1)), _board?.Achievements.Any(q => q.Completed && !q.Claimed) == true, null),
                 ("Sezon", "ink_ico_achievement", () => Run(() => ShowQuestsAsync(4)), (_board?.Pass?.Claimable ?? 0) > 0, null),
-                ("Kronika", "ink_ico_event", () => Run(ShowChronicleAsync), false, null),
-            }, 62, vertical: true);
+                ("Więcej", "ink_ico_event", MoreSheet, achievementsWaiting, null),
+            }, 66, vertical: true);
             var charge = new QiChargeView(this);
             mid.AddView(charge, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MatchParent, 1f));
             ui.IconRow(mid, new List<(string, string, System.Action, bool, string)>
@@ -59,15 +61,74 @@ namespace JianghuGo.Android
                 ("Rozwój", "ink_ico_meridian", () => { if (flowRef?.State != null) CultivationSheet(flowRef, renderRef); }, false, null),
                 ("Odosobnienie", "ink_ico_dao", () => { if (flowRef?.State != null) RetreatSheet(flowRef, renderRef); }, false, null),
                 ("Posiadłość", "ink_ico_place", () => Run(() => ShowEstateAsync(0)), false, null),
-                ("Kuźnia", "ink_ico_forge", () => Run(() => ShowBagAsync(1)), false, null),
-                ("Targ", "ink_ico_market", () => Run(() => ShowBagAsync(2)), false, null),
-            }, 62, vertical: true);
+            }, 66, vertical: true);
+
+            void MoreSheet()
+            {
+                var body = Sheet("Więcej", 0.34f, out var close, "ink_ico_event");
+                void Go(Func<Task> open) => Run(async () =>
+                {
+                    close();
+                    await open();
+                });
+                ui.IconRow(body, new List<(string, string, System.Action, bool, string)>
+                {
+                    ("Osiągnięcia", "ink_ico_ranking", () => Go(() => ShowQuestsAsync(1)), achievementsWaiting, null),
+                    ("Kronika", "ink_ico_event", () => Go(ShowChronicleAsync), false, null),
+                    ("Kuźnia", "ink_ico_forge", () => Go(() => ShowBagAsync(1)), false, null),
+                    ("Targ", "ink_ico_market", () => Go(() => ShowBagAsync(2)), false, null),
+                }, 76);
+            }
+
             var info = ui.Text(string.Empty, page, 11, Ui.Muted, maxLines: 1);
+
+            // 2.8: what no other cultivation game has — the real world around you, one tap from the map
+            var world = ui.HRow(page, 30, 2);
+            world.Clickable = true;
+            world.Click += (_, __) => GoTab(TabWorld);
+            ui.Icon(world, "map_qi", 24);
+            var worldText = ui.Text("Świat wokół ciebie — sprawdź, co jest blisko", world, 12, Ui.Jade, bold: true, maxLines: 1);
+            worldText.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f) { LeftMargin = Px(6), Gravity = GravityFlags.CenterVertical };
+            ui.Text("›", world, 18, Ui.Jade, bold: true).LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent) { Gravity = GravityFlags.CenterVertical };
+
+            void RenderWorld(NearbyDto n)
+            {
+                if (n == null || gen != _screen) return;
+                var node = n.Nodes.Where(x => !x.Harvested).OrderBy(x => x.DistanceM).FirstOrDefault();
+                var weather = n.Region == null ? null : n.Region.WeatherNamePl + (n.Region.TemperatureC is { } tc ? " " + Math.Round(tc) + "°C" : string.Empty);
+                var parts = new List<string>();
+                if (node != null) parts.Add(node.NamePl + " — " + node.DistanceM + " m");
+                if (!string.IsNullOrWhiteSpace(weather)) parts.Add(weather);
+                if (parts.Count > 0) worldText.Text = string.Join(" · ", parts);
+            }
+
+            // 2.8: one clear goal above the buttons — the single most useful thing to do now, one tap away
+            var next = ui.Card(page, 0f, 6, Ui.Cinnabar);
+            next.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Px(4) };
+            next.Clickable = true;
+            var nextRow = ui.HRow(next, 36, 0);
+            var nextIcon = ui.Icon(nextRow, "ink_ico_journey", 30);
+            var nextText = ui.Text(string.Empty, nextRow, 14, Ui.Ink, bold: true, maxLines: 2);
+            nextText.LayoutParameters = new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f) { LeftMargin = Px(8), Gravity = GravityFlags.CenterVertical };
+            var nextGo = ui.Text("›", nextRow, 22, Ui.Cinnabar, bold: true);
+            nextGo.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent) { Gravity = GravityFlags.CenterVertical };
+            System.Action nextAction = null;
+            next.Click += (_, __) => nextAction?.Invoke();
+
+            void RenderNext()
+            {
+                var (text, art, act) = NextStep(flow.State);
+                nextText.Text = text;
+                var nid = ui.ArtId(art);
+                if (nid != 0) nextIcon.SetImageBitmap(Ui.Art(this, nid));
+                nextAction = act;
+            }
 
             var actions = ui.HRow(page, 52);
             var meditate = ui.Btn("Medytuj", () => { }, actions, sp: 16, heightDp: 52, icon: "menu_meditate");
             _homeMeditate = meditate;
             var breakthrough = ui.Btn("Przełom", () => { }, actions, secondary: true, sp: 16, heightDp: 52, icon: "menu_breakthrough");
+            _homeBreakthrough = breakthrough;
             Button steps = null;
             if (c.Path == "body")
             {
@@ -87,6 +148,11 @@ namespace JianghuGo.Android
                 if (st == null || gen != _screen) return;
                 _cultivation = st;
                 RenderHud();
+                // a realm reached elsewhere (the Heavenly Tribulation is a battle) still gets its scene, once
+                var seen = _prefs.GetInt(RealmSeenKey + "." + c.Id, -1);
+                if (seen >= 0 && st.RealmIndex > seen && !_overlayOpen)
+                    ShowBreakthroughScene(st.RealmHanzi, st.RealmNamePl, "Nowe królestwo — wszystkie cechy rosną", true, _power);
+                if (seen != st.RealmIndex) RememberRealm(st.RealmIndex);
                 MaybeShowMilestone(st.RealmIndex);
                 Music.PlayEra(st.Era);
                 realm.Text = (string.IsNullOrEmpty(st.RealmHanzi) ? string.Empty : st.RealmHanzi + " ") + st.RealmNamePl + " · " + (st.StageName ?? "etap") + " " + st.Stage + "/" + st.StagesInRealm;
@@ -105,6 +171,7 @@ namespace JianghuGo.Android
                             (steps != null ? " · kroki " + st.DailySteps + "/" + st.DailyStepCap : string.Empty);
                 meditate.Text = st.IsMeditating ? "Zakończ" : "Medytuj";
                 breakthrough.Text = st.TribulationRequired ? "Próba Niebios" : "Przełom";
+                RenderNext();
             }
 
             meditate.Click += (_, __) => Run(async () =>
@@ -132,7 +199,10 @@ namespace JianghuGo.Android
                     return;
                 }
 
+                var realmBefore = flow.State?.RealmIndex ?? 0;
+                var powerBefore = _power;
                 var r = await flow.BreakthroughAsync(Ct);
+                if (r?.Success == true && flow.State != null) RememberRealm(flow.State.RealmIndex); // the scene below, not the one Render would show
                 Render();
                 if (r == null)
                 {
@@ -142,9 +212,10 @@ namespace JianghuGo.Android
 
                 if (r.Success)
                 {
-                    PlayOverlay(Resource.Drawable.fx_breakthrough, 256, 9);
-                    Sfx.Play(Sfx.Breakthrough);
-                    ShowBanner("PRZEŁOM!", flow.State.RealmNamePl + " · etap " + flow.State.Stage, "+1 punkt meridianu do otwarcia", "ink_popup_breakthrough");
+                    var s2 = flow.State;
+                    var newRealm = s2.RealmIndex != realmBefore;
+                    ShowBreakthroughScene(s2.RealmHanzi, newRealm ? s2.RealmNamePl : s2.RealmNamePl + " · etap " + s2.Stage,
+                        newRealm ? "Nowe królestwo — wszystkie cechy rosną" : "+1 punkt meridianu do otwarcia", newRealm, powerBefore);
                 }
                 else
                 {
@@ -158,6 +229,7 @@ namespace JianghuGo.Android
             void RenderDaily(QuestBoardDto board)
             {
                 if (gen != _screen || board == null) return;
+                if (flow.State != null) RenderNext();
                 daily.RemoveAllViews();
                 // one tap for every reward waiting: the check-in, finished daily quests and achievements
                 var waiting = board.Daily.Count(q => q.Completed && !q.Claimed) + board.Achievements.Count(q => q.Completed && !q.Claimed) + (board.Checkin.CheckedInToday ? 0 : 1);
@@ -249,10 +321,64 @@ namespace JianghuGo.Android
                 await flow.LoadAsync(Ct);
                 Render();
                 ShowOfflineSummary(flow, Render);
-                if (_power == 0) _power = (await _api.GetCombatScoutAsync(c.Id, Ct)).MyPower;
+                SetPower((await _api.GetCombatScoutAsync(c.Id, Ct)).MyPower);
                 if (gen == _screen) ShowPower();
-                RenderDaily(await _api.GetQuestsAsync(c.Id, Ct));
+                _board = await _api.GetQuestsAsync(c.Id, Ct);
+                RenderDaily(_board);
+                if (_exploration?.Nearby != null) RenderWorld(_exploration.Nearby);
+                else
+                {
+                    try
+                    {
+                        RenderWorld(await _api.GetNearbyAsync(c.Id, Ct));
+                    }
+                    catch (ApiException)
+                    {
+                        // no position yet: the row keeps its invitation
+                    }
+                }
+
+                await RefreshAlertsAsync(true);
+                if (gen == _screen && flow.State != null) RenderNext();
             });
+        }
+
+        /// <summary>
+        /// The single next goal for the cultivation screen, in the order a player of the genre expects: a breakthrough
+        /// that is ready, the first win that opens combat, rewards waiting, points to spend, then the story and the day.
+        /// </summary>
+        private (string Text, string Art, System.Action Go) NextStep(CultivationDto st)
+        {
+            if (st != null && st.QiRequired > 0 && st.Qi >= st.QiRequired)
+                return (st.TribulationRequired ? "Naczynie pełne — stań do Próby Niebios" : "Naczynie pełne — spróbuj przełomu", "menu_breakthrough",
+                    () => _homeBreakthrough?.PerformClick());
+            if (_board != null && !Unlocked("battles_won"))
+                return ("Wygraj pierwszą walkę treningową — otworzy Wieżę, Łowy i Bossy", "ink_nav_combat", () => GoTab(TabCombat));
+            if (_huntFinished) return ("Łowy zakończone — odbierz łup", "ink_ico_beast", () => Run(() => GoCombatAsync(1)));
+            if (_bossClaim) return ("Nagroda za bossa świata czeka", "ink_ico_ranking", () => Run(() => GoCombatAsync(3)));
+            if (_freeMeridians > 0) return ("Otwórz meridian — " + _freeMeridians + " " + (_freeMeridians == 1 ? "wolny punkt" : "wolne punkty"), "ink_ico_meridian", () => { _tab = TabHero; Run(() => ShowHeroTabAsync(1)); });
+            var story = _board?.Story;
+            if (story != null && !story.Finished)
+                return (story.Completed ? "Rozdział ukończony — odbierz nagrodę" : story.GoalPl + " (" + story.Progress + "/" + story.Target + ")", "ink_ico_journey", () => Run(() => ShowQuestsAsync(3)));
+            var quest = _board?.Daily.FirstOrDefault(q => !q.Completed);
+            if (quest != null) return (quest.NamePl + ": " + quest.DescriptionPl, "ink_ico_quest", () => Run(() => GoForAsync(quest.Metric)));
+            if (st != null && !st.IsMeditating) return ("Medytuj — Qi płynie pięć razy szybciej", "menu_meditate", () => _homeMeditate?.PerformClick());
+            return ("Wyrusz w Świat — zioła, rudy i źródła Qi czekają", "ink_nav_world", () => GoTab(TabWorld));
+        }
+
+        private const string RealmSeenKey = "jianghu.realm_seen";
+
+        private void RememberRealm(int realm)
+        {
+            using var e = _prefs.Edit();
+            e.PutInt(RealmSeenKey + "." + _me?.Id, realm);
+            e.Apply();
+        }
+
+        private async Task GoCombatAsync(int sub)
+        {
+            _tab = TabCombat;
+            await ShowCombatTabAsync(sub);
         }
 
         // ---- Zadania ------------------------------------------------------------------------------------------

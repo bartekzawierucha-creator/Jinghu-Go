@@ -33,8 +33,38 @@ namespace JianghuGo.Android
         private readonly Dictionary<string, View> _dockDots = new Dictionary<string, View>();
         private DateTime _alertsAt = DateTime.MinValue;
 
-        /// <summary>The hero's combat power (2.2), shown on the cultivation and hero screens; 0 until known.</summary>
+        /// <summary>The hero's combat power (2.2), shown in the HUD; 0 until known. Change it only through <see cref="SetPower"/>.</summary>
         private long _power;
+
+        // what the dock dots last saw, reused by the "next step" card on the cultivation screen
+        private int _freeMeridians;
+        private bool _huntFinished;
+        private bool _bossClaim;
+
+        /// <summary>
+        /// Stores a fresh combat power. A rise floats "+N" up from the HUD number — the moment the genre is built on;
+        /// a drop only updates the number.
+        /// </summary>
+        private void SetPower(long power)
+        {
+            var before = _power;
+            _power = power;
+            if (_hudPower == null) return;
+            RenderHud();
+            if (before <= 0 || power <= before || _hud.Visibility != ViewStates.Visible) return;
+            var plus = new TextView(this) { Text = "+" + (power - before).ToString("N0") };
+            plus.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 20);
+            plus.SetTypeface(Ui.Display, TypefaceStyle.Bold);
+            plus.SetTextColor(Ui.Jade);
+            plus.SetShadowLayer(4, 0, 1, Color.Argb(200, 250, 247, 240));
+            var at = new int[2];
+            _hudPower.GetLocationInWindow(at);
+            var lp = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent) { LeftMargin = at[0] + _hudPower.Width, TopMargin = at[1] + Px(14) };
+            _frame.AddView(plus, lp);
+            plus.Animate().TranslationY(Px(-26)).SetDuration(900).Start();
+            plus.Animate().Alpha(0f).SetStartDelay(700).SetDuration(600).WithEndAction(new Java.Lang.Runnable(() => _frame.RemoveView(plus))).Start();
+            _hudPower.Animate().ScaleX(1.25f).ScaleY(1.25f).SetDuration(140).WithEndAction(new Java.Lang.Runnable(() => _hudPower.Animate().ScaleX(1f).ScaleY(1f).SetDuration(220).Start())).Start();
+        }
 
         /// <summary>
         /// Red dots on the dock: something waits in that hub. Fetched at most every 45 s (more calls than the HUD).
@@ -56,8 +86,11 @@ namespace JianghuGo.Android
                 var hunt = (await _api.GetHuntAsync(_me.Id, Ct)).Hunt;
                 var boss = await _api.GetWorldBossAsync(_me.Id, Ct);
                 combat = hunt?.Finished == true || boss.CanClaim || boss.UnclaimedCycle != null;
-                hero = (await _api.GetMeridiansAsync(_me.Id, Ct)).Free > 0;
-                _power = (await _api.GetCombatScoutAsync(_me.Id, Ct)).MyPower;
+                _freeMeridians = (await _api.GetMeridiansAsync(_me.Id, Ct)).Free;
+                hero = _freeMeridians > 0;
+                _huntFinished = hunt?.Finished == true;
+                _bossClaim = boss.CanClaim || boss.UnclaimedCycle != null;
+                SetPower((await _api.GetCombatScoutAsync(_me.Id, Ct)).MyPower);
             }
             catch (ApiException)
             {
@@ -82,6 +115,7 @@ namespace JianghuGo.Android
         // HUD widgets and the last known values
         private ImageView _hudPortrait;
         private TextView _hudName;
+        private TextView _hudPower;
         private MeterView _hudQi;
         private TextView _hudStones;
         private TextView _hudQuestBadge;
@@ -209,14 +243,25 @@ namespace JianghuGo.Android
             _hudPortrait.Click += (_, __) => GoTab(TabHero);
             hud.AddView(_hudPortrait, new LinearLayout.LayoutParams(Px(44), Px(44)) { RightMargin = Px(8) });
 
+            // 2.8: the combat power is the headline number of the genre — big, first; name and realm quietly after it
             var mid = new LinearLayout(this) { Orientation = Orientation.Vertical };
+            var top = new LinearLayout(this) { Orientation = Orientation.Horizontal };
+            top.SetGravity(GravityFlags.CenterVertical);
+            _hudPower = new TextView(this);
+            _hudPower.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 17);
+            _hudPower.SetTypeface(Ui.Display, TypefaceStyle.Bold);
+            _hudPower.SetTextColor(Ui.Cinnabar);
+            _hudPower.SetMaxLines(1);
+            _hudPower.SetIncludeFontPadding(false);
+            top.AddView(_hudPower, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.WrapContent, ViewGroup.LayoutParams.WrapContent) { RightMargin = Px(6) });
             _hudName = new TextView(this);
-            _hudName.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 12);
-            _hudName.SetTypeface(Ui.Display, TypefaceStyle.Bold);
-            _hudName.SetTextColor(Ui.Gold);
+            _hudName.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 11);
+            _hudName.SetTypeface(Ui.Body, TypefaceStyle.Normal);
+            _hudName.SetTextColor(Ui.Muted);
             _hudName.SetMaxLines(1);
             _hudName.Ellipsize = global::Android.Text.TextUtils.TruncateAt.End;
-            mid.AddView(_hudName);
+            top.AddView(_hudName, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
+            mid.AddView(top);
             _hudQi = new MeterView(this, Ui.QiBlue);
             mid.AddView(_hudQi, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, Px(16)) { TopMargin = Px(3) });
             hud.AddView(mid, new LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WrapContent, 1f));
@@ -272,6 +317,8 @@ namespace JianghuGo.Android
             // the title the player chose to wear (not just the latest one earned)
             var chosen = _board?.AllTitles?.FirstOrDefault(t => t.Selected);
             var title = chosen != null ? "「" + chosen.NamePl + "」 " : string.Empty;
+            _hudPower.Text = _power > 0 ? "⚔ " + _power.ToString("N0") : string.Empty;
+            _hudPower.Visibility = _power > 0 ? ViewStates.Visible : ViewStates.Gone;
             _hudName.Text = title + _me.Name + (_cultivation != null ? " · " + _cultivation.RealmNamePl + " " + _cultivation.Stage + "/" + _cultivation.StagesInRealm : string.Empty);
             if (_cultivation != null) Ui.SetMeter(_hudQi, "Qi " + _cultivation.Qi + " / " + _cultivation.QiRequired, _cultivation.Qi, Math.Max(1, _cultivation.QiRequired));
             _hudStones.Text = _balance.ToString("N0");
@@ -440,10 +487,6 @@ namespace JianghuGo.Android
         // ---- screens ------------------------------------------------------------------------------------------
 
         /// <summary>
-        /// Starts a screen. <paramref name="chrome"/>: HUD and dock visible (in-game hubs and their sub-screens).
-        /// <paramref name="title"/> null hides the title row (hub roots). The returned Ui builds into a fixed page.
-        /// </summary>
-        /// <summary>
         /// Screen captions read as a quiet line, not a shouted label: a list of the tabs below ("A · B · C") or the date
         /// repeats what the screen already shows and is dropped; the rest is set in sentence case.
         /// </summary>
@@ -461,6 +504,10 @@ namespace JianghuGo.Android
             return char.ToUpperInvariant(s[0]) + s.Substring(1);
         }
 
+        /// <summary>
+        /// Starts a screen. <paramref name="chrome"/>: HUD and dock visible (in-game hubs and their sub-screens).
+        /// <paramref name="title"/> null hides the title row (hub roots). The returned Ui builds into a fixed page.
+        /// </summary>
         private Ui NewScreen(string title, System.Action back = null, int art = 0, string subtitle = null, bool chrome = true, string tab = null)
         {
             _screen++;

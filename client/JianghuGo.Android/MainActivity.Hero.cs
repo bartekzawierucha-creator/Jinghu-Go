@@ -115,9 +115,9 @@ namespace JianghuGo.Android
             foreach (var slot in HeroDollView.Slots)
                 doll.Equipped[slot] = inv.Equipped.TryGetValue(slot, out var id) ? inv.Items.FirstOrDefault(i => i.Id == id) : null;
             ui.AddWeighted(page, doll, 1f);
-            _power = (await _api.GetCombatScoutAsync(c.Id, Ct)).MyPower;
+            SetPower((await _api.GetCombatScoutAsync(c.Id, Ct)).MyPower);
             _board ??= await _api.GetQuestsAsync(c.Id, Ct);
-            ui.Text("⚔ MOC BOJOWA " + _power.ToString("N0"), page, 15, Ui.Cinnabar, bold: true, center: true);
+            ui.Text("⚔ Moc bojowa " + _power.ToString("N0"), page, 19, Ui.Cinnabar, bold: true, center: true);
             ui.IconRow(page, new List<(string, string, System.Action, bool, string)>
             {
                 ("Meridiany", "ink_ico_meridian", () => Run(() => ShowHeroTabAsync(1)), meridians != null && meridians.Free > 0, null),
@@ -126,6 +126,7 @@ namespace JianghuGo.Android
                 ("Dao", "ink_ico_dao", () => Run(() => ShowHeroTabAsync(4)), false, Unlocked("battles_won") ? null : "1. wygrana"),
                 ("Sztuki", "ink_ico_alchemy", () => Run(() => ShowHeroTabAsync(5)), false, Unlocked("battles_won") ? null : "1. wygrana"),
             }, 58);
+            AnnounceUnlock("hero_win", Unlocked("battles_won"));
             var info = ui.HRow(page, 34, 4);
             ui.Btn("Cechy, ścieżka i tytuły", () => ShowOriginsSheet(), info, secondary: true, sp: 12, heightDp: 34, icon: "menu_hero");
             ui.Btn("Premie", () => Run(ShowBonusesSheetAsync), info, secondary: true, sp: 12, heightDp: 34);

@@ -191,7 +191,7 @@ $UI tap "Dalej" 20
 adb shell input keyevent KEYCODE_BACK; sleep 1
 $UI wait "Trening" 30
 $UI tap "Arena"
-$UI wait "ARENA" 30
+$UI wait "pkt · miejsce" 30
 $UI noscroll
 $UI shot shots/06k-arena.png
 
@@ -208,22 +208,22 @@ $UI tap "Meridiany"
 $UI wait "Wolne punkty" 60
 $UI shot shots/07b-meridians.png
 adb shell input keyevent KEYCODE_BACK; sleep 1
-$UI wait "MOC BOJOWA" 30
+$UI wait "Moc bojowa" 30
 $UI tap "Techniki"
 $UI wait "Ułóż najlepsze" 60
 $UI shot shots/07c-techniques.png
 adb shell input keyevent KEYCODE_BACK; sleep 1
-$UI wait "MOC BOJOWA" 30
+$UI wait "Moc bojowa" 30
 $UI tap "Towarzysz"
 $UI wait "Nie masz jeszcze towarzysza" 60
 $UI shot shots/07d-pet.png
 adb shell input keyevent KEYCODE_BACK; sleep 1
-$UI wait "MOC BOJOWA" 30
+$UI wait "Moc bojowa" 30
 $UI tap "Dao"
 $UI wait "Ułóż własną" 60
 $UI shot shots/07e-dao.png
 adb shell input keyevent KEYCODE_BACK; sleep 1
-$UI wait "MOC BOJOWA" 30
+$UI wait "Moc bojowa" 30
 $UI tap "Sztuki"
 $UI wait "Intencja Miecza" 60   # the Qi path's own art (Sword) opens first
 $UI noscroll

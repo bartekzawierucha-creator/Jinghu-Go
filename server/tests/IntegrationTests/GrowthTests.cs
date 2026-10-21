@@ -281,6 +281,24 @@ public class GrowthTests : IAsyncLifetime
         await Problem(await a.PostAsync(Url(ca, "combat/arena/claim")), HttpStatusCode.Conflict, "arena_claimed");
     }
 
+    [Fact]
+    public async Task Arena_is_never_empty_wanderers_fill_rivals_and_the_board()
+    {
+        var (a, ca) = await NewAsync("flame");
+        var view = await Ok(await a.GetAsync(Url(ca, "combat/arena")));
+        var rivals = view["opponents"]!.AsArray();
+        Assert.Equal(5, rivals.Count);
+        Assert.True(view["top"]!.AsArray().Count >= 6);
+        var wanderer = rivals.First(o => o!.Str("characterId").StartsWith("00000000-0000-4000-8000-", StringComparison.Ordinal))!;
+        var battle = await Ok(await a.PostAsync(Url(ca, "combat/arena/challenge"), new { opponentCharacterId = wanderer.Str("characterId") }, Player.NewKey()), HttpStatusCode.Created);
+        Assert.Equal("arena", battle.Str("kind"));
+        Assert.Equal(wanderer.Str("name"), battle["opponent"]!.Str("name"));
+        await ForfeitAsync(a, Guid.Parse(battle.Str("id")));
+        var after = await Ok(await a.GetAsync(Url(ca, "combat/arena")));
+        Assert.True(after.Int("rating") < 1000);
+        Assert.Equal(wanderer.Int("rating"), after["opponents"]!.AsArray().First(o => o!.Str("characterId") == wanderer.Str("characterId"))!.Int("rating"));
+    }
+
     // ---- crafting queue, dismantling ----------------------------------------------------------------------
 
     [Fact]

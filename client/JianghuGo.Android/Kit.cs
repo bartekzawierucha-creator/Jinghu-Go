@@ -252,8 +252,11 @@ namespace JianghuGo.Android
         {
             var row = new LinearLayout(_ctx) { Orientation = vertical ? Orientation.Vertical : Orientation.Horizontal };
             row.SetGravity(GravityFlags.Center);
+            // 2.8: what is not open yet is not shown at all (the genre reveals systems as you grow); the screen says what opens next
+            var size = Math.Min(48, Math.Max(36, heightDp - 22));
             foreach (var it in items)
             {
+                if (it.Locked != null) continue;
                 var cell = new LinearLayout(_ctx) { Orientation = Orientation.Vertical, Clickable = true };
                 cell.SetGravity(GravityFlags.Center);
                 var frame = new FrameLayout(_ctx);
@@ -261,7 +264,7 @@ namespace JianghuGo.Android
                 var id = ArtId(it.Art);
                 if (id != 0) img.SetImageBitmap(Art(_ctx, id));
                 img.SetScaleType(ImageView.ScaleType.FitCenter);
-                frame.AddView(img, new FrameLayout.LayoutParams(Dp(40), Dp(40)));
+                frame.AddView(img, new FrameLayout.LayoutParams(Dp(size), Dp(size)));
                 if (it.Dot)
                 {
                     var dot = new View(_ctx);
@@ -273,7 +276,7 @@ namespace JianghuGo.Android
                     frame.AddView(dot, new FrameLayout.LayoutParams(Dp(10), Dp(10), GravityFlags.Top | GravityFlags.End));
                 }
 
-                cell.AddView(frame, new LinearLayout.LayoutParams(Dp(40), Dp(40)));
+                cell.AddView(frame, new LinearLayout.LayoutParams(Dp(size), Dp(size)));
                 var t = new TextView(_ctx) { Text = it.Locked != null ? "🔒 " + it.Locked : it.Label, Gravity = GravityFlags.Center };
                 t.SetTextSize(global::Android.Util.ComplexUnitType.Sp, 10);
                 t.SetTypeface(Display, TypefaceStyle.Bold);
@@ -281,8 +284,8 @@ namespace JianghuGo.Android
                 t.SetMaxLines(1);
                 t.SetIncludeFontPadding(false);
                 // long labels shrink to fit the cell instead of being cut
-                t.SetAutoSizeTextTypeUniformWithConfiguration(7, 10, 1, (int)global::Android.Util.ComplexUnitType.Sp);
-                cell.AddView(t, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, Dp(14)));
+                t.SetAutoSizeTextTypeUniformWithConfiguration(7, 11, 1, (int)global::Android.Util.ComplexUnitType.Sp);
+                cell.AddView(t, new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, Dp(15)));
                 if (it.Locked != null) img.Alpha = 0.35f;
                 var item = it;
                 cell.Click += (_, __) =>

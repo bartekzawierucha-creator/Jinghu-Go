@@ -74,6 +74,37 @@ public sealed partial class CombatService
         return await repo.CountBattlesOfKindSinceAsync(uow, id, BattleKinds.Arena, dayStart, ct);
     }
 
+    /// <summary>
+    /// 2.8: wandering cultivators keep the arena alive while it has few players (the genre never shows an empty board).
+    /// Each has a fixed rating and fights as a human foe raised to a realm near yours (the stronger ones a realm or two
+    /// above). They fill the rival list and the leaderboard only where real players are missing, and their rating does
+    /// not move.
+    /// </summary>
+    public sealed record Wanderer(int Index, string Name, string NpcId, int Rating, int RealmOffset)
+    {
+        public Guid Id { get; } = new("00000000-0000-4000-8000-" + Index.ToString("000000000000", CultureInfo.InvariantCulture));
+    }
+
+    public static readonly IReadOnlyList<Wanderer> Wanderers =
+    [
+        new(1, "Wędrowiec Mo Feng", "mountain_bandit", 940, -1),
+        new(2, "Pustelniczka Lan Yue", "sect_traitor", 1010, 0),
+        new(3, "Mnich Kong Ming", "demonic_cultivator", 1080, 0),
+        new(4, "Szermierz Bai Ye", "sect_traitor", 1160, 1),
+        new(5, "Wiedźma Hei Lian", "demonic_cultivator", 1250, 1),
+        new(6, "Stary Mistrz Gu", "bandit_chief", 1380, 2),
+    ];
+
+    private static Wanderer? WandererOf(Guid id) => Wanderers.FirstOrDefault(w => w.Id == id);
+
+    private async Task<Combatant?> WandererCombatantAsync(IUnitOfWork uow, CharacterSummary c, Wanderer w, CancellationToken ct)
+    {
+        var npc = config.Npcs.FirstOrDefault(n => n.Id == w.NpcId);
+        if (npc is null) return null;
+        var realm = Math.Max(0, await RealmOfAsync(uow, c.Id, ct) + w.RealmOffset);
+        return NpcCombatant(ForFighter(npc, realm)) with { Name = w.Name };
+    }
+
     /// <summary>Arena rivals are looked for within this many realms first (1.7).</summary>
     public const int ArenaRealmWindow = 3;
 
@@ -95,8 +126,19 @@ public sealed partial class CombatService
             var l = LeagueOf(e.Rating);
             return new ArenaOpponentView(e.CharacterId.Value, e.Name, e.Rating, l.Id, l.NamePl, e.Defense.Title, e.Defense.Badges ?? []);
         }).ToList();
-        var top = (await repo.ListArenaAsync(uow, 0, 10000, RankingSize, ct)).Select((e, i) => new RankView(i + 1, e.CharacterId.Value, e.Name, e.Rating)).ToList();
-        var rank = await repo.CountArenaAheadAsync(uow, mine, ct) + 1;
+        // wanderers fill the list up to five rivals, the closest ratings first
+        foreach (var w in Wanderers.OrderBy(w => Math.Abs(w.Rating - mine.Rating)).Take(Math.Max(0, 5 - opponents.Count)))
+        {
+            var l = LeagueOf(w.Rating);
+            opponents.Add(new ArenaOpponentView(w.Id, w.Name, w.Rating, l.Id, l.NamePl, null, []));
+        }
+
+        var real = await repo.ListArenaAsync(uow, 0, 10000, RankingSize, ct);
+        var top = real.Select(e => (Id: e.CharacterId.Value, e.Name, e.Rating))
+            .Concat(real.Count < RankingSize ? Wanderers.Select(w => (Id: w.Id, w.Name, w.Rating)) : [])
+            .OrderByDescending(e => e.Rating).Take(RankingSize)
+            .Select((e, i) => new RankView(i + 1, e.Id, e.Name, e.Rating)).ToList();
+        var rank = await repo.CountArenaAheadAsync(uow, mine, ct) + 1 + (real.Count < RankingSize ? Wanderers.Count(w => w.Rating > mine.Rating) : 0);
         var week = WeekOf(now);
         var attempts = await ArenaAttemptsTodayAsync(uow, c.Id, now, ct);
         var claimable = mine.Wins + mine.Losses > 0 && !await WeekClaimedAsync(uow, c.Id, week, ct);
@@ -117,23 +159,25 @@ public sealed partial class CombatService
                 if (c is null) return CharacterNotFound;
                 if (cmd.OpponentCharacterId == characterId) return Error.Validation("cannot_challenge_self", "You cannot fight your own copy.");
                 var foe = await repo.FindArenaAsync(uow, new CharacterId(cmd.OpponentCharacterId), ct);
-                if (foe is null) return Error.NotFound("opponent_not_found", "This cultivator is not in the arena.");
+                var wanderer = foe is null ? WandererOf(cmd.OpponentCharacterId) : null;
+                if (foe is null && wanderer is null) return Error.NotFound("opponent_not_found", "This cultivator is not in the arena.");
                 if (await ArenaAttemptsTodayAsync(uow, c.Id, now, ct) >= ArenaCfg.AttemptsPerDay)
                     return Error.LimitReached("arena_attempts", $"At most {ArenaCfg.AttemptsPerDay} arena fights a day.");
                 if (await HasActiveBattleAsync(uow, c.Id, now, ct)) return Error.Conflict("already_in_battle", "This character is already fighting.");
                 await RefreshArenaAsync(uow, c, now, ct);
                 var a = await SnapshotAsync(uow, c, ct, pvp: true);
-                var b = foe.Defense with { Name = foe.Name };
+                var b = foe is not null ? foe.Defense with { Name = foe.Name } : await WandererCombatantAsync(uow, c, wanderer!, ct);
+                if (b is null) return Error.NotFound("opponent_not_found", "This cultivator is not in the arena.");
                 var battle = NewBattle(BattleKinds.Arena, BattleStatuses.Active, c, null, "arena_copy", now) with
                 {
                     CombatantA = a,
                     CombatantB = b,
                     State = CombatEngine.Start(config, a, b),
                     Deadline = now.AddSeconds(config.TurnDeadlineSeconds),
-                    Context = "arena:" + foe.CharacterId.Value,
+                    Context = "arena:" + cmd.OpponentCharacterId,
                 };
                 await repo.AddBattleAsync(uow, battle, ct);
-                await AuditAsync(uow, accountId, "combat.arena_started", battle.Id, new { characterId, opponent = foe.CharacterId.Value, battle.SeedHash }, now, ct);
+                await AuditAsync(uow, accountId, "combat.arena_started", battle.Id, new { characterId, opponent = cmd.OpponentCharacterId, battle.SeedHash }, now, ct);
                 return await ViewAsync(uow, battle, 'a', ct);
             }, ct);
             if (result.IsSuccess) await uow.CommitAsync(ct);
@@ -146,15 +190,18 @@ public sealed partial class CombatService
         if (config.Arena is null || battle.Context is not { } ctx || !Guid.TryParse(ctx[6..], out var foeId)) return 0;
         var me = await repo.FindArenaAsync(uow, battle.CharacterA, ct);
         var foe = await repo.FindArenaAsync(uow, new CharacterId(foeId), ct);
-        if (me is null || foe is null) return 0;
+        var wanderer = foe is null ? WandererOf(foeId) : null;
+        if (me is null || (foe is null && wanderer is null)) return 0;
+        var foeRating = foe?.Rating ?? wanderer!.Rating;
         var score = outcome == Outcomes.AWon ? 1.0 : outcome == Outcomes.Draw ? 0.5 : 0.0;
-        var expected = 1.0 / (1.0 + Math.Pow(10, (foe.Rating - me.Rating) / 400.0));
+        var expected = 1.0 / (1.0 + Math.Pow(10, (foeRating - me.Rating) / 400.0));
         var delta = (int)Math.Round(ArenaCfg.KFactor * (score - expected));
         var won = outcome == Outcomes.AWon;
         var lost = outcome == Outcomes.BWon;
         var meNext = me with { Rating = Math.Max(0, me.Rating + delta), Wins = me.Wins + (won ? 1 : 0), Losses = me.Losses + (lost ? 1 : 0), UpdatedAt = at, Version = me.Version + 1 };
-        var foeNext = foe with { Rating = Math.Max(0, foe.Rating - delta), Version = foe.Version + 1 };
-        if (!await repo.TrySaveArenaAsync(uow, meNext, me.Version, ct) || !await repo.TrySaveArenaAsync(uow, foeNext, foe.Version, ct))
+        if (!await repo.TrySaveArenaAsync(uow, meNext, me.Version, ct))
+            throw new TransientConflictException("Arena ratings changed concurrently.");
+        if (foe is not null && !await repo.TrySaveArenaAsync(uow, foe with { Rating = Math.Max(0, foe.Rating - delta), Version = foe.Version + 1 }, foe.Version, ct))
             throw new TransientConflictException("Arena ratings changed concurrently.");
         await AuditAsync(uow, battle.AccountA, "combat.arena_finished", battle.Id, new { outcome, delta, rating = meNext.Rating, opponent = foeId }, at, ct);
         return won ? ArenaCfg.QiPerWin : 0;

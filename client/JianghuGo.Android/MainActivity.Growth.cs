@@ -62,22 +62,73 @@ namespace JianghuGo.Android
 
         // ---- cultivation extras --------------------------------------------------------------------------------
 
-        /// <summary>What happened while away: shown once, then acknowledged on the server.</summary>
+        /// <summary>
+        /// 2.8: "while you were away" gathers everything that waited into one card — Qi that flowed, a finished hunt,
+        /// ripe crops — and one button takes it all. Shown once per return, then acknowledged on the server.
+        /// </summary>
         private void ShowOfflineSummary(CultivationFlow flow, System.Action render)
         {
             var s = flow.State?.Summary;
             if (s == null) return;
-            var hours = Math.Max(0, (s.To - s.From).TotalHours);
-            var extra = new List<string>();
-            if (s.Enlightenments > 0) extra.Add(s.Enlightenments + "× oświecenie");
-            if (s.AutoBreakthroughs > 0) extra.Add(s.AutoBreakthroughs + "× auto-przełom");
-            if (s.VesselFull) extra.Add("naczynie pełne");
-            if (s.RetreatFinished) extra.Add("odosobnienie zakończone");
-            ShowBanner("GDY CIĘ NIE BYŁO", "+" + s.Qi.ToString("N0") + " Qi w " + hours.ToString("0.#") + " h", extra.Count > 0 ? string.Join(" · ", extra) : "Qi płynęło samo.", "ink_popup_chest");
+            var c = _me;
+            var gen = _screen;
             Run(async () =>
             {
-                await flow.ApplyAsync(_api.AcknowledgeSummaryAsync, Ct);
-                render();
+                HuntDto hunt = null;
+                var ripe = 0;
+                try
+                {
+                    hunt = (await _api.GetHuntAsync(c.Id, Ct)).Hunt;
+                    ripe = (await _api.GetEstateAsync(c.Id, Ct)).Plots.Count(p => p.Ready);
+                }
+                catch (ApiException)
+                {
+                    // the extras are a bonus; the Qi line still shows
+                }
+
+                if (gen != _screen) return;
+                var huntDone = hunt?.Finished == true;
+                var hours = Math.Max(0, (s.To - s.From).TotalHours);
+                var body = Popup("Gdy cię nie było", Resource.Drawable.ink_popup_chest, out _, huntDone || ripe > 0 ? "Odbierz wszystko" : "Dalej", () => Run(async () =>
+                {
+                    await flow.ApplyAsync(_api.AcknowledgeSummaryAsync, Ct);
+                    var got = new List<string>();
+                    if (huntDone)
+                    {
+                        await _api.ClaimHuntAsync(c.Id, Ct);
+                        got.Add("łowy +" + hunt.Qi.ToString("N0") + " Qi");
+                    }
+
+                    if (ripe > 0)
+                    {
+                        var r = await _api.HarvestAsync(c.Id, Ct);
+                        got.Add("plony ×" + r.Gained.Sum(g => g.Quantity));
+                    }
+
+                    if (got.Count > 0)
+                    {
+                        Sfx.Play(Sfx.Coin);
+                        SetStatus("Odebrano: " + string.Join(", ", got) + ".");
+                    }
+
+                    render();
+                    RefreshHud();
+                }));
+                var big = _ui.Label("+" + s.Qi.ToString("N0") + " Qi", 30, Ui.QiBlue, bold: true, parent: body);
+                big.Gravity = GravityFlags.Center;
+                var when = _ui.Label("w " + hours.ToString("0.#") + " h" + (s.VesselFull ? " · naczynie pełne" : string.Empty), 13, Ui.Muted, parent: body);
+                when.Gravity = GravityFlags.Center;
+                var lines = new List<string>();
+                if (s.Enlightenments > 0) lines.Add("✦ " + s.Enlightenments + "× oświecenie");
+                if (s.AutoBreakthroughs > 0) lines.Add("✦ " + s.AutoBreakthroughs + "× przełom sam z siebie");
+                if (s.RetreatFinished) lines.Add("✦ odosobnienie zakończone");
+                if (huntDone) lines.Add("⚔ łowy: " + hunt.Wins + " wygranych z " + hunt.Battles + " · +" + hunt.Qi.ToString("N0") + " Qi");
+                if (ripe > 0) lines.Add("🌱 plony gotowe: " + ripe);
+                foreach (var l in lines)
+                {
+                    var t = _ui.Label(l, 15, Ui.Ink, parent: body);
+                    t.Gravity = GravityFlags.Center;
+                }
             });
         }
 
@@ -748,7 +799,7 @@ namespace JianghuGo.Android
             var c = _me;
             var head = ui.Card(page, 0f, 8, Ui.Gold);
             head.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, Px(96)) { TopMargin = Px(4) };
-            ui.Text("ARENA · liga " + a.LeagueNamePl + " · " + a.Rating + " pkt · #" + a.Rank, head, 14, Ui.Gold, bold: true);
+            ui.Text("Liga " + a.LeagueNamePl + " · " + a.Rating + " pkt · miejsce " + a.Rank, head, 15, Ui.Gold, bold: true);
             ui.Text(a.Wins + " zwycięstw · " + a.Losses + " porażek · walki dziś: " + a.AttemptsLeft + "/" + a.AttemptsPerDay
                     + (a.NextLeagueNamePl != null ? " · do ligi " + a.NextLeagueNamePl + ": " + (a.NextLeagueRating - a.Rating) + " pkt" : string.Empty), head, 11, Ui.Ink, maxLines: 2);
             if (a.WeeklyClaimable)
@@ -780,10 +831,12 @@ namespace JianghuGo.Android
                     await StartOrResumeAsync(() => _api.ChallengeArenaAsync(c.Id, o.CharacterId, Ct));
                 }), row, sp: 12, heightDp: 36).LayoutParameters = new LinearLayout.LayoutParams(Px(80), Px(36)) { Gravity = GravityFlags.CenterVertical };
             }, empty: "Na arenie jeszcze pusto — wróć później.");
-            var board = ui.Card(page, 0.8f, 8);
-            ui.Text("Najlepsi", board, 11, Ui.GoldDim, bold: true);
-            foreach (var r in a.Top.Take(4))
-                ui.Text("#" + r.Rank + "  " + r.Name + "  ·  " + r.Value, board, 11, r.CharacterId == c.Id ? Ui.Gold : Ui.Ink);
+            // the board takes the room its names need, no more
+            var board = ui.Card(page, 0f, 8);
+            board.LayoutParameters = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MatchParent, ViewGroup.LayoutParams.WrapContent) { TopMargin = Px(6) };
+            ui.Text("Najlepsi", board, 14, Ui.Gold, bold: true);
+            foreach (var r in a.Top.Take(5))
+                ui.Text(r.Rank + ".  " + r.Name + "  ·  " + r.Value, board, 12, r.CharacterId == c.Id ? Ui.Cinnabar : Ui.Ink, bold: r.CharacterId == c.Id);
         }
 
         // ---- sect development --------------------------------------------------------------------------------
